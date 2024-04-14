@@ -1,0 +1,10 @@
+# https://github.com/syself/cluster-api-provider-hetzner/issues/1206
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: HetznerCluster
+metadata:
+  name: management-cluster
+  namespace: default
+spec:
+  hcloudNetwork:
+    enabled: true
+    networkZone: "us-east"

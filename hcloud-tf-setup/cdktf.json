@@ -1,0 +1,17 @@
+{
+  "language": "typescript",
+  "app": "npx ts-node main.ts",
+  "projectId": "a7edf925-8ff9-4603-a240-843a8ec98455",
+  "sendCrashReports": "false",
+  "terraformProviders": [
+    "hetznercloud/hcloud@~> 1.45",
+    "toowoxx/packer@~> 0.15"
+  ],
+  "terraformModules": [
+    {
+      "name": "terraform-hcloud-kube-hetzner",
+      "source": "github.com/kube-hetzner/terraform-hcloud-kube-hetzner"
+    }
+  ],
+  "context": {}
+}
