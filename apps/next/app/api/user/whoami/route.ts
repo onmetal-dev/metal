@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const userId = payload.sub;
   const user = await clerkClient.users.getUser(userId);
 
-  return new Response(JSON.stringify({ user }, null, 2), {
+  return new Response(JSON.stringify({ token: payload, user }, null, 2), {
     status: 200,
   });
 }

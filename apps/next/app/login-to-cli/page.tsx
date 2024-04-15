@@ -12,13 +12,15 @@ export default async function LoginToCLI({
   if (next) {
     if (userId) {
       // user is logged in--pass a token to the CLI
-      const token = await getToken();
+      const token = await getToken({ template: "cli" });
       redirect(`${next}?token=${token}`);
       return;
     } else {
-      // user is not logged in--pas them to /login?redirectUrl={next}
-      console.log("redirecting to", `/login?next=${encodeURIComponent(next)}`);
-      redirect(`/login?next=${encodeURIComponent(next)}`);
+      // we need the redirect to come back to /login-to-cli with the same next param and trigger the getToken logic
+      const redirectUrl = `/login?next=${encodeURIComponent(
+        `/login-to-cli?next=${encodeURIComponent(next)}`
+      )}`;
+      redirect(redirectUrl);
       return;
     }
   }

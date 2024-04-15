@@ -41,6 +41,32 @@ program
   .version("0.0.1", "-v, --version", "output the current version");
 
 program
+  .command("whoami")
+  .description("Log information about the logged in user")
+  .action(async () => {
+    const { user } = config;
+    if (!user) {
+      log(`Not logged in. Login with ${chalk.red("metal login")}`);
+      return;
+    }
+    // make GET request to METAL_URL + /api/user/whoami passing the token as Authorization header
+    const whoamiResponse: Response = await fetch(
+      `${METAL_URL}/api/user/whoami`,
+      {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
+    if (whoamiResponse.status === 401) {
+      log("Token is not valid, please logout/login again");
+      return;
+    }
+    const body = await whoamiResponse.json();
+    log(JSON.stringify(body, null, 2));
+  });
+
+program
   .command("logout")
   .description("Log out from onmetal.dev")
   .action(async () => {
@@ -51,7 +77,6 @@ program
     }
     config.user = undefined;
     log("Logged out");
-    process.exit(0);
   });
 
 program
@@ -65,7 +90,7 @@ program
           "metal logout"
         )} to log out.`
       );
-      process.exit(0);
+      return;
     }
     let token = process.env.METAL_TOKEN;
     if (options.token) {
@@ -81,7 +106,7 @@ program
       });
       if (!answers.continue) {
         log("Exiting");
-        process.exit(0);
+        return;
       }
       token = await new Promise((resolve) => {
         Bun.serve({
