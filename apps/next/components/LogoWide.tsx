@@ -15,10 +15,10 @@ export function LogoWide(props: React.ComponentPropsWithoutRef<"svg">) {
     return <Skeleton className="h-[40px] w-[109px] bg-background" />;
   }
 
-  if (resolvedTheme === "dark") {
-    return <LogoWideDark {...props} />;
-  } else {
+  if (resolvedTheme === "light") {
     return <LogoWideLight {...props} />;
+  } else {
+    return <LogoWideDark {...props} />;
   }
 }
 
