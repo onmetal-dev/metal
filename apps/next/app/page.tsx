@@ -1,7 +1,7 @@
 // import Image from "next/image";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
-import { Footer } from "@/components/Footer";
+// import { Footer } from "@/components/Footer";
 // import { PrimaryFeatures } from "@/components/PrimaryFeatures";
 // import { SecondaryFeatures } from "@/components/SecondaryFeatures";
 // import { CallToAction } from "@/components/CallToAction";
@@ -9,7 +9,7 @@ import { Footer } from "@/components/Footer";
 // import { Pricing } from "@/components/Pricing";
 // import { Faqs } from "@/components/Faqs";
 
-export default function Home() {
+export default async function Home() {
   return (
     <>
       <Header />

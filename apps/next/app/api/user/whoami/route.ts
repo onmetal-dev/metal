@@ -10,11 +10,11 @@ export async function GET(request: Request) {
       status: 401,
     });
   }
-  const { payload } = decodeJwt(authStatus.token);
-  const userId = payload.sub;
+  const { payload: token } = decodeJwt(authStatus.token);
+  const userId = token.sub;
   const user = await clerkClient.users.getUser(userId);
 
-  return new Response(JSON.stringify({ token: payload, user }, null, 2), {
+  return new Response(JSON.stringify({ token, user }, null, 2), {
     status: 200,
   });
 }
