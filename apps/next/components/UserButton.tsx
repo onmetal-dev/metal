@@ -10,7 +10,7 @@ export const UserButton = () => {
         <Skeleton className="w-8 h-8 rounded-full" />
       </ClerkLoading>
       <ClerkLoaded>
-        <ClerkUserButton />
+        <ClerkUserButton afterSignOutUrl="/" />
       </ClerkLoaded>
     </>
   );
