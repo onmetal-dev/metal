@@ -27,5 +27,6 @@ export default {
     connectionString,
   },
   tablesFilter: ["metal_*"],
+  strict: true,
   verbose: true,
 } satisfies Config;
