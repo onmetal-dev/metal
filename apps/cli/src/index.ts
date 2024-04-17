@@ -5,7 +5,12 @@ import chalk from "chalk";
 import opener from "opener";
 import inquirer from "inquirer";
 import z from "zod";
-import { readFileSync, existsSync, writeFileSync } from "fs";
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
+import { promisify } from "node:util";
+import { exec as execCallbackBased } from "node:child_process";
+import { create as createTar } from "tar";
+
+const exec = promisify(execCallbackBased);
 
 // define a zod schema for a config file. Has a user top level field with a token for the user
 const userSchema = z.object({
@@ -20,7 +25,11 @@ const configSchema = z.object({
 type Config = z.infer<typeof configSchema>;
 
 // setup / load config
-const configPath = path.join(os.homedir(), ".config", "metal", "config.json");
+const configParentDir = path.join(os.homedir(), ".config", "metal");
+const configPath = path.join(configParentDir, "config.json");
+if (!existsSync(configParentDir)) {
+  mkdirSync(configParentDir);
+}
 if (!existsSync(configPath)) {
   writeFileSync(configPath, "{}", "utf8");
 }
@@ -123,6 +132,7 @@ program
             return Response.redirect(`${METAL_URL}/login-to-cli-success`, 302);
           },
         });
+        // TODO MET-10: This was last updated 4 years ago. We should find an alternative?
         opener(url);
       });
     }
@@ -163,5 +173,63 @@ program
     log(`successfully logged in as ${chalk.green(email)}`);
     process.exit(0);
   });
+
+const checkUserConfig = () => {
+  if (!config.user) {
+    log(`Oops! You're not logged in :)`);
+    process.exit(1);
+  }
+
+  return config as Required<Config>;
+}
+
+program
+  .command("up")
+  .description("Deploy a project")
+  .option("--token", "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI.")
+  .action(async (str, options) => {
+    /* Planned steps
+     * - [DONE] use git ls-files to get a list of git-tracked files.
+     * -- [DONE] filter out any .gitignore
+     * - targz them up
+     * - make a POST request to METAL_URL + /api//v1/deploy with:
+     * -- the user's token as a bearer token in the Authorization header
+     * -- add the config for the current project too somehow so that we know the project we're deploying.
+     * -- upload the tarball as a multipart request. Once the upload is complete, return a tag to the command.
+     * - then this command calls GET METAL_URL + /api/v1/deploy/{tag} to check the status of the deployment.
+     * - if the deployment is ongoing, stream responses to the command line.
+     * - if it has already finished with a success or failure, return that and end this command.
+     */
+
+    let step = 1;
+    log(`[${step}] Checking for token...`);
+    const userConfig = checkUserConfig();
+    // Token hierachy: commandline > config file > environment variable
+    const token = options.token || userConfig.user.token || process.env.METAL_TOKEN;
+    if (!token) {
+      log("Error! You must configure a Metal API token.");
+      process.exit(1);
+    }
+
+    log(`[${++step}] Collating files to deploy...`);
+    const { stdout, stderr } = await exec(`git ls-files`);
+    if (stderr) {
+      console.error(stderr);
+      process.exit(1);
+    }
+
+    const pathsToArchive = stdout
+      .split("\n")
+      .filter((path) => !!path && !path.endsWith(".gitignore"));
+
+    log(`[${++step}] Archiving files...`);
+    const payloadStream = createTar({
+      gzip: true,
+      cwd: process.cwd(),
+    }, pathsToArchive);
+
+    log(`[${++step}] Uploading...`);
+    log(`[${++step}] Deployment started. ID is XYZ...`);
+  })
 
 program.parse();
