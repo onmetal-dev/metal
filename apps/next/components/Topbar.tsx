@@ -11,6 +11,7 @@ import {
 import { UserButton } from "@/components/UserButton";
 import { SidebarNavSm } from "@/components/SidebarNavSm";
 import React from "react";
+import { OrganizationSwitcher } from "@clerk/nextjs";
 
 function capFirst(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
@@ -50,6 +51,9 @@ export const Topbar = () => {
               placeholder="Search..."
               className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
             /> */}
+      </div>
+      <div className="pt-2">
+        <OrganizationSwitcher hidePersonal={true} />
       </div>
       <UserButton />
       {/* todo: I think I want to override the Clerk dropdown to make it feel less Clerk-y */}
