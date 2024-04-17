@@ -25,17 +25,24 @@ async function findCreateUserWithClerkId({
   clerkId: string;
   userInsert: UserInsert;
 }): Promise<User> {
-  const user: User | null = await db
-    .select()
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1)
-    .then((rows) => rows[0] || null);
+  async function findUserByClerkId(): Promise<User | null> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1)
+      .then((rows) => rows[0] || null);
+  }
+  const user: User | null = await findUserByClerkId();
   if (user) {
     return user;
   }
   await db.insert(users).values(userInsert);
-  return findCreateUserWithClerkId({ clerkId, userInsert });
+  const newUser: User | null = await findUserByClerkId();
+  if (!newUser) {
+    throw new Error("User not found after insert");
+  }
+  return newUser;
 }
 
 async function findCreateUserTeam({
