@@ -12,6 +12,7 @@
     "build": "concurrently --raw \"npm:build:next\" \"npm:build:temporal\"",
     "db:push": "source $HOME/.nvm/nvm.sh; nvm use 20; drizzle-kit push:pg",
     "db:studio": "source $HOME/.nvm/nvm.sh; nvm use 20; drizzle-kit studio",
+    "db:nuke": "bun run ./app/server/db/nuke.ts",
     "dev:next": "next dev",
     "dev:otel-collector": "cd hack/opentelemetry-collector-dev-setup && docker-compose up",
     "dev:temporal": "tsx --env-file .env.development --watch --watch-preserve-output temporal/src/worker.ts",
