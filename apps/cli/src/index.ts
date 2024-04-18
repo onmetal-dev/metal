@@ -7,15 +7,15 @@ import inquirer from "inquirer";
 import z from "zod";
 import { readFileSync, existsSync, writeFileSync } from "fs";
 
-// define a zod schema for a config file. Has a user top level field with a token for the user
-const userSchema = z.object({
-  id: z.string(),
-  token: z.string(),
-  email: z.string(),
-});
-type User = z.infer<typeof userSchema>;
+// configSchema is the schema of the config file
 const configSchema = z.object({
-  user: userSchema.optional(),
+  user: z
+    .object({
+      id: z.string(),
+      email: z.string(),
+    })
+    .optional(),
+  token: z.string().optional(),
 });
 type Config = z.infer<typeof configSchema>;
 
@@ -25,7 +25,7 @@ if (!existsSync(configPath)) {
   writeFileSync(configPath, "{}", "utf8");
 }
 const config: Config = JSON.parse(readFileSync(configPath, "utf8"));
-// on exit, write the config
+// write the config on exit
 process.on("exit", () => {
   writeFileSync(configPath, JSON.stringify(config, null, 2), "utf8");
 });
@@ -34,6 +34,42 @@ const METAL_URL = process.env.METAL_URL || "https://www.onmetal.dev";
 
 const program = new Command();
 const log = console.log;
+
+// barebones API client that just manages base url and auth
+// in the future we probably want to make a formal API client via
+// something like https://www.stainlessapi.com/
+class MetalApiClient {
+  private token: string;
+  private baseUrl: string;
+  constructor({ token, baseUrl }: { token: string; baseUrl?: string }) {
+    this.token = token;
+    this.baseUrl = baseUrl ?? METAL_URL;
+  }
+  async _makeRequest(
+    method: "POST" | "GET",
+    path: string,
+    body?: any
+  ): Promise<Response> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return response;
+  }
+  async whoami() {
+    const response: Response = await this._makeRequest(
+      "GET",
+      "/api/user/whoami"
+    );
+    if (response.status === 401) {
+      throw new Error("Token is not valid, please logout/login again");
+    }
+    return response.json();
+  }
+}
 
 program
   .name("metal")
@@ -44,26 +80,13 @@ program
   .command("whoami")
   .description("Log information about the logged in user")
   .action(async () => {
-    const { user } = config;
-    if (!user) {
+    if (!config.token) {
       log(`Not logged in. Login with ${chalk.red("metal login")}`);
       return;
     }
-    // make GET request to METAL_URL + /api/user/whoami passing the token as Authorization header
-    const whoamiResponse: Response = await fetch(
-      `${METAL_URL}/api/user/whoami`,
-      {
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-        },
-      }
-    );
-    if (whoamiResponse.status === 401) {
-      log("Token is not valid, please logout/login again");
-      return;
-    }
-    const body = await whoamiResponse.json();
-    log(JSON.stringify(body, null, 2));
+    const client = new MetalApiClient({ token: config.token });
+    const whoami = await client.whoami();
+    log(JSON.stringify(whoami, null, 2));
   });
 
 program
@@ -76,6 +99,7 @@ program
       process.exit(0);
     }
     config.user = undefined;
+    config.token = undefined;
     log("Logged out");
   });
 
@@ -97,6 +121,11 @@ program
       token = options.token;
     }
     if (!token) {
+      // basic idea here is:
+      // 1. start a server on a random port listening for the redirect from the login page
+      // 2. open a browser to the login url
+      // 3. wait for the user to login
+      // 4. the server will receive the token and save it to the config
       const port = Math.floor(Math.random() * 10000) + 50000;
       const url = `${METAL_URL}/login-to-cli?next=http%3A%2F%2Flocalhost%3A${port}%2F`;
       const answers = await inquirer.prompt({
@@ -130,37 +159,14 @@ program
       log("Unexpected: did not receive token");
       process.exit(1);
     }
+    const client = new MetalApiClient({ token: token });
 
     // make GET request to METAL_URL + /api/user/whoami passing the token as Authorization header
-    const whoamiResponse: Response = await fetch(
-      `${METAL_URL}/api/user/whoami`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    const body = await whoamiResponse.json();
+    const whoami = await client.whoami();
 
-    // insert user id, token, email
-    const { user } = body;
-    let email = "";
-    if (
-      user.emailAddresses &&
-      user.emailAddresses.length > 0 &&
-      user.emailAddresses[0].emailAddress
-    ) {
-      email = user.emailAddresses[0].emailAddress;
-    } else {
-      console.error("No email address found for user.");
-      process.exit(1);
-    }
-    config.user = {
-      id: user.id,
-      token,
-      email,
-    };
-    log(`successfully logged in as ${chalk.green(email)}`);
+    config.user = whoami.user;
+    config.token = whoami.token;
+    log(`successfully logged in as ${chalk.green(config.user!.email)}`);
     process.exit(0);
   });
 
