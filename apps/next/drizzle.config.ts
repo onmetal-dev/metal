@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import type { Config } from "drizzle-kit";
 import tmp from "tmp";
 import { writeFileSync } from "fs";
+import sqlSchemaForEnv from "@/app/server/db/schemaForEnv";
 dotenv.config();
 console.log("process.env.POSTGRES_URL", process.env.POSTGRES_URL);
 
@@ -26,7 +27,7 @@ export default {
   dbCredentials: {
     connectionString,
   },
-  tablesFilter: ["metal_*"],
+  schemaFilter: sqlSchemaForEnv(process.env.NODE_ENV),
   strict: true,
   verbose: true,
 } satisfies Config;
