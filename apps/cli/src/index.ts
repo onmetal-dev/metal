@@ -59,9 +59,9 @@ program
       log(`Not logged in. Login with ${chalk.red("metal login")}`);
       return;
     }
-    // make GET request to METAL_URL + /api/v1/user/whoami passing the token as Authorization header
+    // make GET request to METAL_URL + /api/user/whoami passing the token as Authorization header
     const whoamiResponse: Response = await fetch(
-      `${METAL_URL}/api/v1/user/whoami`,
+      `${METAL_URL}/api/user/whoami`,
       {
         headers: {
           Authorization: `Bearer ${user.token}`,
@@ -142,9 +142,9 @@ program
       process.exit(1);
     }
 
-    // make GET request to METAL_URL + /api/v1/user/whoami passing the token as Authorization header
+    // make GET request to METAL_URL + /api/user/whoami passing the token as Authorization header
     const whoamiResponse: Response = await fetch(
-      `${METAL_URL}/api/v1/user/whoami`,
+      `${METAL_URL}/api/user/whoami`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -193,11 +193,11 @@ program
      * - [DONE] use git ls-files to get a list of git-tracked files.
      * -- [DONE] filter out any .gitignore
      * - [DONE] targz them up
-     * - [PARTIALLY DONE] make a POST request to METAL_URL + /api/v1/deploy/up with:
+     * - [PARTIALLY DONE] make a POST request to METAL_URL + /api/deploy/up with:
      * -- [DONE] the user's token as a bearer token in the Authorization header
      * -- add the config for the current project too somehow so that we know the project we're deploying.
      * - [DONE] upload the tarball. Once the upload is complete, return a tag to the command.
-     * - then this command calls GET METAL_URL + /api/v1/deploy/{tag}/status to check the status of the deployment.
+     * - then this command calls GET METAL_URL + /api/deploy/{tag}/status to check the status of the deployment.
      * - if the deployment is ongoing, stream responses to the command line.
      * - if it has already finished with a success or failure, return that and end this command.
      */
@@ -233,7 +233,7 @@ program
     const reqOptions = {
       host: "localhost",
       port: 3000,
-      path: "/api/v1/deploy/up",
+      path: "/api/deploy/up",
       method: "POST",
       headers: {
         "Content-Type": "application/octet-stream",
