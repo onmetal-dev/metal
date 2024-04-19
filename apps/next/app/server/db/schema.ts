@@ -60,6 +60,7 @@ export const teams = metalSchema.table("teams", {
 });
 export type Team = typeof teams.$inferSelect; // return type when queried
 export type TeamInsert = typeof teams.$inferInsert;
+export const selectTeamSchema = createSelectSchema(teams);
 
 export const teamRelations = relations(teams, ({ one, many }) => ({
   creator: one(users, {

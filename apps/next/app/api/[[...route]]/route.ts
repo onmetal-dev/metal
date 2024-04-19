@@ -12,8 +12,16 @@ export const config = {
 const app = new OpenAPIHono().basePath("/api");
 app.use("*", otelTracer(serviceName));
 
-import whoami from "./user/whoami";
+import whoami from "./whoami";
 whoami(app);
+
+const securitySchemeKey = "bearerAuth";
+app.openAPIRegistry.registerComponent("securitySchemes", securitySchemeKey, {
+  type: "http",
+  scheme: "bearer",
+  bearerFormat: "JWT",
+  description: "Bearer token",
+});
 
 // The OpenAPI documentation will be available at /doc
 app.doc("/doc", {
@@ -21,7 +29,23 @@ app.doc("/doc", {
   info: {
     version: "0.0.1",
     title: "Metal API",
+    contact: {
+      email: "support@onmetal.dev",
+    },
   },
+  security: [
+    {
+      [securitySchemeKey]: [],
+    },
+  ],
+  servers: [
+    {
+      url:
+        process.env.NODE_ENV === "production"
+          ? "https://www.onmetal.dev/api"
+          : "http://localhost:3000/api",
+    },
+  ],
 });
 
 const h = handle(app);
