@@ -11,6 +11,7 @@ import {
   timestamp,
   pgSchema,
 } from "drizzle-orm/pg-core";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import sqlSchemaForEnv from "./schemaForEnv";
 
 const createdAndUpdatedAt = {
@@ -44,6 +45,7 @@ export const users = metalSchema.table(
 );
 export type User = typeof users.$inferSelect; // return type when queried
 export type UserInsert = typeof users.$inferInsert;
+export const selectUserSchema = createSelectSchema(users);
 
 export const userRelations = relations(users, ({ many }) => ({
   usersToTeams: many(usersToTeams), // user can belong to many teams, a team can have many users
