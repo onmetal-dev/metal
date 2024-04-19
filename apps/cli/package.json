@@ -10,7 +10,7 @@
     "dev": "METAL_URL=http://localhost:3000 bun run ./src/index.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/bun": "^1.1.0",
     "@types/inquirer": "^9.0.7",
     "@types/opener": "^1.4.3"
   },
