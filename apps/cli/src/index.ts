@@ -240,13 +240,11 @@ program
         Authorization: `Bearer ${token}`,
         "Accept": "application/json",
       },
-    }
+    };
+
     // TODO MET-10: explore any better ways of promisifying this.
     const uploadPromise = new Promise<string>((resolve, reject) => {
       const request = nodeRequest(reqOptions, response => {
-        // console.log(`STATUS: ${response.statusCode}`);
-        // console.log(`HEADERS: ${JSON.stringify(response.headers)}`);
-        // response.setEncoding("utf8");
         let bodyJSONString = "";
         response.on("data", (chunk) => {
           bodyJSONString += chunk;
@@ -267,7 +265,7 @@ program
         reject(err);
       });
 
-      // Write compressed data to request body
+      // Write compressed data to request's body
       // TODO MET-10: consider using node:zlib
       payloadStream.on("data", (chunk) => {
         request.write(chunk);
@@ -276,7 +274,7 @@ program
       payloadStream.on("end", () => {
         request.end();
       });
-    })
+    });
 
     const bodyAsString = await uploadPromise;
     const body = JSON.parse(bodyAsString);
