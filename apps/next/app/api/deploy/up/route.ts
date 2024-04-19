@@ -3,12 +3,6 @@ import { createWriteStream } from "node:fs";
 
 export const dynamic = "force-dynamic";
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
-
 export async function POST(request: Request) {
   const authStatus = await clerkClient.authenticateRequest({ request });
   if (!authStatus.isSignedIn) {
