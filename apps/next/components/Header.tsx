@@ -133,7 +133,7 @@ export function Header() {
                   </Button>
                 </SignInButton>
               </div>
-              <SignUpButton mode="modal">
+              <SignUpButton mode="redirect" redirectUrl="/register">
                 <Button className="rounded-3xl">
                   <span>Get started today</span>
                 </Button>
