@@ -4,21 +4,13 @@ import os from "os";
 import chalk from "chalk";
 import opener from "opener";
 import inquirer from "inquirer";
-import z from "zod";
 import { readFileSync, existsSync, writeFileSync } from "fs";
+import Metal from "@onmetal/node";
+import { type WhoAmI } from "@onmetal/node/resources/whoami.mjs";
 
-// configSchema is the schema of the config file
-const configSchema = z.object({
-  user: z
-    .object({
-      id: z.string(),
-      email: z.string(),
-    })
-    .optional(),
-  token: z.string().optional(),
-});
-type Config = z.infer<typeof configSchema>;
-
+interface Config {
+  whoami?: WhoAmI;
+}
 // setup / load config
 const configPath = path.join(os.homedir(), ".config", "metal", "config.json");
 if (!existsSync(configPath)) {
@@ -30,46 +22,12 @@ process.on("exit", () => {
   writeFileSync(configPath, JSON.stringify(config, null, 2), "utf8");
 });
 
-const METAL_URL = process.env.METAL_URL || "https://www.onmetal.dev";
+const baseURL = process.env.METAL_BASE_URL || "https://www.onmetal.dev/api";
+const baseUrlObj = new URL(baseURL);
+const baseDomainWithProtocol = `${baseUrlObj.protocol}//${baseUrlObj.host}`;
 
 const program = new Command();
 const log = console.log;
-
-// barebones API client that just manages base url and auth
-// in the future we probably want to make a formal API client via
-// something like https://www.stainlessapi.com/
-class MetalApiClient {
-  private token: string;
-  private baseUrl: string;
-  constructor({ token, baseUrl }: { token: string; baseUrl?: string }) {
-    this.token = token;
-    this.baseUrl = baseUrl ?? METAL_URL;
-  }
-  async _makeRequest(
-    method: "POST" | "GET",
-    path: string,
-    body?: any
-  ): Promise<Response> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    return response;
-  }
-  async whoami() {
-    const response: Response = await this._makeRequest(
-      "GET",
-      "/api/user/whoami"
-    );
-    if (response.status === 401) {
-      throw new Error("Token is not valid, please logout/login again");
-    }
-    return response.json();
-  }
-}
 
 program
   .name("metal")
@@ -80,26 +38,25 @@ program
   .command("whoami")
   .description("Log information about the logged in user")
   .action(async () => {
-    if (!config.token) {
+    if (!config.whoami) {
       log(`Not logged in. Login with ${chalk.red("metal login")}`);
       return;
     }
-    const client = new MetalApiClient({ token: config.token });
-    const whoami = await client.whoami();
-    log(JSON.stringify(whoami, null, 2));
+    const metal = new Metal({ baseURL, metalAPIKey: config.whoami.token });
+    const whoAmI = await metal.whoami.retrieve();
+    log(JSON.stringify(whoAmI, null, 2));
   });
 
 program
   .command("logout")
   .description("Log out from onmetal.dev")
   .action(async () => {
-    const { user } = config;
+    const user = config.whoami?.user;
     if (!user) {
       log(`Not logged in, so you're already logged out :)`);
       process.exit(0);
     }
-    config.user = undefined;
-    config.token = undefined;
+    config.whoami = undefined;
     log("Logged out");
   });
 
@@ -108,9 +65,9 @@ program
   .description("Login to onmetal.dev")
   .option("--token", "or METAL_TOKEN. Provide a token manually, useful for CI")
   .action(async (str, options) => {
-    if (config.user) {
+    if (config.whoami) {
       log(
-        `Already logged in as ${config.user.email}. Use ${chalk.red(
+        `Already logged in as ${config.whoami.user.email}. Use ${chalk.red(
           "metal logout"
         )} to log out.`
       );
@@ -127,7 +84,7 @@ program
       // 3. wait for the user to login
       // 4. the server will receive the token and save it to the config
       const port = Math.floor(Math.random() * 10000) + 50000;
-      const url = `${METAL_URL}/login-to-cli?next=http%3A%2F%2Flocalhost%3A${port}%2F`;
+      const url = `${baseDomainWithProtocol}/login-to-cli?next=http%3A%2F%2Flocalhost%3A${port}%2F`;
       const answers = await inquirer.prompt({
         name: "continue",
         type: "confirm",
@@ -149,7 +106,10 @@ program
             setTimeout(() => {
               resolve(token); // need to give time for the redirect response to be delivered
             }, 500);
-            return Response.redirect(`${METAL_URL}/login-to-cli-success`, 302);
+            return Response.redirect(
+              `${baseDomainWithProtocol}/login-to-cli-success`,
+              302
+            );
           },
         });
         opener(url);
@@ -159,14 +119,11 @@ program
       log("Unexpected: did not receive token");
       process.exit(1);
     }
-    const client = new MetalApiClient({ token: token });
+    const metal = new Metal({ baseURL, metalAPIKey: token });
+    const whoami = await metal.whoami.retrieve();
 
-    // make GET request to METAL_URL + /api/user/whoami passing the token as Authorization header
-    const whoami = await client.whoami();
-
-    config.user = whoami.user;
-    config.token = whoami.token;
-    log(`successfully logged in as ${chalk.green(config.user!.email)}`);
+    config.whoami = whoami;
+    log(`successfully logged in as ${chalk.green(config.whoami.user!.email)}`);
     process.exit(0);
   });
 
