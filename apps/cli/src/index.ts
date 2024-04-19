@@ -9,6 +9,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import { promisify } from "node:util";
 import { exec as execCallbackBased } from "node:child_process";
 import { create as createTar } from "tar";
+import { request as nodeRequest } from "node:http";
 
 const exec = promisify(execCallbackBased);
 
@@ -58,9 +59,9 @@ program
       log(`Not logged in. Login with ${chalk.red("metal login")}`);
       return;
     }
-    // make GET request to METAL_URL + /api/user/whoami passing the token as Authorization header
+    // make GET request to METAL_URL + /api/v1/user/whoami passing the token as Authorization header
     const whoamiResponse: Response = await fetch(
-      `${METAL_URL}/api/user/whoami`,
+      `${METAL_URL}/api/v1/user/whoami`,
       {
         headers: {
           Authorization: `Bearer ${user.token}`,
@@ -141,9 +142,9 @@ program
       process.exit(1);
     }
 
-    // make GET request to METAL_URL + /api/user/whoami passing the token as Authorization header
+    // make GET request to METAL_URL + /api/v1/user/whoami passing the token as Authorization header
     const whoamiResponse: Response = await fetch(
-      `${METAL_URL}/api/user/whoami`,
+      `${METAL_URL}/api/v1/user/whoami`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -191,12 +192,12 @@ program
     /* Planned steps
      * - [DONE] use git ls-files to get a list of git-tracked files.
      * -- [DONE] filter out any .gitignore
-     * - targz them up
-     * - make a POST request to METAL_URL + /api//v1/deploy with:
-     * -- the user's token as a bearer token in the Authorization header
+     * - [DONE] targz them up
+     * - [PARTIALLY DONE] make a POST request to METAL_URL + /api/v1/deploy/up with:
+     * -- [DONE] the user's token as a bearer token in the Authorization header
      * -- add the config for the current project too somehow so that we know the project we're deploying.
-     * -- upload the tarball as a multipart request. Once the upload is complete, return a tag to the command.
-     * - then this command calls GET METAL_URL + /api/v1/deploy/{tag} to check the status of the deployment.
+     * - [DONE] upload the tarball. Once the upload is complete, return a tag to the command.
+     * - then this command calls GET METAL_URL + /api/v1/deploy/{tag}/status to check the status of the deployment.
      * - if the deployment is ongoing, stream responses to the command line.
      * - if it has already finished with a success or failure, return that and end this command.
      */
@@ -222,14 +223,64 @@ program
       .split("\n")
       .filter((path) => !!path && !path.endsWith(".gitignore"));
 
-    log(`[${++step}] Archiving files...`);
+    log(`[${++step}] Compressing files...`);
     const payloadStream = createTar({
       gzip: true,
       cwd: process.cwd(),
     }, pathsToArchive);
 
     log(`[${++step}] Uploading...`);
-    log(`[${++step}] Deployment started. ID is XYZ...`);
+    const reqOptions = {
+      host: "localhost",
+      port: 3000,
+      path: "/api/v1/deploy/up",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        Authorization: `Bearer ${token}`,
+        "Accept": "application/json",
+      },
+    }
+    // TODO MET-10: explore any better ways of promisifying this.
+    const uploadPromise = new Promise<string>((resolve, reject) => {
+      const request = nodeRequest(reqOptions, response => {
+        // console.log(`STATUS: ${response.statusCode}`);
+        // console.log(`HEADERS: ${JSON.stringify(response.headers)}`);
+        // response.setEncoding("utf8");
+        let bodyJSONString = "";
+        response.on("data", (chunk) => {
+          bodyJSONString += chunk;
+        });
+
+        response.on("error", (err) => {
+          console.error(`Problem with response from upload: ${err.message}`);
+          reject(err);
+        });
+
+        response.on("end", () => {
+          resolve(bodyJSONString);
+        });
+      });
+
+      request.on("error", (err) => {
+        console.error(`Problem with upload request: ${err.message}`);
+        reject(err);
+      });
+
+      // Write compressed data to request body
+      // TODO MET-10: consider using node:zlib
+      payloadStream.on("data", (chunk) => {
+        request.write(chunk);
+      });
+
+      payloadStream.on("end", () => {
+        request.end();
+      });
+    })
+
+    const bodyAsString = await uploadPromise;
+    const body = JSON.parse(bodyAsString);
+    log(`[${++step}] Deployment started. ID is ${body.tag}`);
   })
 
 program.parse();
