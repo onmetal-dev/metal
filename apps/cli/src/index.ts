@@ -4,15 +4,25 @@ import os from "os";
 import chalk from "chalk";
 import opener from "opener";
 import inquirer from "inquirer";
-import { readFileSync, existsSync, writeFileSync } from "fs";
 import Metal from "@onmetal/node";
 import { type WhoAmI } from "@onmetal/node/resources/whoami.mjs";
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
+import { promisify } from "node:util";
+import { exec as execCallbackBased } from "node:child_process";
+import { create as createTar } from "tar";
+import { request as nodeRequest } from "node:http";
+const exec = promisify(execCallbackBased);
 
 interface Config {
   whoami?: WhoAmI;
 }
+
 // setup / load config
-const configPath = path.join(os.homedir(), ".config", "metal", "config.json");
+const configParentDir = path.join(os.homedir(), ".config", "metal");
+const configPath = path.join(configParentDir, "config.json");
+if (!existsSync(configParentDir)) {
+  mkdirSync(configParentDir);
+}
 if (!existsSync(configPath)) {
   writeFileSync(configPath, "{}", "utf8");
 }
@@ -112,6 +122,7 @@ program
             );
           },
         });
+        // TODO MET-10: This was last updated 4 years ago. We should find an alternative?
         opener(url);
       });
     }
@@ -121,10 +132,115 @@ program
     }
     const metal = new Metal({ baseURL, metalAPIKey: token });
     const whoami = await metal.whoami.retrieve();
-
     config.whoami = whoami;
     log(`successfully logged in as ${chalk.green(config.whoami.user!.email)}`);
     process.exit(0);
   });
+
+const checkUserConfig = () => {
+  if (!config.whoami) {
+    log(`Oops! You're not logged in :)`);
+    process.exit(1);
+  }
+
+  return config as Required<Config>;
+}
+
+program
+  .command("up")
+  .description("Deploy a project")
+  .option("--token", "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI.")
+  .action(async (str, options) => {
+    /* Planned steps
+     * - [DONE] use git ls-files to get a list of git-tracked files.
+     * -- [DONE] filter out any .gitignore
+     * - [DONE] targz them up
+     * - [PARTIALLY DONE] make a POST request to METAL_URL + /api/deploy/up with:
+     * -- [DONE] the user's token as a bearer token in the Authorization header
+     * -- add the config for the current project too somehow so that we know the project we're deploying.
+     * - [DONE] upload the tarball. Once the upload is complete, return a tag to the command.
+     * - then this command calls GET METAL_URL + /api/deploy/{tag}/status to check the status of the deployment.
+     * - if the deployment is ongoing, stream responses to the command line.
+     * - if it has already finished with a success or failure, return that and end this command.
+     */
+
+    let step = 1;
+    log(`[${step}] Checking for token...`);
+    const userConfig = checkUserConfig();
+    // Token hierachy: commandline > config file > environment variable
+    const token = options.token || userConfig.token || process.env.METAL_TOKEN;
+    if (!token) {
+      log("Error! You must configure a Metal API token.");
+      process.exit(1);
+    }
+
+    log(`[${++step}] Collating files to deploy...`);
+    const { stdout, stderr } = await exec(`git ls-files`);
+    if (stderr) {
+      console.error(stderr);
+      process.exit(1);
+    }
+
+    const pathsToArchive = stdout
+      .split("\n")
+      .filter((path) => !!path && !path.endsWith(".gitignore"));
+
+    log(`[${++step}] Compressing files...`);
+    const payloadStream = createTar({
+      gzip: true,
+      cwd: process.cwd(),
+    }, pathsToArchive);
+
+    log(`[${++step}] Uploading...`);
+    const reqOptions = {
+      host: "localhost",
+      port: 3000,
+      path: "/api/deploy/up",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        Authorization: `Bearer ${token}`,
+        "Accept": "application/json",
+      },
+    };
+
+    // TODO MET-10: explore any better ways of promisifying this.
+    const uploadPromise = new Promise<string>((resolve, reject) => {
+      const request = nodeRequest(reqOptions, response => {
+        let bodyJSONString = "";
+        response.on("data", (chunk) => {
+          bodyJSONString += chunk;
+        });
+
+        response.on("error", (err) => {
+          console.error(`Problem with response from upload: ${err.message}`);
+          reject(err);
+        });
+
+        response.on("end", () => {
+          resolve(bodyJSONString);
+        });
+      });
+
+      request.on("error", (err) => {
+        console.error(`Problem with upload request: ${err.message}`);
+        reject(err);
+      });
+
+      // Write compressed data to request's body
+      // TODO MET-10: consider using node:zlib
+      payloadStream.on("data", (chunk) => {
+        request.write(chunk);
+      });
+
+      payloadStream.on("end", () => {
+        request.end();
+      });
+    });
+
+    const bodyAsString = await uploadPromise;
+    const body = JSON.parse(bodyAsString);
+    log(`[${++step}] Deployment started. ID is ${body.tag}`);
+  })
 
 program.parse();

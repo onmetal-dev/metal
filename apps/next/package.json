@@ -13,7 +13,7 @@
     "db:push": "source $HOME/.nvm/nvm.sh; nvm use 20; drizzle-kit push:pg",
     "db:studio": "source $HOME/.nvm/nvm.sh; nvm use 20; drizzle-kit studio",
     "db:nuke": "bun run ./app/server/db/nuke.ts",
-    "dev:next": "next dev --turbo",
+    "dev:next": "next dev",
     "dev:otel-collector": "cd hack/opentelemetry-collector-dev-setup && docker-compose up",
     "dev:temporal": "tsx --env-file .env.development --watch --watch-preserve-output temporal/src/worker.ts",
     "dev": "concurrently --raw \"npm:dev:*\"",
@@ -64,6 +64,7 @@
     "react-dom": "^18",
     "tailwind-merge": "^2.2.2",
     "tailwindcss-animate": "^1.0.7",
+    "tar": "^7.0.1",
     "tmp": "^0.2.3"
   },
   "devDependencies": {

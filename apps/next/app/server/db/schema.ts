@@ -3,7 +3,6 @@ import {
   boolean,
   index,
   integer,
-  pgTable,
   primaryKey,
   serial,
   text,
@@ -11,7 +10,7 @@ import {
   timestamp,
   pgSchema,
 } from "drizzle-orm/pg-core";
-import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import { createSelectSchema } from "drizzle-zod";
 import sqlSchemaForEnv from "./schemaForEnv";
 
 const createdAndUpdatedAt = {
