@@ -20,7 +20,8 @@ export async function POST(request: Request) {
   });
   await request.body?.pipeTo(writableUploadStream);
 
-  return new Response(JSON.stringify({ message: "Deployment Started", tag }, null, 2), {
-    status: 200,
-  });
+  return new Response(
+    JSON.stringify({ message: "Deployment Started", tag }),
+    { status: 200 }
+  );
 }
