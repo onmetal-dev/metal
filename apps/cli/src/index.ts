@@ -212,7 +212,7 @@ program
     log(`[${step}] Checking for token...`);
     const userConfig = checkUserConfig();
     // Token hierachy: commandline > config file > environment variable
-    const token = options.token || userConfig.user.token || process.env.METAL_TOKEN;
+    const token = options.token || userConfig.token || process.env.METAL_TOKEN;
     if (!token) {
       log("Error! You must configure a Metal API token.");
       process.exit(1);
