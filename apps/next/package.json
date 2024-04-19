@@ -61,6 +61,7 @@
     "react-dom": "^18",
     "tailwind-merge": "^2.2.2",
     "tailwindcss-animate": "^1.0.7",
+    "tar": "^7.0.1",
     "tmp": "^0.2.3"
   },
   "devDependencies": {

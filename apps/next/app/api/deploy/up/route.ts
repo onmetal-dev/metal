@@ -1,5 +1,7 @@
 import { clerkClient } from "@clerk/nextjs";
 import { createWriteStream } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { extract } from "tar";
 
 export const dynamic = "force-dynamic";
 
@@ -11,13 +13,29 @@ export async function POST(request: Request) {
     });
   }
 
+  if (!request.body) {
+    return new Response(JSON.stringify({}), { status: 400 });
+  }
+
+  const tempDir = 'temp';
+  if (!existsSync(tempDir)) {
+    mkdirSync(tempDir);
+  }
+
   const tag = `foo-${Date.now()}`;
-  const uploadedTarball = createWriteStream(`${tag}.gz`, "utf8");
+  const filename = `${tag}.gz`;
+  const uploadedTarball = createWriteStream(filename, "utf8");
+  const extractor = extract({
+    C: tempDir,
+  });
+
   const writableUploadStream = new WritableStream<Uint8Array>({
     write(chunk) {
       uploadedTarball.write(chunk);
+      extractor.write(Buffer.from(chunk));
     },
   });
+
   await request.body?.pipeTo(writableUploadStream);
 
   return new Response(
