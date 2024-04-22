@@ -7,7 +7,7 @@
   },
   "scripts": {
     "build": "bun build ./src/index.ts --compile --outfile ./bin/metal",
-    "dev": "METAL_URL=http://localhost:3000 bun run ./src/index.ts"
+    "dev": "METAL_BASE_URL=http://localhost:3000/api bun run ./src/index.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.1.0",
@@ -23,6 +23,8 @@
     "commander": "^12.0.0",
     "inquirer": "^9.2.18",
     "opener": "^1.5.2",
-    "tar": "^7.0.1"
+    "socket.io-client": "^4.7.5",
+    "tar": "^7.0.1",
+    "zod": "^3.22.4"
   }
 }

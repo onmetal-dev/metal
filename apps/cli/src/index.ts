@@ -168,7 +168,7 @@ program
     log(`[${step}] Checking for token...`);
     const userConfig = checkUserConfig();
     // Token hierachy: commandline > config file > environment variable
-    const token = options.token || userConfig.token || process.env.METAL_TOKEN;
+    const token = options.token || userConfig.whoami.token || process.env.METAL_TOKEN;
     if (!token) {
       log("Error! You must configure a Metal API token.");
       process.exit(1);
@@ -240,7 +240,21 @@ program
 
     const bodyAsString = await uploadPromise;
     const body = JSON.parse(bodyAsString);
-    log(`[${++step}] Deployment started. ID is ${body.tag}`);
+    log(`--> Deployment started. Tag is ${body.tag}`);
+
+    log(`[${++step}] Checking deployment status...`);
+    const statusResponse = await fetch(
+      `${baseDomainWithProtocol}/api/deploy/${body.tag}/status`,
+      {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json",
+        },
+      }
+    );
+    console.log(statusResponse)
+    console.log(await statusResponse.json());
   })
 
 program.parse();

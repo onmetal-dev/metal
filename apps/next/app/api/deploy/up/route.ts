@@ -1,11 +1,11 @@
 import { clerkClient } from "@clerk/nextjs";
-import { createWriteStream } from "node:fs";
-import { existsSync, mkdirSync } from "node:fs";
+import { type NextRequest } from "next/server";
+import { createWriteStream, existsSync, mkdirSync } from "node:fs";
 import { extract } from "tar";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const authStatus = await clerkClient.authenticateRequest({ request });
   if (!authStatus.isSignedIn) {
     return new Response(JSON.stringify({}), {
@@ -37,6 +37,7 @@ export async function POST(request: Request) {
   });
 
   await request.body?.pipeTo(writableUploadStream);
+  uploadedTarball.close();
 
   return new Response(
     JSON.stringify({ message: "Deployment Started", tag }),
