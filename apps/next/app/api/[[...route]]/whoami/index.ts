@@ -9,7 +9,8 @@ import {
 import { clerkClient } from "@clerk/nextjs";
 import { decodeJwt } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
-import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
+import { type OpenAPIHono, createRoute } from "@hono/zod-openapi";
+import { z } from "zod";
 import { type Context } from "hono";
 
 const whoAmISchema = z

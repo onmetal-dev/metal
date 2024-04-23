@@ -14,12 +14,12 @@
     "db:studio": "source $HOME/.nvm/nvm.sh; nvm use 20; drizzle-kit studio",
     "db:nuke": "bun run ./app/server/db/nuke.ts",
     "dev:next": "next dev --turbo",
-    "dev:otel-collector": "cd hack/opentelemetry-collector-dev-setup && docker-compose up",
-    "dev:temporal": "tsx --env-file .env.development --watch --watch-preserve-output temporal/src/worker.ts",
+    "dev:otel-collector": "cd hack/opentelemetry-collector-dev-setup && docker-compose up > /dev/null 2>&1",
+    "dev:temporal": "cd temporal && tsx --env-file ../.env --watch --watch-preserve-output src/worker.ts",
     "dev": "concurrently --raw \"npm:dev:*\"",
     "lint": "next lint",
     "start:next": "next start",
-    "start:worker": "tsx ./temporal/lib/worker"
+    "start:worker": "cd temporal && tsx ./src/worker.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^4.29.11",
@@ -59,12 +59,15 @@
     "lucide-react": "^0.363.0",
     "next": "14.1.4",
     "next-themes": "^0.3.0",
+    "openapi-fetch": "^0.9.3",
     "postgres": "^3.4.4",
     "react": "^18",
     "react-dom": "^18",
+    "sshpk": "^1.18.0",
     "tailwind-merge": "^2.2.2",
     "tailwindcss-animate": "^1.0.7",
-    "tmp": "^0.2.3"
+    "tmp": "^0.2.3",
+    "uuid-base62": "^0.1.0"
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",
@@ -73,14 +76,16 @@
     "@types/opener": "^1.4.3",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/sshpk": "^1.17.4",
     "@types/tmp": "^0.2.6",
     "autoprefixer": "^10.0.1",
     "concurrently": "^8.2.2",
-    "drizzle-kit": "^0.20.14",
+    "drizzle-kit": "^0.20.17",
     "eslint": "^8",
     "eslint-config-next": "14.1.4",
+    "openapi-typescript": "^6.7.5",
     "postcss": "^8",
     "tailwindcss": "^3.3.0",
-    "typescript": "^5"
+    "typescript": "^5.4.5"
   }
 }

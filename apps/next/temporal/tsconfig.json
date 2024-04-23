@@ -6,11 +6,23 @@
     "experimentalDecorators": false,
     "declaration": true,
     "declarationMap": true,
+    "noUncheckedIndexedAccess": true,
     "sourceMap": true,
     "composite": true,
-    "rootDir": "./src",
-    "outDir": "./lib"
+    "rootDir": "../",
+    "outDir": "./lib",
+    "paths": {
+      "@db/*": ["../app/server/db/*"],
+      "@lib/*": ["../lib/*"]
+    }
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "../app/server/db/schema*.ts",
+    "../app/server/db/index.ts",
+    "../lib/constants.ts",
+    "../lib/hcloud/index.d.ts",
+    "../types/*"
+  ],
   "exclude": ["node_modules"]
 }
