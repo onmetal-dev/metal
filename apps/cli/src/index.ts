@@ -160,7 +160,7 @@ program
      * -- add the config for the current project too somehow so that we know the project we're deploying.
      * - [DONE] upload the tarball. Once the upload is complete, return a tag to the command.
      * - then this command calls GET METAL_URL + /api/deploy/{tag}/status to check the status of the deployment.
-     * - if the deployment is ongoing, stream responses to the command line.
+     * - [DONE/IN-PROGRESS] if the deployment is ongoing, stream responses to the command line.
      * - if it has already finished with a success or failure, return that and end this command.
      */
 
@@ -243,18 +243,74 @@ program
     log(`--> Deployment started. Tag is ${body.tag}`);
 
     log(`[${++step}] Checking deployment status...`);
-    const statusResponse = await fetch(
-      `${baseDomainWithProtocol}/api/deploy/${body.tag}/status`,
-      {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Accept": "application/json",
-        },
-      }
-    );
-    console.log(statusResponse)
-    console.log(await statusResponse.json());
-  })
+    const statusPromise = new Promise<string>((resolve, reject) => {
+      const statusRequest = nodeRequest(
+        `${baseDomainWithProtocol}/api/deploy/${body.tag}/status`,
+        {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Accept": "application/json",
+          },
+        }
+      );
+
+      statusRequest.on('response', (res) => {
+        res.on('data', (chunk) => {
+          log(`[${++step}] ${chunk.toString()}`);
+        });
+        res.on('error', (err) => {
+          console.error('Failed to read response.');
+          console.error(err);
+          reject(err);
+        });
+        res.on('end', () => {
+          resolve('Deployment finished.');
+        });
+      });
+
+      statusRequest.on('error', (err) => {
+        console.error(`Error in status request: ${err.message}`);
+        reject(err);
+      });
+
+      statusRequest.end();
+    });
+
+    const result = await statusPromise;
+    log(`[END] ${result}`);
+  });
+
+  // program
+  // .command("status")
+  // .description("Deploy a project")
+  // .action(async (str, options) => {
+  //   const statusRequest = nodeRequest(
+  //     `${baseDomainWithProtocol}/api/deploy/${body.tag}/status`,
+  //     {
+  //       method: "GET",
+  //       headers: {
+  //         "Authorization": `Bearer ${token}`,
+  //         "Accept": "application/json",
+  //       },
+  //     }
+  //   );
+  //   statusRequest.on('connect', (res, socket, head) => {
+  //     console.log('got connected!');
+  
+  //     // Make a request over an HTTP tunnel
+  //     socket.write('GET / HTTP/1.1\r\n' +
+  //                  `Host: ${baseUrlObj.host}:3000\r\n` +
+  //                  'Connection: close\r\n' +
+  //                  '\r\n');
+  //     socket.on('data', (chunk) => {
+  //       console.log(chunk.toString());
+  //     });
+  //     socket.on('end', () => {
+  //       // proxy.close();
+  //     });
+  //   });
+  //   console.log(statusRequest)
+  // })
 
 program.parse();

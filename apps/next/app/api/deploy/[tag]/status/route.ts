@@ -1,5 +1,58 @@
 import { clerkClient } from "@clerk/nextjs";
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
+
+// This code below is heavily based on:
+// https://nextjs.org/docs/app/building-your-application/routing/route-handlers#streaming
+
+// https://developer.mozilla.org/docs/Web/API/ReadableStream#convert_async_iterator_to_stream
+function iteratorToStream(iterator: any) {
+  return new ReadableStream({
+    async pull(controller) {
+      const { value, done } = await iterator.next()
+
+      if (done) {
+        controller.close()
+      } else {
+        controller.enqueue(value)
+      }
+    },
+  })
+}
+
+function sleep(time: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, time)
+  })
+}
+
+const encoder = new TextEncoder()
+
+enum DeploymentStatus {
+  NOT_STARTED = 'NOT_STARTED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+}
+
+type DeploymentDetails = {
+  message: string
+  status: DeploymentStatus
+}
+
+const mockGetDeploymentStatus = async (deploymentTag: string): Promise<DeploymentDetails> => {
+  return Promise.resolve({
+    message: `Deployment in progress for ${deploymentTag}`,
+    status: DeploymentStatus.IN_PROGRESS,
+  });
+};
+
+async function* makeIterator() {
+  yield encoder.encode('Deployment in progress...')
+  await sleep(5000)
+  yield encoder.encode('Cleaning deployment files...')
+  await sleep(5000)
+  yield encoder.encode('Deployed...')
+}
 
 export async function GET(
   request: NextRequest,
@@ -7,19 +60,25 @@ export async function GET(
 ) {
   const authStatus = await clerkClient.authenticateRequest({ request });
   if (!authStatus.isSignedIn) {
-    return new Response(JSON.stringify({}), {
-      status: 401,
-    });
+    return new Response(
+      JSON.stringify({ message: "Unauthorized" }),
+      { status: 401 },
+    );
   }
 
-  return new NextResponse(
-    JSON.stringify({
-      messsage: 'Tag found',
-      tag: tag,
-    }),
-    {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    },
-  )
+  const { status } = await mockGetDeploymentStatus(tag);
+
+  if (status === DeploymentStatus.SUCCESS || status === DeploymentStatus.FAILED) {
+    return new Response(
+      JSON.stringify({
+        message: status,
+      }),
+      { status: 200 },
+    )
+  }
+
+  const iterator = makeIterator()
+  const stream = iteratorToStream(iterator)
+
+  return new Response(stream)
 }
