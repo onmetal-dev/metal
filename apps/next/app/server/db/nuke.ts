@@ -19,7 +19,9 @@ const nuke = async (): Promise<void> => {
   );
 
   for (let table of tables) {
-    const query = sql.raw(`DROP TABLE ${table.table_name} CASCADE;`);
+    const query = sql.raw(
+      `DROP TABLE ${sqlSchema}.${table.table_name} CASCADE;`
+    );
     await db.execute(query);
   }
   console.log("finished nuking the db");

@@ -1,80 +1,72 @@
-"use client";
-import { Button } from "@/components/ui/button";
 import * as React from "react";
-import { Step, type StepItem, Stepper, useStepper } from "@/components/stepper";
+import hetznerLogoImage from "@/images/hetzner-square-200.jpg";
+import Image from "next/image";
+import { Onboarding } from "./onboarding";
+import { db } from "@/app/server/db";
+import {
+  HetznerProject,
+  Team,
+  hetznerProjects,
+  teams,
+} from "@/app/server/db/schema";
+import { eq } from "drizzle-orm";
+import { auth } from "@clerk/nextjs";
 
-function StepperFooterInside({ steps }: { steps: StepItem[] }) {
+const ClusterList = () => {
   return (
-    <div className="flex w-full flex-col gap-4">
-      <Stepper orientation="vertical" initialStep={0} steps={steps}>
-        {steps.map((stepProps, index) => {
-          return (
-            <Step key={stepProps.label} {...stepProps}>
-              <div className="h-40 flex items-center justify-center my-4 border bg-secondary text-primary rounded-md">
-                <h1 className="text-xl">Step {index + 1}</h1>
-              </div>
-              <StepButtons />
-            </Step>
-          );
-        })}
-        <FinalStep />
-      </Stepper>
-    </div>
-  );
-}
-
-const StepButtons = () => {
-  const { nextStep, prevStep, isLastStep, isOptionalStep, isDisabledStep } =
-    useStepper();
-  return (
-    <div className="w-full flex gap-2 mb-4">
-      <Button
-        disabled={isDisabledStep}
-        onClick={prevStep}
-        size="sm"
-        variant="secondary"
-      >
-        Prev
-      </Button>
-      <Button size="sm" onClick={nextStep}>
-        {isLastStep ? "Finish" : isOptionalStep ? "Skip" : "Next"}
-      </Button>
-    </div>
+    <p>
+      Todo: hetzner project connected, now show clusters / create cluster option
+    </p>
   );
 };
 
-const FinalStep = () => {
-  const { hasCompletedAllSteps, resetSteps } = useStepper();
-
-  if (!hasCompletedAllSteps) {
-    return null;
+export default async function Page() {
+  // load hetzner projects for active org
+  const { orgId } = auth();
+  if (!orgId) {
+    throw new Error("No orgId found");
   }
-
+  const team: Team | undefined = await db
+    .select()
+    .from(teams)
+    .where(eq(teams.clerkId, orgId))
+    .then((rows) => rows[0] || undefined);
+  if (!team) {
+    throw new Error("No team found");
+  }
+  const hetznerProject: HetznerProject | undefined = await db
+    .select()
+    .from(hetznerProjects)
+    .where(eq(hetznerProjects.teamId, team.id))
+    .then((rows) => rows[0] || undefined);
   return (
     <>
-      <div className="h-40 flex items-center justify-center border bg-secondary text-primary rounded-md">
-        <h1 className="text-xl">Woohoo! All steps completed! 🎉</h1>
-      </div>
-      <div className="w-full flex justify-end gap-2">
-        <Button size="sm" onClick={resetSteps}>
-          Reset
-        </Button>
-      </div>
-    </>
-  );
-};
-
-export default function Page() {
-  const steps = [
-    { label: "Log in / Sign up for Hetzner Cloud" },
-    { label: "Create a new Hetzner project" },
-    { label: "Create a Hetzner API key" },
-    { label: "Generate and upload an SSH key" },
-  ] satisfies StepItem[];
-
-  return (
-    <>
-      <StepperFooterInside steps={steps} />
+      {hetznerProject ? (
+        <ClusterList />
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <div>
+              <Image
+                src={hetznerLogoImage}
+                alt="Hetzner Logo"
+                width={50}
+                height={50}
+              />
+            </div>
+            <h1 className="text-xl font-semibold">
+              Connect your Hetzner account
+            </h1>
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-muted-foreground">
+              Follow the steps below to connect a Hetzner project and API key to
+              Metal.
+            </p>
+          </div>
+          <Onboarding />
+        </div>
+      )}
     </>
   );
 }
