@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
   const tag = `foo-${Date.now()}`;
   const filename = `${tag}.gz`;
-  const uploadedTarball = createWriteStream(filename, "utf8");
+  const uploadedTarball = createWriteStream(filename, 'binary');
   const extractor = extract({
     C: tempDir,
   });
