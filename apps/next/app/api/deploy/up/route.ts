@@ -29,15 +29,15 @@ export async function POST(request: NextRequest) {
     C: tempDir,
   });
 
-  const writableUploadStream = new WritableStream<Uint8Array>({
+  const extractorStream = new WritableStream<Uint8Array>({
     write(chunk) {
-      uploadedTarball.write(chunk);
       extractor.write(Buffer.from(chunk));
     },
   });
 
-  await request.body?.pipeTo(writableUploadStream);
-  uploadedTarball.close();
+  const [tarballStream, filesToExtractStream] = request.body.tee();
+  // await Bun.write(filename, new Response(tarballStream));
+  await filesToExtractStream.pipeTo(extractorStream);
 
   return new Response(
     JSON.stringify({ message: "Deployment Started", tag }),
