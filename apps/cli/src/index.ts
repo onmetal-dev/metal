@@ -10,7 +10,9 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import { promisify } from "node:util";
 import { exec as execCallbackBased } from "node:child_process";
 import { create as createTar } from "tar";
-import { request as nodeRequest } from "node:https";
+import { request as insecureRequest } from "node:http";
+import { request as secureRequest } from "node:https";
+
 const exec = promisify(execCallbackBased);
 
 interface Config {
@@ -35,6 +37,9 @@ process.on("exit", () => {
 const baseURL = process.env.METAL_BASE_URL || "https://www.onmetal.dev/api";
 const baseUrlObj = new URL(baseURL);
 const baseDomainWithProtocol = `${baseUrlObj.protocol}//${baseUrlObj.host}`;
+
+const isLocalhost = baseUrlObj.hostname === "localhost" || baseUrlObj.hostname === "127.0.0.1"
+const nodeRequest = isLocalhost ? insecureRequest : secureRequest
 
 const program = new Command();
 const log = console.log;
