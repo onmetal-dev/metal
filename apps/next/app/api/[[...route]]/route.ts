@@ -2,6 +2,7 @@ import { handle } from "hono/vercel";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { otelTracer } from "./tracing";
 import { serviceName } from "@/lib/constants";
+import { HTTPException } from "hono/http-exception";
 
 export const config = {
   runtime: "nodejs",
@@ -12,8 +13,32 @@ export const config = {
 const app = new OpenAPIHono().basePath("/api");
 app.use("*", otelTracer(serviceName));
 
+// implement onError so that we pass back meaningful 500 responses
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+app.onError((err, c) => {
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
+  return c.json(
+    {
+      error: {
+        name: "internal",
+        message: getErrorMessage(err),
+        stack: process.env.NODE_ENV !== "production" ? err.stack : undefined,
+      },
+    },
+    500
+  );
+});
+
 import whoami from "./whoami";
 whoami(app);
+import hetznerProjectsRoutes from "./hetzner/projects";
+import { WorkflowFailedError } from "@temporalio/client";
+hetznerProjectsRoutes(app);
 
 const securitySchemeKey = "bearerAuth";
 app.openAPIRegistry.registerComponent("securitySchemes", securitySchemeKey, {

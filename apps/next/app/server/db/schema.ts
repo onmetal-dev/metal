@@ -4,14 +4,23 @@ import {
   index,
   integer,
   primaryKey,
-  serial,
   text,
   pgEnum,
   timestamp,
   pgSchema,
+  varchar,
 } from "drizzle-orm/pg-core";
-import { createSelectSchema } from "drizzle-zod";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import uuidBase62 from "uuid-base62";
+import { z } from "zod";
 import sqlSchemaForEnv from "./schemaForEnv";
+
+// use base62 uuids to be shorter and more friendly to the eyes
+const uuidId = {
+  id: varchar("id", { length: 22 })
+    .$defaultFn(() => uuidBase62.v4())
+    .primaryKey(),
+};
 
 const createdAndUpdatedAt = {
   createdAt: timestamp("created_at")
@@ -23,19 +32,23 @@ const createdAndUpdatedAt = {
     .$onUpdateFn(() => new Date()),
 };
 
-export const metalSchema = pgSchema(sqlSchemaForEnv(process.env.NODE_ENV));
+const schemaDefaults = {
+  ...uuidId,
+  ...createdAndUpdatedAt,
+};
+
+export const metalSchema = pgSchema(sqlSchemaForEnv(process.env.NODE_ENV!));
 
 export const users = metalSchema.table(
   "users",
   {
-    id: serial("id").primaryKey(),
+    ...schemaDefaults,
     clerkId: text("clerk_id").unique().notNull(),
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
     email: text("email").notNull(),
     emailVerified: boolean("email_verified").notNull().default(false),
     githubId: text("github_id").$type<string | null>(),
-    ...createdAndUpdatedAt,
   },
   (example) => ({
     clerkIndex: index("clerk_id").on(example.clerkId),
@@ -51,11 +64,10 @@ export const userRelations = relations(users, ({ many }) => ({
 }));
 
 export const teams = metalSchema.table("teams", {
-  id: serial("id").primaryKey(),
+  ...schemaDefaults,
   clerkId: text("clerk_id").unique().notNull(),
   name: text("name").notNull(),
-  creatorId: integer("creator_id"),
-  ...createdAndUpdatedAt,
+  creatorId: varchar("creator_id", { length: 22 }).notNull(),
 });
 export type Team = typeof teams.$inferSelect; // return type when queried
 export type TeamInsert = typeof teams.$inferInsert;
@@ -75,10 +87,10 @@ export const teamRelations = relations(teams, ({ one, many }) => ({
 export const usersToTeams = metalSchema.table(
   "users_to_teams",
   {
-    userId: integer("user_id")
+    userId: varchar("user_id", { length: 22 })
       .notNull()
       .references(() => users.id),
-    teamId: integer("team_id")
+    teamId: varchar("team_id", { length: 22 })
       .notNull()
       .references(() => teams.id),
   },
@@ -103,21 +115,29 @@ export const usersToTeamsRelations = relations(usersToTeams, ({ one }) => ({
 // Once we have this Hetzner project info we can start creating things in their Hetzner account.
 // We associate them with the user who created them, the team they belong to, and the clusters they contain.
 export const hetznerProjects = metalSchema.table("hetzner_projects", {
-  id: serial("id").primaryKey(),
-  creatorId: integer("creator_id").notNull(),
-  teamId: integer("team_id").notNull(),
+  ...schemaDefaults,
+  creatorId: varchar("creator_id", { length: 22 }).notNull(),
+  teamId: varchar("team_id", { length: 22 }).notNull(),
   hetznerName: text("hetzner_project_name").notNull(),
   hetznerApiToken: text("hetzner_api_token").notNull(),
-  publicSshKeyData: text("public_ssh_key_data").notNull(),
-  privateSshKeyData: text("private_ssh_key_data").notNull(),
+  publicSshKeyData: text("public_ssh_key_data"),
+  privateSshKeyData: text("private_ssh_key_data"),
   hetznerWebserviceUsername: text("hetzner_web_service_username").$type<
     string | null
   >(),
   hetznerWebservicePassword: text("hetzner_web_service_password").$type<
     string | null
   >(),
-  ...createdAndUpdatedAt,
 });
+export const insertHetznerProjectSchema = createInsertSchema(hetznerProjects);
+export type HetznerProjectInsert = z.infer<typeof insertHetznerProjectSchema>;
+export const selectHetznerProjectSchema = createSelectSchema(hetznerProjects);
+export type HetznerProject = z.infer<typeof selectHetznerProjectSchema>;
+export const hetznerProjectSpec = insertHetznerProjectSchema.omit({
+  createdAt: true,
+  updatedAt: true,
+});
+export type HetznerProjectSpec = z.infer<typeof hetznerProjectSpec>;
 
 export const hetznerProjectRelations = relations(
   hetznerProjects,
@@ -161,10 +181,10 @@ export const hetznerClusterStatusEnum = pgEnum("hetzner_cluster_status_enum", [
 
 // hetznerClusters. This represents k8s clusters that we spin up within a user's Hetzner account.
 export const hetznerClusters = metalSchema.table("hetzner_clusters", {
-  id: serial("id").primaryKey(),
-  creatorId: integer("creator_id").notNull(),
-  teamId: integer("team_id").notNull(),
-  hetznerProjectId: integer("hetzner_project_id").notNull(),
+  ...schemaDefaults,
+  creatorId: varchar("creator_id", { length: 22 }).notNull(),
+  teamId: varchar("team_id", { length: 22 }).notNull(),
+  hetznerProjectId: varchar("hetzner_project_id", { length: 22 }).notNull(),
   name: text("name").notNull(), // what we call it in the cluster api (assigned)
   vanityName: text("vanity_name").notNull(), // name the user gave it
   status: hetznerClusterStatusEnum("status").notNull(),
@@ -172,7 +192,6 @@ export const hetznerClusters = metalSchema.table("hetzner_clusters", {
   cidr: text("cidr").notNull(),
   location: hetznerLocationEnum("location").notNull(),
   k8sVersion: text("k8s_version").notNull(),
-  ...createdAndUpdatedAt,
 });
 
 export const hetznerClusterRelations = relations(
@@ -223,13 +242,12 @@ export const hetznerInstanceTypeEnum = pgEnum("hetzner_instance_type_enum", [
 
 // hetznerNodeGroups subdivide clusters and provide isolation for different workload types.
 export const hetznerNodeGroups = metalSchema.table("hetzner_node_group", {
-  id: serial("id").primaryKey(),
-  clusterId: integer("cluster_id").notNull(),
+  ...schemaDefaults,
+  clusterId: varchar("cluster_id", { length: 22 }).notNull(),
   type: nodeGroupTypeEnum("type").notNull(),
   instanceType: hetznerInstanceTypeEnum("instance_type").notNull(),
   minNodes: integer("min_nodes").notNull(),
   maxNodes: integer("max_nodes").notNull(),
-  ...createdAndUpdatedAt,
 });
 
 export const hetznerNodeGroupRelations = relations(

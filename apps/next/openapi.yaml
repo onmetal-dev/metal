@@ -1,0 +1,109 @@
+openapi: 3.0.0
+info:
+  version: 0.0.1
+  title: Metal API
+  contact:
+    email: support@onmetal.dev
+security:
+  - bearerAuth: []
+servers:
+  - url: http://localhost:3000/api
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token
+  schemas:
+    WhoAmI:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          type: object
+          properties:
+            id:
+              type: number
+            clerkId:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
+            email:
+              type: string
+            emailVerified:
+              type: boolean
+            githubId:
+              type: string
+              nullable: true
+            createdAt:
+              type: string
+            updatedAt:
+              type: string
+          required:
+            - id
+            - clerkId
+            - firstName
+            - lastName
+            - email
+            - emailVerified
+            - githubId
+            - createdAt
+            - updatedAt
+        teams:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: number
+              clerkId:
+                type: string
+              name:
+                type: string
+              creatorId:
+                type: number
+                nullable: true
+              createdAt:
+                type: string
+              updatedAt:
+                type: string
+            required:
+              - id
+              - clerkId
+              - name
+              - creatorId
+              - createdAt
+              - updatedAt
+      required:
+        - token
+        - user
+        - teams
+  parameters: {}
+paths:
+  /whoami:
+    get:
+      operationId: whoami
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Retrieve information about the authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhoAmI'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
