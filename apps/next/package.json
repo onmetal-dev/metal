@@ -62,7 +62,6 @@
     "postgres": "^3.4.4",
     "react": "^18",
     "react-dom": "^18",
-    "socket.io": "^4.7.5",
     "tailwind-merge": "^2.2.2",
     "tailwindcss-animate": "^1.0.7",
     "tar": "^7.0.1",
