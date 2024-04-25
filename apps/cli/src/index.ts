@@ -268,36 +268,4 @@ program
     log(`[END] ${result}`);
   });
 
-  // program
-  // .command("status")
-  // .description("Deploy a project")
-  // .action(async (str, options) => {
-  //   const statusRequest = nodeRequest(
-  //     `${baseDomainWithProtocol}/api/deploy/${body.tag}/status`,
-  //     {
-  //       method: "GET",
-  //       headers: {
-  //         "Authorization": `Bearer ${token}`,
-  //         "Accept": "application/json",
-  //       },
-  //     }
-  //   );
-  //   statusRequest.on('connect', (res, socket, head) => {
-  //     console.log('got connected!');
-  
-  //     // Make a request over an HTTP tunnel
-  //     socket.write('GET / HTTP/1.1\r\n' +
-  //                  `Host: ${baseUrlObj.host}:3000\r\n` +
-  //                  'Connection: close\r\n' +
-  //                  '\r\n');
-  //     socket.on('data', (chunk) => {
-  //       console.log(chunk.toString());
-  //     });
-  //     socket.on('end', () => {
-  //       // proxy.close();
-  //     });
-  //   });
-  //   console.log(statusRequest)
-  // })
-
 program.parse();
