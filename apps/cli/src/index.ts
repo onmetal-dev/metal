@@ -151,19 +151,6 @@ program
   .description("Deploy a project")
   .option("--token", "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI.")
   .action(async (str, options) => {
-    /* Planned steps
-     * - [DONE] use git ls-files to get a list of git-tracked files.
-     * -- [DONE] filter out any .gitignore
-     * - [DONE] targz them up
-     * - [PARTIALLY DONE] make a POST request to METAL_URL + /api/deploy/up with:
-     * -- [DONE] the user's token as a bearer token in the Authorization header
-     * -- add the config for the current project too somehow so that we know the project we're deploying.
-     * - [DONE] upload the tarball. Once the upload is complete, return a tag to the command.
-     * - then this command calls GET METAL_URL + /api/deploy/{tag}/status to check the status of the deployment.
-     * - [DONE/IN-PROGRESS] if the deployment is ongoing, stream responses to the command line.
-     * - if it has already finished with a success or failure, return that and end this command.
-     */
-
     let step = 1;
     log(`[${step}] Checking for token...`);
     const userConfig = checkUserConfig();
