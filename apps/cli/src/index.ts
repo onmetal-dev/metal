@@ -10,7 +10,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import { promisify } from "node:util";
 import { exec as execCallbackBased } from "node:child_process";
 import { create as createTar } from "tar";
-import { request as nodeRequest } from "node:http";
+import { request as nodeRequest } from "node:https";
 const exec = promisify(execCallbackBased);
 
 interface Config {
