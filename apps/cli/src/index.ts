@@ -9,7 +9,7 @@ import { type WhoAmI } from "@onmetal/node/resources/whoami.mjs";
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import { promisify } from "node:util";
 import { exec as execCallbackBased } from "node:child_process";
-import { create as createTar } from "tar";
+import { Pack, create as createTar } from "tar";
 import { request as insecureRequest } from "node:http";
 import { request as secureRequest } from "node:https";
 
@@ -184,52 +184,50 @@ program
     }, pathsToArchive);
 
     log(`[${++step}] Uploading...`);
-    const reqOptions = {
-      host: baseUrlObj.hostname,
-      port: baseUrlObj.port || 80,
-      path: "/api/deploy/up",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/octet-stream",
-        Authorization: `Bearer ${token}`,
-        "Accept": "application/json",
-      },
+    const uploadData = async (payloadStream: Pack, token: string) => {
+      return new Promise<{ tag: string }>(async (resolve, reject) => {
+        const stream = new ReadableStream({
+          start(controller) {
+            payloadStream.on("data", (chunk) => {
+              // Assuming chunk is a Buffer this might be necessary
+              controller.enqueue(new Uint8Array(chunk));
+            });
+            payloadStream.on("end", () => {
+              controller.close();
+            });
+            payloadStream.on("error", err => {
+              controller.error(err);
+              reject(err);
+            });
+          }
+        });
+
+        const reqOptions: FetchRequestInit = {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "Authorization": `Bearer ${token}`,
+            "Accept": "application/json",
+          },
+          body: stream,
+        };
+
+        try {
+          const response = await fetch(`${baseDomainWithProtocol}/api/deploy/up`, reqOptions);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const bodyJSONString = await response.text();
+          resolve(JSON.parse(bodyJSONString));
+        } catch (error) {
+          console.error('Problem with upload request: ', error);
+          reject(error);
+        }
+      });
     };
 
-    const uploadPromise = new Promise<string>((resolve, reject) => {
-      const request = nodeRequest(reqOptions, response => {
-        let bodyJSONString = "";
-        response.on("data", (chunk) => {
-          bodyJSONString += chunk;
-        });
-
-        response.on("error", (err) => {
-          console.error(`Problem with response from upload: ${err.message}`);
-          reject(err);
-        });
-
-        response.on("end", () => {
-          resolve(bodyJSONString);
-        });
-      });
-
-      request.on("error", (err) => {
-        console.error(`Problem with upload request: ${err.message}`);
-        reject(err);
-      });
-
-      // Write compressed data to request's body
-      payloadStream.on("data", (chunk) => {
-        request.write(chunk);
-      });
-
-      payloadStream.on("end", () => {
-        request.end();
-      });
-    });
-
-    const bodyAsString = await uploadPromise;
-    const body = JSON.parse(bodyAsString);
+    const uploadPromise = uploadData(payloadStream, token);
+    const body = await uploadPromise;
     log(`--> Deployment started. Tag is ${body.tag}`);
 
     log(`[${++step}] Checking deployment status...`);
