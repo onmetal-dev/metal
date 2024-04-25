@@ -191,7 +191,6 @@ program
       },
     };
 
-    // TODO MET-10: explore any better ways of promisifying this.
     const uploadPromise = new Promise<string>((resolve, reject) => {
       const request = nodeRequest(reqOptions, response => {
         let bodyJSONString = "";
@@ -215,7 +214,6 @@ program
       });
 
       // Write compressed data to request's body
-      // TODO MET-10: consider using node:zlib
       payloadStream.on("data", (chunk) => {
         request.write(chunk);
       });
