@@ -180,8 +180,8 @@ program
 
     log(`[${++step}] Uploading...`);
     const reqOptions = {
-      host: "localhost",
-      port: 3000,
+      host: baseUrlObj.hostname,
+      port: baseUrlObj.port || 80,
       path: "/api/deploy/up",
       method: "POST",
       headers: {
