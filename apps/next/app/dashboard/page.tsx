@@ -81,7 +81,7 @@ async function findCreateUserTeam({
       creatorId: userId,
     });
     team = await tx.query.teams.findFirst({
-      where: (team, { eq }) => eq(team.clerkId, clerkOrg.id),
+      where: (teamTable, { eq }) => eq(teamTable.clerkId, clerkOrg.id),
     });
     if (!team) {
       tx.rollback();
