@@ -6,8 +6,8 @@
   },
   "private": true,
   "scripts": {
-    "build:next": "next build",
-    "build:oci": "nixpacks build ./ --name metal-next --start-cmd 'bun run start:next'",
+    "build:next": "NEXT_TELEMETRY_DISABLED=1 next build",
+    "build:oci": "NEXT_TELEMETRY_DISABLED=1 nixpacks build ./ --name metal-next --start-cmd 'bun run start:next'",
     "build:temporal": "tsc --build ./temporal/tsconfig.json",
     "build": "concurrently --raw \"npm:build:next\" \"npm:build:temporal\"",
     "db:push": "source $HOME/.nvm/nvm.sh; nvm use 20; drizzle-kit push:pg",
@@ -18,7 +18,7 @@
     "dev:temporal": "cd temporal && tsx --env-file ../.env --watch --watch-preserve-output src/worker.ts",
     "dev": "concurrently --raw \"npm:dev:*\"",
     "lint": "next lint",
-    "start:next": "next start",
+    "start:next": "NEXT_TELEMETRY_DISABLED=1 next start",
     "start:worker": "cd temporal && tsx ./src/worker.ts"
   },
   "dependencies": {
@@ -63,6 +63,7 @@
     "postgres": "^3.4.4",
     "react": "^18",
     "react-dom": "^18",
+    "sharp": "^0.33.3",
     "sshpk": "^1.18.0",
     "tailwind-merge": "^2.2.2",
     "tailwindcss-animate": "^1.0.7",
