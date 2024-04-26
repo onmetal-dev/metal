@@ -1,7 +1,8 @@
 import { clerkClient } from "@clerk/nextjs";
 import { type NextRequest } from "next/server";
+import { spawnSync } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync } from "node:fs";
-import { extract } from "tar";
+import { Writable } from "node:stream";
 
 export const dynamic = "force-dynamic";
 
@@ -24,20 +25,11 @@ export async function POST(request: NextRequest) {
 
   const tag = `foo-${Date.now()}`;
   const filename = `${tag}.gz`;
-  const uploadedTarball = createWriteStream(filename, 'binary');
-  const extractor = extract({
-    C: tempDir,
-  });
-
-  const writableUploadStream = new WritableStream<Uint8Array>({
-    write(chunk) {
-      uploadedTarball.write(chunk);
-      extractor.write(Buffer.from(chunk));
-    },
-  });
-
-  await request.body?.pipeTo(writableUploadStream);
-  uploadedTarball.close();
+  const uploadedTarball = Writable.toWeb(
+    createWriteStream(filename, "binary")
+  ) as WritableStream<Uint8Array>;
+  await request.body.pipeTo(uploadedTarball);
+  spawnSync("tar", ["xzfv", filename, "-C", "temp/"]);
 
   return new Response(
     JSON.stringify({ message: "Deployment Started", tag }),
