@@ -1,6 +1,6 @@
 import { clerkClient } from "@clerk/nextjs";
 import { type NextRequest } from "next/server";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync } from "node:fs";
 import { Writable } from "node:stream";
 
@@ -29,7 +29,14 @@ export async function POST(request: NextRequest) {
     createWriteStream(filename, "binary")
   ) as WritableStream<Uint8Array>;
   await request.body.pipeTo(uploadedTarball);
-  spawnSync("tar", ["xzfv", filename, "-C", "temp/"]);
+
+  const ls = spawn('tar', ['xzfv', filename, '-C', tempDir]);
+  await new Promise<void>((resolve) => {
+    ls.on('exit', () => {
+      console.log("Tarball extracted");
+      resolve();
+    });
+  });
 
   return new Response(
     JSON.stringify({ message: "Deployment Started", tag }),
