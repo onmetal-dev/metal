@@ -196,7 +196,7 @@ program
       },
     };
 
-    const uploadPromise = new Promise<string>((resolve, reject) => {
+    const bodyAsString = await new Promise<string>((resolve, reject) => {
       const request = nodeRequest(reqOptions, response => {
         let bodyJSONString = "";
         response.on("data", (chunk) => {
@@ -219,16 +219,9 @@ program
       });
 
       // Write compressed data to request's body
-      payloadStream.on("data", (chunk) => {
-        request.write(chunk);
-      });
-
-      payloadStream.on("end", () => {
-        request.end();
-      });
+      payloadStream.pipe(request);
     });
 
-    const bodyAsString = await uploadPromise;
     const body = JSON.parse(bodyAsString);
     log(`--> Deployment started. Tag is ${body.tag}`);
 
