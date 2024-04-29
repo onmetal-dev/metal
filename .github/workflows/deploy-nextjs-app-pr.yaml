@@ -26,6 +26,9 @@ jobs:
       - name: Install Railway
         run: bun install -g @railway/cli
 
+      - name: Check working directory
+        run: pwd && ls
+
       - name: Deploy
         run: railway up
         env:
