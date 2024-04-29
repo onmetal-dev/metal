@@ -33,9 +33,9 @@ jobs:
         run: bun install @railway/cli
 
       - name: Check working directory
-        run: pwd && ls && echo "check bunx" && bunx --help && echo "check railway" && bunx railway --help
+        run: pwd && ls && echo "check bunx" && bunx --help && echo "check railway" && bunx @railway/cli --help
 
       - name: Deploy
-        run: bunx railway up
+        run: bunx @railway/cli up
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PR }}
