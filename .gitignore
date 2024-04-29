@@ -2,6 +2,6 @@ id_ed25519*
 
 .DS_Store
 
-# Deployment files
-temp/
+*.tgz
 *.gz
+**/temp/*

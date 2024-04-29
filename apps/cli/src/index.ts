@@ -4,15 +4,27 @@ import os from "os";
 import chalk from "chalk";
 import opener from "opener";
 import inquirer from "inquirer";
-import { readFileSync, existsSync, writeFileSync } from "fs";
 import Metal from "@onmetal/node";
 import { type WhoAmI } from "@onmetal/node/resources/whoami.mjs";
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
+import { promisify } from "node:util";
+import { exec as execCallbackBased } from "node:child_process";
+import { create as createTar } from "tar";
+import { request as insecureRequest } from "node:http";
+import { request as secureRequest } from "node:https";
+
+const exec = promisify(execCallbackBased);
 
 interface Config {
   whoami?: WhoAmI;
 }
+
 // setup / load config
-const configPath = path.join(os.homedir(), ".config", "metal", "config.json");
+const configParentDir = path.join(os.homedir(), ".config", "metal");
+const configPath = path.join(configParentDir, "config.json");
+if (!existsSync(configParentDir)) {
+  mkdirSync(configParentDir);
+}
 if (!existsSync(configPath)) {
   writeFileSync(configPath, "{}", "utf8");
 }
@@ -25,6 +37,9 @@ process.on("exit", () => {
 const baseURL = process.env.METAL_BASE_URL || "https://www.onmetal.dev/api";
 const baseUrlObj = new URL(baseURL);
 const baseDomainWithProtocol = `${baseUrlObj.protocol}//${baseUrlObj.host}`;
+
+const isLocalhost = baseUrlObj.hostname === "localhost" || baseUrlObj.hostname === "127.0.0.1"
+const nodeRequest = isLocalhost ? insecureRequest : secureRequest
 
 const program = new Command();
 const log = console.log;
@@ -112,6 +127,7 @@ program
             );
           },
         });
+        // TODO MET-10: This was last updated 4 years ago. We should find an alternative?
         opener(url);
       });
     }
@@ -121,10 +137,131 @@ program
     }
     const metal = new Metal({ baseURL, metalAPIKey: token });
     const whoami = await metal.whoami.retrieve();
-
     config.whoami = whoami;
     log(`successfully logged in as ${chalk.green(config.whoami.user!.email)}`);
     process.exit(0);
+  });
+
+const checkUserConfig = () => {
+  if (!config.whoami) {
+    log(`Oops! You're not logged in :)`);
+    process.exit(1);
+  }
+
+  return config as Required<Config>;
+}
+
+program
+  .command("up")
+  .description("Deploy a project")
+  .option("--token", "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI.")
+  .action(async (str, options) => {
+    let step = 1;
+    log(`[${step}] Checking for token...`);
+    const userConfig = checkUserConfig();
+    // Token hierachy: commandline > config file > environment variable
+    const token = options.token || userConfig.whoami.token || process.env.METAL_TOKEN;
+    if (!token) {
+      log("Error! You must configure a Metal API token.");
+      process.exit(1);
+    }
+
+    log(`[${++step}] Collating files to deploy...`);
+    const { stdout, stderr } = await exec(`git ls-files`);
+    if (stderr) {
+      console.error(stderr);
+      process.exit(1);
+    }
+
+    const pathsToArchive = stdout
+      .split("\n")
+      .filter((path) => !!path && !path.endsWith(".gitignore"));
+
+    log(`[${++step}] Compressing files...`);
+    const payloadStream = createTar({
+      gzip: true,
+      cwd: process.cwd(),
+    }, pathsToArchive);
+
+    log(`[${++step}] Uploading...`);
+    const reqOptions = {
+      host: baseUrlObj.hostname,
+      port: baseUrlObj.port || 80,
+      path: "/api/deploy/up",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        Authorization: `Bearer ${token}`,
+        "Accept": "application/json",
+      },
+    };
+
+    const bodyAsString = await new Promise<string>((resolve, reject) => {
+      const request = nodeRequest(reqOptions, response => {
+        let bodyJSONString = "";
+        response.on("data", (chunk) => {
+          bodyJSONString += chunk;
+        });
+
+        response.on("error", (err) => {
+          console.error(`Problem with response from upload: ${err.message}`);
+          reject(err);
+        });
+
+        response.on("end", () => {
+          resolve(bodyJSONString);
+        });
+      });
+
+      request.on("error", (err) => {
+        console.error(`Problem with upload request: ${err.message}`);
+        reject(err);
+      });
+
+      // Write compressed data to request's body
+      payloadStream.pipe(request);
+    });
+
+    const body = JSON.parse(bodyAsString);
+    log(`--> Deployment started. Tag is ${body.tag}`);
+
+    log(`[${++step}] Checking deployment status...`);
+    const statusPromise = new Promise<string>((resolve, reject) => {
+      const statusRequest = nodeRequest(
+        `${baseDomainWithProtocol}/api/deploy/${body.tag}/status`,
+        {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Accept": "application/json",
+          },
+        }
+      );
+
+      statusRequest.on('response', (res) => {
+        res.on('data', (chunk) => {
+          log(`[${++step}] ${chunk.toString()}`);
+        });
+        res.on('error', (err) => {
+          console.error('Failed to read response.');
+          console.error(err);
+          reject(err);
+        });
+        res.on('end', () => {
+          resolve('Deployment finished.');
+        });
+      });
+
+      statusRequest.on('error', (err) => {
+        console.error(`Error in status request: ${err.message}`);
+        reject(err);
+      });
+
+      statusRequest.end();
+    });
+
+    const result = await statusPromise;
+    log(`[END] ${result}`);
   });
 
 program.parse();
