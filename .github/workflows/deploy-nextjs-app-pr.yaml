@@ -30,12 +30,12 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Install Railway
-        run: bun install @railway/cli
+        run: bash <(curl -fsSL cli.new)
 
       - name: Check working directory
-        run: pwd && ls && echo "check bunx" && bunx --help && echo "check railway" && bunx @railway/cli --help
+        run: pwd && ls && echo "check bunx" && bunx --help && echo "check railway" && railway help
 
       - name: Deploy
-        run: bunx @railway/cli up
+        run: railway up
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PR }}
