@@ -27,9 +27,9 @@ jobs:
         run: bun install -g @railway/cli
 
       - name: Check working directory
-        run: pwd && ls && echo "check railway" && railway --help && echo "check bun" && bun --help
+        run: pwd && ls && echo "check railway" && bun railway --help && echo "check bun" && bun --help
 
       - name: Deploy
-        run: railway up
+        run: bun railway up
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PR }}
