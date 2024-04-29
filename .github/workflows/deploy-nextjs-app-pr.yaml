@@ -15,27 +15,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '>=20'
-          cache: 'npm'
-
-      # - name: Use Bun
-      #   uses: oven-sh/setup-bun@v1
+      # - name: Use Node.js 20
+      #   uses: actions/setup-node@v4
       #   with:
-      #     bun-version: 1.1.3
+      #     node-version: '>=20'
+      #     cache: 'npm'
+
+      - name: Use Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.1.3
 
       - name: Install packages
-        run: npm install
+        run: bun install --frozen-lockfile
 
       - name: Install Railway
-        run: npm install -g @railway/cli
+        run: bun install @railway/cli
 
       - name: Check working directory
-        run: pwd && ls && echo "check railway" && railway --help && echo "check npm" && npm --help
+        run: pwd && ls && echo "check bunx" && bunx --help && echo "check railway" && bunx railway --help
 
       - name: Deploy
-        run: railway up
+        run: bunx railway up
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PR }}
