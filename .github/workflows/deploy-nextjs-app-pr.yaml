@@ -29,14 +29,8 @@ jobs:
       - name: Install packages
         run: bun install --frozen-lockfile
 
-      - name: Install Railway
-        run: bash <(curl -fsSL cli.new)
-
-      - name: Check working directory
-        run: pwd && ls
-
       - name: Deploy
-        run: bash <(curl -fsSL cli.new) && railway help && railway up --ci --service $RAILWAY_SERVICE_NAME
+        run: bash <(curl -fsSL cli.new) && railway up --ci --service $RAILWAY_SERVICE_NAME
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PR }}
           RAILWAY_SERVICE_NAME: ${{ vars.RAILWAY_SERVICE_NAME }}
