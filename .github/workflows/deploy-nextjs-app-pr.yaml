@@ -36,6 +36,7 @@ jobs:
         run: pwd && ls
 
       - name: Deploy
-        run: bash <(curl -fsSL cli.new) && railway help && railway up
+        run: bash <(curl -fsSL cli.new) && railway help && railway up --ci --service $RAILWAY_SERVICE_NAME
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PR }}
+          RAILWAY_SERVICE_NAME: ${{ vars.RAILWAY_SERVICE_NAME }}
