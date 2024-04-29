@@ -33,9 +33,9 @@ jobs:
         run: bash <(curl -fsSL cli.new)
 
       - name: Check working directory
-        run: pwd && ls && echo "check bunx" && bunx --help && echo "check railway" && railway help
+        run: pwd && ls
 
       - name: Deploy
-        run: railway up
+        run: bash <(curl -fsSL cli.new) && railway help && railway up
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PR }}
