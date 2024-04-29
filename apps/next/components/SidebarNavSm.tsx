@@ -58,6 +58,7 @@ export const SidebarNavSm = () => {
     { href: "/dashboard/integrations", label: "Integrations", Icon: Link2 },
     { href: "/dashboard/settings", label: "Settings", Icon: SettingsIcon },
   ];
+
   return (
     <Sheet>
       <SheetTrigger asChild>
