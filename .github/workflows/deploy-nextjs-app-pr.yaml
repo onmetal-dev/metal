@@ -29,6 +29,9 @@ jobs:
       - name: Install packages
         run: bun install --frozen-lockfile
 
+      - name: Push DB changes
+        run: bun run ci:db:push
+
       - name: Deploy
         run: bash <(curl -fsSL cli.new) && railway up --ci --service $RAILWAY_SERVICE_NAME
         env:

@@ -28,6 +28,6 @@ export default {
     connectionString,
   },
   schemaFilter: sqlSchemaForEnv(process.env.NODE_ENV),
-  strict: true,
+  strict: process.env.DRIZZLE_DISABLE_STRICT_PUSHES !== "true",
   verbose: true,
 } satisfies Config;
