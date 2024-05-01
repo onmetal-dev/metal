@@ -11,7 +11,7 @@
     "build:temporal": "tsc --build ./temporal/tsconfig.json",
     "build": "concurrently --raw \"npm:build:next\" \"npm:build:temporal\"",
     "db:push": "source $HOME/.nvm/nvm.sh; nvm use 20; drizzle-kit push:pg",
-    "ci:db:push": "drizzle-kit push:pg",
+    "ci:db:push": "npm config set ca='' && drizzle-kit push:pg",
     "db:studio": "source $HOME/.nvm/nvm.sh; nvm use 20; drizzle-kit studio",
     "db:nuke": "bun run ./app/server/db/nuke.ts",
     "dev:next": "next dev --turbo",

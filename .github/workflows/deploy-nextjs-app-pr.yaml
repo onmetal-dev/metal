@@ -11,7 +11,7 @@ jobs:
       run:
         working-directory: ./apps/next
     env:
-      NODE_ENV: ci
+      NODE_ENV: development
       RAILWAY_SERVICE_NAME: ${{ vars.RAILWAY_SERVICE_NAME }}
 
     steps:
@@ -20,6 +20,8 @@ jobs:
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4
+        with:
+          node-version: '>=20'
 
       - name: Use Bun
         uses: oven-sh/setup-bun@v1
@@ -30,7 +32,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Push DB changes
-        run: bun run ci:db:push
+        run: npm run ci:db:push
         env:
           DRIZZLE_DISABLE_STRICT_PUSHES: ${{ vars.DRIZZLE_DISABLE_STRICT_PUSHES }}
           POSTGRES_CA_DATA: ${{ secrets.POSTGRES_CA_DATA_DEV }}
