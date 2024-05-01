@@ -10,10 +10,18 @@ jobs:
     defaults:
       run:
         working-directory: ./apps/next
+    env:
+      NODE_ENV: development
+      RAILWAY_SERVICE_NAME: ${{ vars.RAILWAY_SERVICE_NAME }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '>=20'
 
       - name: Use Bun
         uses: oven-sh/setup-bun@v1
@@ -23,10 +31,7 @@ jobs:
       - name: Install packages
         run: bun install --frozen-lockfile
 
-      - name: Install Railway
-        run: bun install -g @railway/cli
-
       - name: Deploy
-        run: railway up
+        run: bash <(curl -fsSL cli.new) && railway up --ci --service $RAILWAY_SERVICE_NAME
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_DEV }}
