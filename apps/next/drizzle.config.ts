@@ -14,9 +14,9 @@ writeFileSync(
 
 let connectionString = process.env.POSTGRES_URL!;
 if (connectionString.includes("?")) {
-  connectionString += `&sslmode=require&sslrootcert=${ca.name}`;
+  connectionString += `&sslrootcert=${ca.name}`;
 } else {
-  connectionString += `?sslmode=require&sslrootcert=${ca.name}`;
+  connectionString += `?sslrootcert=${ca.name}`;
 }
 
 export default {
