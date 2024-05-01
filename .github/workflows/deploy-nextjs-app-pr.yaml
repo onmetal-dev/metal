@@ -31,6 +31,11 @@ jobs:
 
       - name: Push DB changes
         run: bun run ci:db:push
+        env:
+          DRIZZLE_DISABLE_STRICT_PUSHES: ${{ vars.DRIZZLE_DISABLE_STRICT_PUSHES }}
+          POSTGRES_CA_DATA: ${{ secrets.POSTGRES_CA_DATA_DEV }}
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL_DEV }}
+          RAILWAY_SERVICE_NAME: ${{ vars.RAILWAY_SERVICE_NAME }}
 
       - name: Deploy
         run: bash <(curl -fsSL cli.new) && railway up --ci --service $RAILWAY_SERVICE_NAME
