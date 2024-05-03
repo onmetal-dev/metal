@@ -3,12 +3,12 @@ name: Deploy website from PR
 on:
   pull_request:
     branches: [main]
-    # types: [labeled, edited]
+    types: [labeled, edited]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # if: ${{ github.event.label.name == 'PR_DEPLOY' }}
+    if: ${{ github.event.label.name == 'PR_DEPLOY' }}
     defaults:
       run:
         working-directory: ./apps/next
