@@ -33,14 +33,6 @@ jobs:
       - name: Install packages
         run: bun install --frozen-lockfile
 
-      - name: Save Postgres CA to file
-        run: bun deploy/save_pg_ca_to_file.ts && export NODE_EXTRA_CA_CERTS="$(pwd)/pg_ca.crt"
-        env:
-          POSTGRES_CA_DATA: ${{ secrets.POSTGRES_CA_DATA_DEV }}
-
-      - name: Echo NODE_EXTRA_CA_CERTS
-        run: echo $NODE_EXTRA_CA_CERTS
-
       - name: Push DB changes
         run: bun run ci:db:push
         env:
