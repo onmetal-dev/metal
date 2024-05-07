@@ -8,6 +8,7 @@
     "startCommand": "bun run start:next",
     "healthcheckPath": "/",
     "healthcheckTimeout": 100,
-    "restartPolicyType": "NEVER"
+    "restartPolicyType": "ALWAYS",
+    "restartPolicyMaxRetries": 5
   }
 }
