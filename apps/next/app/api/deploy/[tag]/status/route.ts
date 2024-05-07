@@ -1,5 +1,9 @@
 import { clerkClient } from "@clerk/nextjs";
 import { type NextRequest } from "next/server";
+import { exec as execCallbackBased } from "node:child_process";
+import { promisify } from "node:util";
+
+const exec = promisify(execCallbackBased);
 
 // This code below is heavily based on:
 // https://nextjs.org/docs/app/building-your-application/routing/route-handlers#streaming
@@ -47,9 +51,10 @@ const mockGetDeploymentStatus = async (deploymentTag: string): Promise<Deploymen
 };
 
 async function* makeIterator() {
-  yield encoder.encode('Deployment in progress...')
-  await sleep(5000)
-  yield encoder.encode('Cleaning deployment files...')
+  yield encoder.encode('Compiling Dockerfile...')
+  await exec('nixpacks plan ./temp > ./temp/build-plan.json');
+  await exec('nixpacks build --config build-plan.json ./temp');
+  yield encoder.encode('Building OCI image...')
   await sleep(5000)
   yield encoder.encode('Deployed...')
 }
