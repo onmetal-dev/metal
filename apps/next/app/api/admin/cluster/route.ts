@@ -6,8 +6,6 @@ const exec = util.promisify(execCB);
 import tmp from "tmp";
 import fs from "fs";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
-import { createTemporalClient } from "@/lib/temporal-client";
-import { OneClickBuy } from "@/temporal/lib/workflows.js";
 import { serviceName } from "@/lib/constants";
 
 export const dynamic = "force-dynamic"; // defaults to auto
@@ -120,16 +118,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // test workflow
-  const itemId = "test-item-id";
-  const client = await createTemporalClient;
-  const handle = await client.workflow.start(OneClickBuy, {
-    workflowId: `test-${Math.random().toString(36).substring(2, 12)}`,
-    taskQueue: "tutorial", // must match the taskQueue polled by Worker above
-    args: [itemId],
-  });
-
-  return Response.json({ workflowId: handle.workflowId }, { status: 200 });
+  return Response.json({ workflowId: "foo-bar" }, { status: 200 });
 }
 
 export async function GET(request: Request) {

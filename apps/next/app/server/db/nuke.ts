@@ -9,7 +9,7 @@ const nuke = async (): Promise<void> => {
     process.exit(1);
   }
 
-  const sqlSchema = sqlSchemaForEnv(process.env.NODE_ENV);
+  const sqlSchema = sqlSchemaForEnv(process.env.NODE_ENV, process.env.CI);
   const tables = await db.execute(
     sql.raw(`SELECT table_name
       FROM information_schema.tables
