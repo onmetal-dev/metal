@@ -30,9 +30,9 @@ export async function POST(request: NextRequest) {
   ) as WritableStream<Uint8Array>;
   await request.body.pipeTo(uploadedTarball);
 
-  const ls = spawn('tar', ['xzfv', filename, '-C', tempDir]);
+  const extractionStream = spawn('tar', ['xzfv', filename, '-C', tempDir]);
   await new Promise<void>((resolve) => {
-    ls.on('exit', () => {
+    extractionStream.on('exit', () => {
       console.log("Tarball extracted");
       resolve();
     });
