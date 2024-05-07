@@ -30,6 +30,13 @@ jobs:
       - name: Install packages
         run: bun install --frozen-lockfile
 
+      - name: Push DB changes
+        run: bun run ci:db:push
+        env:
+          DRIZZLE_DISABLE_STRICT_PUSHES: ${{ vars.DRIZZLE_DISABLE_STRICT_PUSHES }}
+          POSTGRES_CA_DATA: ${{ secrets.POSTGRES_CA_DATA_PROD }}
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL_PROD }}
+
       - name: Deploy
         run: bash <(curl -fsSL cli.new) && railway up --ci --service nextjs-service
         env:
