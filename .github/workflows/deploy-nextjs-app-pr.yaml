@@ -15,7 +15,6 @@ jobs:
     env:
       NODE_ENV: development
       NEXT_TELEMETRY_DISABLED: 1
-      # CI: ${{ vars.CI }}
 
     steps:
       - name: Checkout
@@ -37,7 +36,6 @@ jobs:
       - name: Push DB changes
         run: bun run ci:db:push
         env:
-          # CI: ${{ vars.CI }}
           POSTGRES_CA_DATA: ${{ secrets.POSTGRES_CA_DATA_DEV }}
           POSTGRES_URL: ${{ secrets.POSTGRES_URL_DEV }}
 
