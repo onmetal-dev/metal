@@ -13,7 +13,7 @@ jobs:
       run:
         working-directory: ./apps/next
     env:
-      NODE_ENV: ci
+      NODE_ENV: development
 
     steps:
       - name: Checkout
