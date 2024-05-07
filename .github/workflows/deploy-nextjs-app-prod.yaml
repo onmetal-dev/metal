@@ -12,6 +12,7 @@ jobs:
         working-directory: ./apps/next
     env:
       NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: 1
 
     steps:
       - name: Checkout
