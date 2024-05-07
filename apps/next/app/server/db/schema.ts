@@ -37,7 +37,7 @@ const schemaDefaults = {
   ...createdAndUpdatedAt,
 };
 
-export const metalSchema = pgSchema(sqlSchemaForEnv(process.env.NODE_ENV!));
+export const metalSchema = pgSchema(sqlSchemaForEnv(process.env.NODE_ENV!, process.env.CI));
 
 export const users = metalSchema.table(
   "users",

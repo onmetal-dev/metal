@@ -1,6 +1,10 @@
 import os from "os";
 
-export default function sqlSchemaForEnv(env: string) {
+export default function sqlSchemaForEnv(env: string, ciEnvironment?: string) {
+  if (ciEnvironment === "true") {
+    return 'metaldev_githubaction';
+  }
+
   const username = os.userInfo().username;
   switch (env) {
     case "development":

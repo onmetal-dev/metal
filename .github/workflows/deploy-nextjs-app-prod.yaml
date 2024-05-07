@@ -33,7 +33,7 @@ jobs:
       - name: Push DB changes
         run: bun run ci:db:push
         env:
-          DRIZZLE_DISABLE_STRICT_PUSHES: ${{ vars.DRIZZLE_DISABLE_STRICT_PUSHES }}
+          CI: ${{ vars.CI }}
           POSTGRES_CA_DATA: ${{ secrets.POSTGRES_CA_DATA_PROD }}
           POSTGRES_URL: ${{ secrets.POSTGRES_URL_PROD }}
 

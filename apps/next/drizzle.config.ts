@@ -26,7 +26,7 @@ export default {
   dbCredentials: {
     connectionString,
   },
-  schemaFilter: sqlSchemaForEnv(process.env.NODE_ENV),
-  strict: process.env.DRIZZLE_DISABLE_STRICT_PUSHES !== "true",
+  schemaFilter: sqlSchemaForEnv(process.env.NODE_ENV, process.env.CI),
+  strict: process.env.CI !== "true",
   verbose: true,
 } satisfies Config;
