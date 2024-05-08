@@ -4,7 +4,6 @@ import tmp from "tmp";
 import { writeFileSync } from "fs";
 import sqlSchemaForEnv from "@/app/server/db/schemaForEnv";
 dotenv.config();
-console.log("process.env.POSTGRES_URL", process.env.POSTGRES_URL);
 
 // Config doesn't have a ca option, so we'll use a tmp file to store the ca
 const ca = tmp.fileSync();
@@ -27,7 +26,7 @@ export default {
   dbCredentials: {
     connectionString,
   },
-  schemaFilter: sqlSchemaForEnv(process.env.NODE_ENV),
-  strict: true,
+  schemaFilter: sqlSchemaForEnv(process.env.NODE_ENV, process.env.CI),
+  strict: process.env.CI !== "true",
   verbose: true,
 } satisfies Config;

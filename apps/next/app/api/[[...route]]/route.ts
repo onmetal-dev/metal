@@ -4,9 +4,7 @@ import { otelTracer } from "./tracing";
 import { serviceName } from "@/lib/constants";
 import { HTTPException } from "hono/http-exception";
 
-export const config = {
-  runtime: "nodejs",
-};
+export const runtime = "nodejs";
 
 // After deliberating between trpc and hono I decided hono since it was
 // much, much more straightforward for getting a basic openapi setup going
