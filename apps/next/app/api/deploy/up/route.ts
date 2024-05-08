@@ -1,7 +1,7 @@
 import { clerkClient } from "@clerk/nextjs";
 import { type NextRequest } from "next/server";
 import { spawn } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, rmdirSync } from "node:fs";
 import { Writable } from "node:stream";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,9 @@ export async function POST(request: NextRequest) {
 
   const tempDir = 'temp';
   if (!existsSync(tempDir)) {
+    mkdirSync(tempDir);
+  } else {
+    rmdirSync(tempDir, { recursive: true });
     mkdirSync(tempDir);
   }
 

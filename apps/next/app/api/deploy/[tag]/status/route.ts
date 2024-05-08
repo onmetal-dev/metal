@@ -50,13 +50,19 @@ const mockGetDeploymentStatus = async (deploymentTag: string): Promise<Deploymen
   });
 };
 
-async function* makeIterator() {
-  yield encoder.encode('Compiling Dockerfile...')
+async function* makeIterator(buildTag: string) {
+  yield encoder.encode('Planning build...')
+  // await exec('nixpacks plan ./temp --pkgs docker-buildx > ./temp/build-plan.json');
   await exec('nixpacks plan ./temp > ./temp/build-plan.json');
-  await exec('nixpacks build --config build-plan.json ./temp');
+  await sleep(1000);
+  yield encoder.encode('Generating Dockerfile...')
+  await exec(`nixpacks build ./temp --name ${buildTag} --config build-plan.json --out temp`);
+  await sleep(5000);
   yield encoder.encode('Building OCI image...')
-  await sleep(5000)
-  yield encoder.encode('Deployed...')
+  // await exec(`echo ${process.env.DOCKERHUB_TOKEN} | docker login -u ${process.env.DOCKERHUB_USERNAME} --password-stdin && docker buildx create --driver cloud onmetal/arm-builder`);
+  // await exec(`echo ${process.env.DOCKERHUB_TOKEN} | docker login -u ${process.env.DOCKERHUB_USERNAME} --password-stdin && cd temp && pwd && docker buildx build . --tag sample-build:${buildTag}`);
+  await exec(`docker build temp --file .nixpacks/Dockerfile --tag sample-build:${buildTag}`);
+  yield encoder.encode('Deployed...');
 }
 
 export async function GET(
@@ -82,7 +88,7 @@ export async function GET(
     )
   }
 
-  const iterator = makeIterator()
+  const iterator = makeIterator(tag)
   const stream = iteratorToStream(iterator)
 
   return new Response(stream)

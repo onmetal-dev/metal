@@ -79,7 +79,7 @@ program
   .command("login")
   .description("Login to onmetal.dev")
   .option("--token", "or METAL_TOKEN. Provide a token manually, useful for CI")
-  .action(async (str, options) => {
+  .action(async (options) => {
     if (config.whoami) {
       log(
         `Already logged in as ${config.whoami.user.email}. Use ${chalk.red(
@@ -155,7 +155,8 @@ program
   .command("up")
   .description("Deploy a project")
   .option("--token", "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI.")
-  .action(async (str, options) => {
+  .option("--workingDir <workingDir>", "Set the directory you want to deploy. Defaults to the current directory.")
+  .action(async (options) => {
     let step = 1;
     log(`[${step}] Checking for token...`);
     const userConfig = checkUserConfig();
@@ -167,21 +168,36 @@ program
     }
 
     log(`[${++step}] Collating files to deploy...`);
-    const { stdout, stderr } = await exec(`git ls-files`);
-    if (stderr) {
-      console.error(stderr);
+    const workingDir = options.workingDir || process.cwd();
+
+    let pathsToCompress: string[] = [];
+    try {
+      const { stdout, stderr } = await exec(`cd ${workingDir} && git ls-files`);
+      if (stderr) {
+        console.error("Failed to use Git list your files.");
+        console.error(stderr);
+        process.exit(1);
+      }
+
+      pathsToCompress = stdout
+        .split("\n")
+        .filter((path) => !!path && !path.endsWith(".gitignore"));
+    } catch (error) {
+      console.error("Error compiling a list of files to archive.");
+      console.error(error);
       process.exit(1);
     }
 
-    const pathsToArchive = stdout
-      .split("\n")
-      .filter((path) => !!path && !path.endsWith(".gitignore"));
+    if (!pathsToCompress.length) {
+      console.error("Error: the list of files to archive is empty. Please check that your working directory is a Git repository and that there are git-tracked files available.");
+      process.exit(1);
+    }
 
     log(`[${++step}] Compressing files...`);
     const payloadStream = createTar({
       gzip: true,
-      cwd: process.cwd(),
-    }, pathsToArchive);
+      cwd: workingDir,
+    }, pathsToCompress);
 
     log(`[${++step}] Uploading...`);
     const reqOptions = {
