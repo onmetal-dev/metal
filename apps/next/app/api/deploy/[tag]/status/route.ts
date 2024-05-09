@@ -1,6 +1,8 @@
+import { NixpackPlan } from "@/types/deployment";
 import { clerkClient } from "@clerk/nextjs";
 import { type NextRequest } from "next/server";
 import { exec as execCallbackBased } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import { promisify } from "node:util";
 
 const exec = promisify(execCallbackBased);
@@ -51,18 +53,24 @@ const mockGetDeploymentStatus = async (deploymentTag: string): Promise<Deploymen
 };
 
 async function* makeIterator(buildTag: string) {
-  yield encoder.encode('Planning build...')
-  // await exec('nixpacks plan ./temp --pkgs docker-buildx > ./temp/build-plan.json');
-  await exec('nixpacks plan ./temp > ./temp/build-plan.json');
+  yield encoder.encode('Planning build...');
+  const { stdout: stdoutJson } = await exec('nixpacks plan ./temp');
+  const plan = JSON.parse(stdoutJson) as NixpackPlan;
+  // Filtering out 'npm-9_x' because for some reason it's not listed on:
+  // https://search.nixos.org/packages
+  plan.phases.setup.nixPkgs =
+    plan.phases.setup.nixPkgs.filter(nixPackage => nixPackage !== 'npm-9_x');
+  writeFileSync('./temp/build-plan.json', JSON.stringify(plan, null, 2), "utf8");
   await sleep(1000);
-  yield encoder.encode('Generating Dockerfile...')
+
+  yield encoder.encode('Generating Dockerfile...');
   await exec(`nixpacks build ./temp --name ${buildTag} --config build-plan.json --out temp`);
-  await sleep(5000);
-  yield encoder.encode('Building OCI image...')
-  // await exec(`echo ${process.env.DOCKERHUB_TOKEN} | docker login -u ${process.env.DOCKERHUB_USERNAME} --password-stdin && docker buildx create --driver cloud onmetal/arm-builder`);
-  // await exec(`echo ${process.env.DOCKERHUB_TOKEN} | docker login -u ${process.env.DOCKERHUB_USERNAME} --password-stdin && cd temp && pwd && docker buildx build . --tag sample-build:${buildTag}`);
-  await exec(`docker build temp --file .nixpacks/Dockerfile --tag sample-build:${buildTag}`);
-  yield encoder.encode('Deployed...');
+  await exec(`mv ./temp/.nixpacks/Dockerfile ./temp/Dockerfile`);
+  await sleep(1000);
+
+  yield encoder.encode('Building OCI image...');
+  await exec(`docker buildx build temp --builder ${process.env.CLOUD_BUILDER_NAME} --tag build:${buildTag}`);
+  yield encoder.encode('OCI image built...');
 }
 
 export async function GET(
