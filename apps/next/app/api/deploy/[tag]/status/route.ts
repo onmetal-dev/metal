@@ -95,6 +95,7 @@ export async function GET(
     );
   }
 
+  // TODO Folusho: store and check the deployment status.
   const { status } = await mockGetDeploymentStatus(tag);
 
   if (status === DeploymentStatus.SUCCESS || status === DeploymentStatus.FAILED) {
