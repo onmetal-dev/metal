@@ -6,6 +6,9 @@ import { writeFileSync } from "node:fs";
 import { promisify } from "node:util";
 
 const exec = promisify(execCallbackBased);
+const org = process.env.DOCKERHUB_ORG;
+const repo = process.env.DOCKERHUB_REPO;
+const cloudBuilderName = process.env.CLOUD_BUILDER_NAME;
 
 // This code below is heavily based on:
 // https://nextjs.org/docs/app/building-your-application/routing/route-handlers#streaming
@@ -69,8 +72,6 @@ async function* makeIterator(buildTag: string) {
   await sleep(1000);
 
   yield encoder.encode('Building OCI image...');
-  const org = process.env.DOCKERHUB_ORG;
-  const repo = process.env.DOCKERHUB_REPO;
   /* NOTE: the build takes place in the cloud, so a copy of the build image is
   not available locally. Using the "--push" flag works because the Docker BuildCloud
   can directly export the built image to DockerHub. If you want to use the
@@ -79,7 +80,7 @@ async function* makeIterator(buildTag: string) {
   "--output type=registry". For more details, see:
   https://docs.docker.com/reference/cli/docker/buildx/build/#output
   */
-  await exec(`docker buildx build temp --builder ${process.env.CLOUD_BUILDER_NAME} --tag ${org}/${repo}:${buildTag} --push`);
+  await exec(`docker buildx build temp --builder ${cloudBuilderName} --tag ${org}/${repo}:${buildTag} --push`);
   yield encoder.encode('OCI image built...');
 }
 
