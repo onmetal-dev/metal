@@ -69,7 +69,17 @@ async function* makeIterator(buildTag: string) {
   await sleep(1000);
 
   yield encoder.encode('Building OCI image...');
-  await exec(`docker buildx build temp --builder ${process.env.CLOUD_BUILDER_NAME} --tag build:${buildTag}`);
+  const org = process.env.DOCKERHUB_ORG;
+  const repo = process.env.DOCKERHUB_REPO;
+  /* NOTE: the build takes place in the cloud, so a copy of the build image is
+  not available locally. Using the "--push" flag works because the Docker BuildCloud
+  can directly export the built image to DockerHub. If you want to use the
+  image locally, you'll have to replace "--push" with something like
+  "--output type=docker". After all, "--push" is just shorthand for
+  "--output type=registry". For more details, see:
+  https://docs.docker.com/reference/cli/docker/buildx/build/#output
+  */
+  await exec(`docker buildx build temp --builder ${process.env.CLOUD_BUILDER_NAME} --tag ${org}/${repo}:${buildTag} --push`);
   yield encoder.encode('OCI image built...');
 }
 
