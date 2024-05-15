@@ -45,3 +45,4 @@ temporal/lib
 # Deployment files
 temp/
 *.gz
+ups

@@ -1,10 +1,13 @@
+import { getDirectoryNameForUps } from "@/app/server/util/functions";
 import { clerkClient } from "@clerk/nextjs";
 import { type NextRequest } from "next/server";
 import { spawn } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync, rmdirSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync } from "node:fs";
 import { Writable } from "node:stream";
+import { dirSync } from "tmp";
 
 export const dynamic = "force-dynamic";
+const upsDirectory = getDirectoryNameForUps();
 
 export async function POST(request: NextRequest) {
   const authStatus = await clerkClient.authenticateRequest({ request });
@@ -18,27 +21,30 @@ export async function POST(request: NextRequest) {
     return new Response(JSON.stringify({}), { status: 400 });
   }
 
-  const tempDir = 'temp';
-  if (!existsSync(tempDir)) {
-    mkdirSync(tempDir);
-  } else {
-    rmdirSync(tempDir, { recursive: true });
-    mkdirSync(tempDir);
+  const tag = `up_${Date.now()}`;
+  if (!existsSync(upsDirectory)) {
+    mkdirSync(upsDirectory);
   }
+  const { name: tempDirName } = dirSync({
+    tmpdir: upsDirectory,
+    name: tag,
+  });
 
-  const tag = `foo-${Date.now()}`;
   const filename = `${tag}.gz`;
   const uploadedTarball = Writable.toWeb(
     createWriteStream(filename, "binary")
   ) as WritableStream<Uint8Array>;
   await request.body.pipeTo(uploadedTarball);
 
-  const extractionStream = spawn('tar', ['xzfv', filename, '-C', tempDir]);
-  await new Promise<void>((resolve) => {
+  const extractionStream = spawn('tar', ['xzfv', filename, '-C', tempDirName]);
+  await new Promise<void>((resolve, reject) => {
     extractionStream.on('exit', () => {
       console.log("Tarball extracted");
       resolve();
     });
+    extractionStream.on('error', (error) => {
+      reject(error);
+    })
   });
 
   return new Response(

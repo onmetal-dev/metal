@@ -1,3 +1,4 @@
+import { getDirectoryNameForUps } from "@/app/server/util/functions";
 import { NixpackPlan } from "@/types/deployment";
 import { clerkClient } from "@clerk/nextjs";
 import { type NextRequest } from "next/server";
@@ -9,6 +10,7 @@ const exec = promisify(execCallbackBased);
 const org = process.env.DOCKERHUB_ORG;
 const repo = process.env.DOCKERHUB_REPO;
 const cloudBuilderName = process.env.CLOUD_BUILDER_NAME;
+const upsDirectory = getDirectoryNameForUps();
 
 // This code below is heavily based on:
 // https://nextjs.org/docs/app/building-your-application/routing/route-handlers#streaming
@@ -57,18 +59,19 @@ const mockGetDeploymentStatus = async (deploymentTag: string): Promise<Deploymen
 
 async function* makeIterator(buildTag: string) {
   yield encoder.encode('Planning build...');
-  const { stdout: stdoutJson } = await exec('nixpacks plan ./temp');
+  const tempDirName = `./${upsDirectory}/${buildTag}`;
+  const { stdout: stdoutJson } = await exec(`nixpacks plan ${tempDirName}`);
   const plan = JSON.parse(stdoutJson) as NixpackPlan;
   // Filtering out 'npm-9_x' because for some reason it's not listed on:
   // https://search.nixos.org/packages
   plan.phases.setup.nixPkgs =
     plan.phases.setup.nixPkgs.filter(nixPackage => nixPackage !== 'npm-9_x');
-  writeFileSync('./temp/build-plan.json', JSON.stringify(plan, null, 2), "utf8");
+  writeFileSync(`${tempDirName}/build-plan.json`, JSON.stringify(plan, null, 2), "utf8");
   await sleep(1000);
 
   yield encoder.encode('Generating Dockerfile...');
-  await exec(`nixpacks build ./temp --name ${buildTag} --config build-plan.json --out temp`);
-  await exec(`mv ./temp/.nixpacks/Dockerfile ./temp/Dockerfile`);
+  await exec(`nixpacks build ${tempDirName} --name ${buildTag} --config build-plan.json --out ${tempDirName}`);
+  await exec(`mv ${tempDirName}/.nixpacks/Dockerfile ${tempDirName}/Dockerfile`);
   await sleep(1000);
 
   yield encoder.encode('Building OCI image...');
@@ -80,7 +83,7 @@ async function* makeIterator(buildTag: string) {
   "--output type=registry". For more details, see:
   https://docs.docker.com/reference/cli/docker/buildx/build/#output
   */
-  await exec(`docker buildx build temp --builder ${cloudBuilderName} --tag ${org}/${repo}:${buildTag} --push`);
+  await exec(`docker buildx build ${tempDirName} --builder ${cloudBuilderName} --tag ${org}/${repo}:${buildTag} --push`);
   yield encoder.encode('OCI image built...');
 }
 
