@@ -153,10 +153,10 @@ const checkUserConfig = () => {
 
 program
   .command("up")
+  .argument("[sourceDir]", "[OPTIONAL] The absolute or relative path of the directory you want to deploy. Defaults to the current directory.")
   .description("Deploy a project")
   .option("--token", "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI.")
-  .option("--workingDir <workingDir>", "Set the directory you want to deploy. Defaults to the current directory.")
-  .action(async (options) => {
+  .action(async (sourceDir, options) => {
     let step = 1;
     log(`[${step}] Checking for token...`);
     const userConfig = checkUserConfig();
@@ -168,7 +168,7 @@ program
     }
 
     log(`[${++step}] Collating files to deploy...`);
-    const workingDir = options.workingDir || process.cwd();
+    const workingDir = sourceDir || process.cwd();
 
     let pathsToCompress: string[] = [];
     try {
