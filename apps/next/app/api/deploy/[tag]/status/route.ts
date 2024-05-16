@@ -3,7 +3,7 @@ import { NixpackPlan } from "@/types/deployment";
 import { clerkClient } from "@clerk/nextjs";
 import { type NextRequest } from "next/server";
 import { exec as execCallbackBased } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, existsSync } from "node:fs";
 import { promisify } from "node:util";
 
 const exec = promisify(execCallbackBased);
@@ -83,7 +83,16 @@ async function* makeIterator(buildTag: string) {
   "--output type=registry". For more details, see:
   https://docs.docker.com/reference/cli/docker/buildx/build/#output
   */
-  await exec(`docker buildx build ${tempDirName} --builder ${cloudBuilderName} --tag ${org}/${repo}:${buildTag} --push`);
+  let dockerConfig = "";
+  const hasCustomDockerConfig = existsSync(`${tempDirName}/.docker/config.json`);
+  if (hasCustomDockerConfig) {
+    dockerConfig = `--config ${tempDirName}/.docker/config.json`;
+  }
+  await exec(`docker${hasCustomDockerConfig ? " " : ""}${dockerConfig}\
+ buildx build ${tempDirName}\
+ --builder ${cloudBuilderName}\
+ --tag ${org}/${repo}:${buildTag}\
+ --push`);
   yield encoder.encode('OCI image built...');
 }
 
