@@ -38,6 +38,14 @@ export async function POST(request: NextRequest) {
 
   const extractionStream = spawn('tar', ['xzfv', filename, '-C', tempDirName]);
   await new Promise<void>((resolve, reject) => {
+    // These two log no data, not even '2--> '.
+    extractionStream.stdout.on('data', (data) => {
+      console.log(`2--> stdout ${data}`);
+    });
+    extractionStream.on('data', (data) => {
+      console.log(`2--> ${data}`);
+    });
+
     extractionStream.on('exit', () => {
       console.log("Tarball extracted");
       resolve();

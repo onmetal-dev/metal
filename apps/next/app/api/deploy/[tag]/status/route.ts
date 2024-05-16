@@ -88,11 +88,34 @@ async function* makeIterator(buildTag: string) {
   if (hasCustomDockerConfig) {
     dockerConfig = `--config ${tempDirName}/.docker/config.json`;
   }
-  await exec(`docker${hasCustomDockerConfig ? " " : ""}${dockerConfig}\
+  await new Promise((resolve, reject) => {
+    const dockerBuildStream = execCallbackBased(`docker${hasCustomDockerConfig ? " " : ""}${dockerConfig}\
  buildx build ${tempDirName}\
  --builder ${cloudBuilderName}\
  --tag ${org}/${repo}:${buildTag}\
  --push`);
+    dockerBuildStream.on('error', (err) => {
+      console.log('err', err);
+      reject(err);
+    })
+    dockerBuildStream.on('exit', (code) => {
+      console.log('exit', code);
+      resolve(code);
+    });
+    dockerBuildStream.on('close', (code) => {
+      console.log('code', code);
+    })
+    dockerBuildStream.on('message', (message) => {
+      console.log('message', message);
+    })
+    // Neither do these two log data.
+    dockerBuildStream.stdout?.on('data', (data) => {
+      console.log('dockerBuildStream stdout data', data);
+    })
+    dockerBuildStream.on('data', (data) => {
+      console.log('dockerBuildStream data', data);
+    })
+  })
   yield encoder.encode('OCI image built...');
 }
 

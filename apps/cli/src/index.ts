@@ -12,6 +12,7 @@ import { exec as execCallbackBased } from "node:child_process";
 import { create as createTar } from "tar";
 import { request as insecureRequest } from "node:http";
 import { request as secureRequest } from "node:https";
+import { spawn } from "node:child_process";
 
 const exec = promisify(execCallbackBased);
 
@@ -240,6 +241,12 @@ program
 
     const body = JSON.parse(bodyAsString);
     log(`--> Deployment started. Tag is ${body.tag}`);
+
+    const subprocess = spawn('ls', ['-l']);
+    // This successfully logs data
+    subprocess.stdout.on('data', (data) => {
+      console.log(`[LS ON CLIENT] Received chunk ${data}`);
+    });
 
     log(`[${++step}] Checking deployment status...`);
     const statusPromise = new Promise<string>((resolve, reject) => {
