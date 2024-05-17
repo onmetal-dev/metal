@@ -158,7 +158,7 @@ program
   .option("--token", "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI.")
   .action(async (sourceDir, options) => {
     let step = 0;
-    log(`[${chalk.green(++step)}] Checking for token...`);
+    log(chalk.green(`[${++step}] Checking for token...`));
     const userConfig = checkUserConfig();
     // Token hierachy: commandline > config file > environment variable
     const token = options.token || userConfig.whoami.token || process.env.METAL_TOKEN;
@@ -167,7 +167,7 @@ program
       process.exit(1);
     }
 
-    log(`[${chalk.green(++step)}] Collating files to deploy...`);
+    log(chalk.green(`[${++step}] Collating files to deploy...`));
     const workingDir = sourceDir || process.cwd();
 
     let pathsToCompress: string[] = [];
@@ -193,13 +193,13 @@ program
       process.exit(1);
     }
 
-    log(`[${chalk.green(++step)}] Compressing files...`);
+    log(chalk.green(`[${++step}] Compressing files...`));
     const payloadStream = createTar({
       gzip: true,
       cwd: workingDir,
     }, pathsToCompress);
 
-    log(`[${chalk.green(++step)}] Uploading...`);
+    log(chalk.green(`[${++step}] Uploading...`));
     const reqOptions = {
       host: baseUrlObj.hostname,
       port: baseUrlObj.port || 80,
@@ -217,10 +217,17 @@ program
 
       request.on('response', (res) => {
         res.on('data', (chunk) => {
+          const chunkAsString = chunk.toString();
+          if (!chunkAsString.includes("[<FE>]")) {
+            log(chunkAsString);
+            return;
+          }
+
           log(
-            `${chunk.toString()}`
+            // TODO: If Raf likes the green text, figure out how to greenify Metal lines apart from streamed build updates.
+            chunkAsString
               .replaceAll('.[<FE>]', '.\n[<FE>]')
-              .replaceAll('[<FE>]', `[${chalk.green(++step)}]`)
+              .replaceAll('[<FE>]', chalk.green(`[${++step}]`))
           );
         });
         res.on('error', (err) => {
@@ -229,7 +236,7 @@ program
           reject(err);
         });
         res.on('end', () => {
-          log(`[${chalk.green(++step)}] Deployment finished.`);
+          log(chalk.green(`[${++step}] Deployment finished.`));
           resolve();
         });
       });
@@ -243,7 +250,7 @@ program
       payloadStream.pipe(request);
     });
 
-    log("[END]");
+    log(chalk.green("[END]"));
   });
 
 program.parse();

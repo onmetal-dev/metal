@@ -20,7 +20,7 @@ const cloudBuilderName = process.env.CLOUD_BUILDER_NAME;
 // https://nextjs.org/docs/app/building-your-application/routing/route-handlers#streaming
 
 // https://developer.mozilla.org/docs/Web/API/ReadableStream#convert_async_iterator_to_stream
-function iteratorToStream(iterator: any) {
+function iteratorToStream(iterator: AsyncGenerator<Uint8Array, void, unknown>) {
   return new ReadableStream({
     async pull(controller) {
       const { value, done } = await iterator.next()
@@ -42,11 +42,48 @@ function sleep(time: number) {
 
 const encoder = new TextEncoder();
 
-async function* makeIterator(buildTag: string) {
+// Thanks ChatGPT!
+async function* streamIterator(stderr: NodeJS.ReadableStream) {
+  for await (const chunk of stderr) {
+    yield chunk.toString();
+  }
+}
+
+async function* makeIterator(buildTag: string, fileName: string) {
+  const { name: tempDirName } = dirSync({
+    tmpdir: upsDirectory,
+    name: buildTag,
+  });
+  const extractionStream = spawn('tar', ['xzfv', fileName, '-C', tempDirName]);
+  const extractionPromise = new Promise<void>((resolve, reject) => {
+    extractionStream.on('error', (error) => {
+      reject(error);
+    });
+    extractionStream.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Tarball extraction failed with code ${code}`));
+        return;
+      }
+
+      resolve();
+    });
+  });
+
+  let isFirstDataFromExtraction = true;
+  for await (const data of streamIterator(extractionStream.stderr)) {
+    if (isFirstDataFromExtraction) {
+      isFirstDataFromExtraction = false;
+      console.log(`***** METAL: Extract files for ${buildTag} *****`);
+    }
+
+    yield encoder.encode(`--> [EXTRACT FILES] ${data}`);
+  }
+
+  await extractionPromise;
+
   yield encoder.encode(`--> Deployment started. Tag is ${buildTag}.`);
 
   yield encoder.encode('[<FE>] Planning build...');
-  const tempDirName = `./${upsDirectory}/${buildTag}`;
   const { stdout: stdoutJson } = await exec(`nixpacks plan ${tempDirName}`);
   const plan = JSON.parse(stdoutJson) as NixpackPlan;
   // Filtering out 'npm-9_x' because for some reason it's not listed on:
@@ -70,50 +107,50 @@ async function* makeIterator(buildTag: string) {
   https://docs.docker.com/reference/cli/docker/buildx/build/#output
   */
   const hasCustomDockerConfig = existsSync(`${tempDirName}/.docker/config.json`);
-  await new Promise((resolve, reject) => {
-    // Trust me, don't have spaces within any flag.
-    let dockerFlags = [
-      "buildx",
-      "build",
-      tempDirName,
-      "--builder",
-      cloudBuilderName || "",
-      "--tag",
-      `${org}/${repo}:${buildTag}`,
-      "--push",
-    ];
+  const dockerFlags = [
+    "buildx",
+    "build",
+    tempDirName,
+    "--builder",
+    cloudBuilderName || "",
+    "--tag",
+    `${org}/${repo}:${buildTag}`,
+    "--push",
+  ];
 
-    if (hasCustomDockerConfig) {
-      dockerFlags = [
-        // The --config flag is for the docker command itself. Keep it at the head of the list.
-        '--config',
-        `${tempDirName}/.docker/config.json`,
-        ...dockerFlags,
-      ];
-    }
+  if (hasCustomDockerConfig) {
+    dockerFlags.unshift('--config', `${tempDirName}/.docker/config.json`);
+  }
 
-    const dockerBuildStream = spawn("docker", dockerFlags);
+  const dockerBuildStream = spawn("docker", dockerFlags);
+
+  const dockerPromise = new Promise<void>((resolve, reject) => {
     dockerBuildStream.on('error', (err) => {
       console.log('err', err);
       reject(err);
     });
 
-    dockerBuildStream.on('close', (code) => {
-      resolve(code);
-    });
-
-    let isFirstDataChunk = true;
-    dockerBuildStream.stderr.on('data', (data: Buffer) => {
-      if (isFirstDataChunk) {
-        isFirstDataChunk = false;
-        console.log('***** METAL: Docker build *****');
+    dockerBuildStream.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Docker build failed with code ${code}`));
+        return;
       }
 
-      console.log(`${data}`);
-      // Resorted to logging for now as an initial attempt to use "yield" here didn't work, apparently because it was an inner generator (i.e. inner function*). Will try again.
-      // yield encoder.encode(`--> [DOCKER BUILD] ${data}`);
+      resolve();
     });
   });
+
+  let isFirstDataFromDockerBuild = true;
+  for await (const data of streamIterator(dockerBuildStream.stderr)) {
+    if (isFirstDataFromDockerBuild) {
+      isFirstDataFromDockerBuild = false;
+      console.log(`***** METAL: Docker build for ${buildTag} *****`);
+    }
+
+    yield encoder.encode(`--> [DOCKER BUILD] ${data}`);
+  }
+
+  await dockerPromise;
 
   yield encoder.encode('[<FE>] OCI image built...');
 }
@@ -134,43 +171,14 @@ export async function POST(request: NextRequest) {
   if (!existsSync(upsDirectory)) {
     mkdirSync(upsDirectory);
   }
-  const { name: tempDirName } = dirSync({
-    tmpdir: upsDirectory,
-    name: tag,
-  });
 
-  const filename = `${tag}.gz`;
+  const fileName = `${tag}.gz`;
   const uploadedTarball = Writable.toWeb(
-    createWriteStream(filename, "binary")
+    createWriteStream(fileName, "binary")
   ) as WritableStream<Uint8Array>;
   await request.body.pipeTo(uploadedTarball);
 
-  const extractionStream = spawn('tar', ['xzfv', filename, '-C', tempDirName]);
-  await new Promise<void>((resolve, reject) => {
-    let isFirstDataChunk = true;
-    extractionStream.stderr.on('data', (data: Buffer) => {
-      if (isFirstDataChunk) {
-        isFirstDataChunk = false;
-        console.log('***** METAL: Extract files *****');
-      }
-
-      console.log(`${data}`);
-    });
-    extractionStream.on('exit', (code) => {
-      if (code !== 0) {
-        reject(new Error(`Tarball extraction failed with code ${code}`));
-        return;
-      }
-
-      console.log("Tarball extracted");
-      resolve();
-    });
-    extractionStream.on('error', (error) => {
-      reject(error);
-    })
-  });
-
-  const iterator = makeIterator(tag)
+  const iterator = makeIterator(tag, fileName)
   const stream = iteratorToStream(iterator)
 
   return new Response(stream)
