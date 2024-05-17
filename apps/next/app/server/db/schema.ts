@@ -37,7 +37,9 @@ const schemaDefaults = {
   ...createdAndUpdatedAt,
 };
 
-export const metalSchema = pgSchema(sqlSchemaForEnv(process.env.NODE_ENV!, process.env.CI));
+export const metalSchema = pgSchema(
+  sqlSchemaForEnv(process.env.NODE_ENV!, process.env.CI)
+);
 
 export const users = metalSchema.table(
   "users",
@@ -92,7 +94,7 @@ export const usersToTeams = metalSchema.table(
       .references(() => users.id),
     teamId: varchar("team_id", { length: 22 })
       .notNull()
-      .references(() => teams.id),
+      .references(() => teams.id, { onDelete: "cascade" }),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.userId, t.teamId] }),
@@ -117,9 +119,12 @@ export const usersToTeamsRelations = relations(usersToTeams, ({ one }) => ({
 export const hetznerProjects = metalSchema.table("hetzner_projects", {
   ...schemaDefaults,
   creatorId: varchar("creator_id", { length: 22 }).notNull(),
-  teamId: varchar("team_id", { length: 22 }).notNull(),
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
   hetznerName: text("hetzner_project_name").notNull(),
   hetznerApiToken: text("hetzner_api_token").notNull(),
+  sshKeyName: text("ssh_key_name"),
   publicSshKeyData: text("public_ssh_key_data"),
   privateSshKeyData: text("private_ssh_key_data"),
   hetznerWebserviceUsername: text("hetzner_web_service_username").$type<
@@ -161,6 +166,9 @@ export const hetznerNetworkZoneEnum = pgEnum("hetzner_network_zone_enum", [
   "us-east",
   "us-west",
 ]);
+export type HetznerNetworkZoneEnum =
+  (typeof hetznerNetworkZoneEnum.enumValues)[number];
+
 export const hetznerLocationEnum = pgEnum("hetzner_location_enum", [
   "fsn1", // eu-central
   "nbg1", // eu-central
@@ -168,6 +176,8 @@ export const hetznerLocationEnum = pgEnum("hetzner_location_enum", [
   "ash", // us-east
   "hil", // us-west
 ]);
+export type HetznerLocationEnum =
+  (typeof hetznerLocationEnum.enumValues)[number];
 
 export const hetznerClusterStatusEnum = pgEnum("hetzner_cluster_status_enum", [
   "creating", // waiting for the k8s cluster api to finish its thing
@@ -178,21 +188,31 @@ export const hetznerClusterStatusEnum = pgEnum("hetzner_cluster_status_enum", [
   "destroyed", // the cluster is fully destroyed
   "error", // something went wrong
 ]);
+export type HetznerClusterStatusEnum =
+  (typeof hetznerClusterStatusEnum.enumValues)[number];
 
 // hetznerClusters. This represents k8s clusters that we spin up within a user's Hetzner account.
 export const hetznerClusters = metalSchema.table("hetzner_clusters", {
   ...schemaDefaults,
   creatorId: varchar("creator_id", { length: 22 }).notNull(),
-  teamId: varchar("team_id", { length: 22 }).notNull(),
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
   hetznerProjectId: varchar("hetzner_project_id", { length: 22 }).notNull(),
   name: text("name").notNull(), // what we call it in the cluster api (assigned)
-  vanityName: text("vanity_name").notNull(), // name the user gave it
   status: hetznerClusterStatusEnum("status").notNull(),
   networkZone: hetznerNetworkZoneEnum("network_zone").notNull(),
-  cidr: text("cidr").notNull(),
   location: hetznerLocationEnum("location").notNull(),
   k8sVersion: text("k8s_version").notNull(),
+  clusterctlVersion: text("clusterctl_version"),
+  clusterctlTemplate: text("clusterctl_manifest"),
+  kubeconfig: text("kubeconfig"),
 });
+
+export const insertHetznerClusterSchema = createInsertSchema(hetznerClusters);
+export type HetznerClusterInsert = z.infer<typeof insertHetznerClusterSchema>;
+export const selectHetznerClusterSchema = createSelectSchema(hetznerClusters);
+export type HetznerCluster = z.infer<typeof selectHetznerClusterSchema>;
 
 export const hetznerClusterRelations = relations(
   hetznerClusters,
@@ -218,11 +238,11 @@ export const hetznerInstanceTypeEnum = pgEnum("hetzner_instance_type_enum", [
   // Cloud Shared AMD and Cloud Dedicated AMD are available in all locations, so list those out
   // https://docs.hetzner.com/cloud/general/locations/#which-cloud-products-are-available
   // amd shared: (knock off 0.50 for ipv6 only. all come with 20 TB traffic)
-  "cpx11", // 2 vcpu, 2 gb ram, 20 gb disk, 4.35/mo
-  "cpx21", // 3 vcpu, 4 gb ram, 80 gb disk, 7.55/mo
-  "cpx31", // 4 vcpu, 8 gb ram, 160 gb disk, 13.60/mo
-  "cpx41", // 8 vcpu, 16 gb ram, 240 gb disk, 25.20/mo
-  "cpx51", // 16 vcpu, 32 gb ram, 360 gb disk, 54.90/mo
+  // "cpx11", // 2 vcpu, 2 gb ram, 20 gb disk, 4.35/mo
+  // "cpx21", // 3 vcpu, 4 gb ram, 80 gb disk, 7.55/mo
+  // "cpx31", // 4 vcpu, 8 gb ram, 160 gb disk, 13.60/mo
+  // "cpx41", // 8 vcpu, 16 gb ram, 240 gb disk, 25.20/mo
+  // "cpx51", // 16 vcpu, 32 gb ram, 360 gb disk, 54.90/mo
   // amd dedicated: (also knock off 0.50 for ipv6 only. range from 20 to 60 TB traffic)
   // "ccx13", // 2 vcpu, 8 gb ram, 80 gb disk, 12.49/mo
   // "ccx23", // 4 vcpu, 16 gb ram, 160 gb disk, 24.49/mo
@@ -239,16 +259,61 @@ export const hetznerInstanceTypeEnum = pgEnum("hetzner_instance_type_enum", [
   "cax31", // 8 vcpu, 16 gb ram, 160 gb disk, 12.49/mo
   "cax41", // 16 vcpu, 32 gb ram, 320 gb disk, 24.49/mo
 ]);
+export type HetznerInstanceTypeEnum =
+  (typeof hetznerInstanceTypeEnum.enumValues)[number];
 
 // hetznerNodeGroups subdivide clusters and provide isolation for different workload types.
-export const hetznerNodeGroups = metalSchema.table("hetzner_node_group", {
+export const hetznerNodeGroups = metalSchema.table("hetzner_node_groups", {
   ...schemaDefaults,
-  clusterId: varchar("cluster_id", { length: 22 }).notNull(),
+  clusterId: varchar("cluster_id", { length: 22 })
+    .notNull()
+    .references(() => hetznerClusters.id, { onDelete: "cascade" }),
   type: nodeGroupTypeEnum("type").notNull(),
   instanceType: hetznerInstanceTypeEnum("instance_type").notNull(),
   minNodes: integer("min_nodes").notNull(),
   maxNodes: integer("max_nodes").notNull(),
 });
+
+export const insertHetznerNodeGroupSchema =
+  createInsertSchema(hetznerNodeGroups);
+export type HetznerNodeGroupInsert = z.infer<
+  typeof insertHetznerNodeGroupSchema
+>;
+export const selectHetznerNodeGroupSchema =
+  createSelectSchema(hetznerNodeGroups);
+export const selectHetznerClusterWithNodeGroupsSchema =
+  selectHetznerClusterSchema.extend({
+    nodeGroups: selectHetznerNodeGroupSchema.array(),
+  });
+export type HetznerClusterWithNodeGroups = z.infer<
+  typeof selectHetznerClusterWithNodeGroupsSchema
+>;
+export type HetznerNodeGroup = z.infer<typeof selectHetznerNodeGroupSchema>;
+export const hetznerNodeGroupSpec = insertHetznerNodeGroupSchema.omit({
+  createdAt: true,
+  updatedAt: true,
+});
+export type HetznerNodeGroupSpec = z.infer<typeof hetznerNodeGroupSpec>;
+export const hetznerClusterSpec = insertHetznerClusterSchema
+  .omit({
+    createdAt: true,
+    updatedAt: true,
+    // fixed for now
+    name: true,
+    k8sVersion: true,
+    // to be filled in when we provision the cluster
+    creatorId: true, // implied by request auth
+    status: true,
+    networkZone: true, // set implicitly by location
+    hetznerProjectId: true,
+    clusterctlVersion: true,
+    clusterctlTemplate: true,
+    kubeconfig: true,
+  })
+  .extend({
+    nodeGroups: hetznerNodeGroupSpec.omit({ clusterId: true }).array(),
+  });
+export type HetznerClusterSpec = z.infer<typeof hetznerClusterSpec>;
 
 export const hetznerNodeGroupRelations = relations(
   hetznerNodeGroups,

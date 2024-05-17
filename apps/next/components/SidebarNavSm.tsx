@@ -44,8 +44,8 @@ export const SidebarNavSm = () => {
 
   const links = [
     {
-      href: "/dashboard/infrastructure",
-      label: "Infrastructure",
+      href: "/dashboard/clusters",
+      label: "Clusters",
       Icon: Server,
     },
     {
