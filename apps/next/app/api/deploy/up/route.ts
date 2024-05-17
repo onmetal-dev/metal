@@ -38,15 +38,21 @@ export async function POST(request: NextRequest) {
 
   const extractionStream = spawn('tar', ['xzfv', filename, '-C', tempDirName]);
   await new Promise<void>((resolve, reject) => {
-    // These two log no data, not even '2--> '.
-    extractionStream.stdout.on('data', (data) => {
-      console.log(`2--> stdout ${data}`);
-    });
-    extractionStream.on('data', (data) => {
-      console.log(`2--> ${data}`);
-    });
+    let isFirstDataChunk = true;
+    extractionStream.stderr.on('data', (data: Buffer) => {
+      if (isFirstDataChunk) {
+        isFirstDataChunk = false;
+        console.log('***** METAL: Extract files *****');
+      }
 
-    extractionStream.on('exit', () => {
+      console.log(`${data}`);
+    });
+    extractionStream.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Tarball extraction failed with code ${code}`));
+        return;
+      }
+
       console.log("Tarball extracted");
       resolve();
     });
