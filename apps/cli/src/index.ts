@@ -157,8 +157,8 @@ program
   .description("Deploy a project")
   .option("--token", "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI.")
   .action(async (sourceDir, options) => {
-    let step = 1;
-    log(`[${step}] Checking for token...`);
+    let step = 0;
+    log(`[${chalk.green(++step)}] Checking for token...`);
     const userConfig = checkUserConfig();
     // Token hierachy: commandline > config file > environment variable
     const token = options.token || userConfig.whoami.token || process.env.METAL_TOKEN;
@@ -167,7 +167,7 @@ program
       process.exit(1);
     }
 
-    log(`[${++step}] Collating files to deploy...`);
+    log(`[${chalk.green(++step)}] Collating files to deploy...`);
     const workingDir = sourceDir || process.cwd();
 
     let pathsToCompress: string[] = [];
@@ -193,13 +193,13 @@ program
       process.exit(1);
     }
 
-    log(`[${++step}] Compressing files...`);
+    log(`[${chalk.green(++step)}] Compressing files...`);
     const payloadStream = createTar({
       gzip: true,
       cwd: workingDir,
     }, pathsToCompress);
 
-    log(`[${++step}] Uploading...`);
+    log(`[${chalk.green(++step)}] Uploading...`);
     const reqOptions = {
       host: baseUrlObj.hostname,
       port: baseUrlObj.port || 80,
@@ -212,25 +212,30 @@ program
       },
     };
 
-    const bodyAsString = await new Promise<string>((resolve, reject) => {
-      const request = nodeRequest(reqOptions, response => {
-        let bodyJSONString = "";
-        response.on("data", (chunk) => {
-          bodyJSONString += chunk;
-        });
+    await new Promise<void>((resolve, reject) => {
+      const request = nodeRequest(reqOptions);
 
-        response.on("error", (err) => {
-          console.error(`Problem with response from upload: ${err.message}`);
+      request.on('response', (res) => {
+        res.on('data', (chunk) => {
+          log(
+            `${chunk.toString()}`
+              .replaceAll('.[<FE>]', '.\n[<FE>]')
+              .replaceAll('[<FE>]', `[${chalk.green(++step)}]`)
+          );
+        });
+        res.on('error', (err) => {
+          console.error(chalk.red('Failed to deploy project.'));
+          console.error(err);
           reject(err);
         });
-
-        response.on("end", () => {
-          resolve(bodyJSONString);
+        res.on('end', () => {
+          log(`[${chalk.green(++step)}] Deployment finished.`);
+          resolve();
         });
       });
 
       request.on("error", (err) => {
-        console.error(`Problem with upload request: ${err.message}`);
+        console.error(chalk.red(`Problem with upload request: ${err.message}`));
         reject(err);
       });
 
@@ -238,46 +243,7 @@ program
       payloadStream.pipe(request);
     });
 
-    const body = JSON.parse(bodyAsString);
-    log(`--> Deployment started. Tag is ${body.tag}`);
-
-    log(`[${++step}] Checking deployment status...`);
-    const statusPromise = new Promise<string>((resolve, reject) => {
-      const statusRequest = nodeRequest(
-        `${baseDomainWithProtocol}/api/deploy/${body.tag}/status`,
-        {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Accept": "application/json",
-          },
-        }
-      );
-
-      statusRequest.on('response', (res) => {
-        res.on('data', (chunk) => {
-          log(`[${++step}] ${chunk.toString()}`);
-        });
-        res.on('error', (err) => {
-          console.error('Failed to read response.');
-          console.error(err);
-          reject(err);
-        });
-        res.on('end', () => {
-          resolve('Deployment finished.');
-        });
-      });
-
-      statusRequest.on('error', (err) => {
-        console.error(`Error in status request: ${err.message}`);
-        reject(err);
-      });
-
-      statusRequest.end();
-    });
-
-    const result = await statusPromise;
-    log(`[END] ${result}`);
+    log("[END]");
   });
 
 program.parse();
