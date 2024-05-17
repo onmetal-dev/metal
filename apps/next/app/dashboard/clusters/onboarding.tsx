@@ -7,15 +7,15 @@ import { createHetznerProject } from "./actions";
 import { hetznerRedHex } from "@/lib/constants";
 import { useFormState, useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
-import {
-  createHetznerProjectInitialState,
-  createHetznerProjectState,
-} from "./shared";
+import hetznerLogoImage from "@/images/hetzner-square-200.jpg";
+import Image from "next/image";
+import { serverActionInitialState, serverActionState } from "./shared";
+import { preventDefaultEnter } from "@/lib/utils";
 
 export function Onboarding() {
   const [state, formAction] = useFormState(
     createHetznerProject,
-    createHetznerProjectInitialState
+    serverActionInitialState
   );
   const [apiKey, setApiKey] = React.useState("");
   const [projectName, setProjectName] = React.useState("");
@@ -26,44 +26,63 @@ export function Onboarding() {
   ];
 
   return (
-    <div className="flex w-full md:max-w-[700px] flex-col gap-4">
-      <form action={formAction}>
-        <input type="hidden" name="projectName" value={projectName} />
-        <input type="hidden" name="apiKey" value={apiKey} />
-        <Stepper orientation="vertical" initialStep={0} steps={steps}>
-          <Step {...steps[0]}>
-            <div className="flex mt-2 mb-4 text-primary rounded-md">
-              <HetznerLogin />
-            </div>
-            <StepButtons />
-          </Step>
-          <Step {...steps[1]}>
-            <div className="flex mt-2 mb-4 text-primary rounded-md">
-              <HetznerProject
-                projectName={projectName}
-                setProjectName={setProjectName}
-              />
-            </div>
-            <StepButtons />
-          </Step>
-          <Step {...steps[2]}>
-            <div className="flex mt-2 mb-4 text-primary rounded-md">
-              <HetznerApiKey apiKey={apiKey} setApiKey={setApiKey} />
-            </div>
-            <StepButtons />
-            <Result state={state} />
-          </Step>
-        </Stepper>
-      </form>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <div>
+          <Image
+            src={hetznerLogoImage}
+            alt="Hetzner Logo"
+            width={50}
+            height={50}
+          />
+        </div>
+        <h1 className="text-xl font-semibold">Connect your Hetzner account</h1>
+      </div>
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-muted-foreground">
+          Follow the steps below to connect a Hetzner project and API key to
+          Metal.
+        </p>
+      </div>
+      <div className="flex w-full md:max-w-[700px] flex-col gap-4">
+        <form action={formAction}>
+          <input type="hidden" name="projectName" value={projectName} />
+          <input type="hidden" name="apiKey" value={apiKey} />
+          <Stepper orientation="vertical" initialStep={0} steps={steps}>
+            <Step {...steps[0]}>
+              <div className="flex mt-2 mb-4 text-primary rounded-md">
+                <HetznerLogin />
+              </div>
+              <StepButtons />
+            </Step>
+            <Step {...steps[1]}>
+              <div className="flex mt-2 mb-4 text-primary rounded-md">
+                <HetznerProject
+                  projectName={projectName}
+                  setProjectName={setProjectName}
+                />
+              </div>
+              <StepButtons />
+            </Step>
+            <Step {...steps[2]}>
+              <div className="flex mt-2 mb-4 text-primary rounded-md">
+                <HetznerApiKey apiKey={apiKey} setApiKey={setApiKey} />
+              </div>
+              <StepButtons />
+              <Result state={state} />
+            </Step>
+          </Stepper>
+        </form>
+      </div>
     </div>
   );
 }
 
-const Result = ({ state }: { state: createHetznerProjectState }) => {
+const Result = ({ state }: { state: serverActionState }) => {
   const status = useFormStatus();
   return (
     <>
-      {!status.pending && state.isError ? (
+      {!status.pending && state?.isError ? (
         <p aria-live="polite" className="text-sm text-destructive">
           {state.message}
         </p>
@@ -86,13 +105,6 @@ const HetznerLogin = () => {
     </div>
   );
 };
-
-// handleKeyDown prevents enter from submitting the form
-function handleKeyDown(event: React.KeyboardEvent) {
-  if (event.key === "Enter") {
-    event.preventDefault();
-  }
-}
 
 const HetznerProject = ({
   projectName,
@@ -117,12 +129,13 @@ const HetznerProject = ({
       </p>
       <div>
         <Input
+          className="text-foreground"
           type="text"
           placeholder="Project name"
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
           disabled={status.pending}
-          onKeyDown={handleKeyDown}
+          onKeyDown={preventDefaultEnter}
         />
       </div>
     </div>
@@ -146,6 +159,7 @@ const HetznerApiKey = ({
       <p className="text-sm text-muted-foreground">Enter the API key below:</p>
       <div>
         <Input
+          className="text-foreground"
           type="password"
           placeholder="API key"
           value={apiKey}

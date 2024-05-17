@@ -1,57 +1,132 @@
-import { clerkClient } from "@clerk/nextjs/server";
-import { decodeJwt } from "@clerk/nextjs/server";
 import {
   HetznerProject,
   selectHetznerProjectSchema,
-  teams,
-  users,
-  usersToTeams,
+  hetznerProjectSpec,
+  HetznerProjectSpec,
+  hetznerProjects,
 } from "@/app/server/db/schema";
 import { db } from "@/app/server/db";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { type OpenAPIHono, createRoute } from "@hono/zod-openapi";
 import { z } from "zod";
 import { type Context } from "hono";
 import { createTemporalClient } from "@/lib/temporal-client";
-import { hetznerProjectSpec, HetznerProjectSpec } from "@/app/server/db/schema";
 import { CreateHetznerProject } from "@/temporal/src/workflows";
 import { ApplicationFailure, WorkflowFailedError } from "@temporalio/client";
 import { queueNameForEnv } from "@/lib/constants";
+import { DeleteHetznerProject } from "@/temporal/src/workflows/deleteHetznerProject";
+import {
+  responseSpecs,
+  idSchema,
+  unauthorizedResponse,
+  userTeams,
+  authenticateRequest,
+} from "../../shared";
 
-const paramsSchema = z.object({
-  projectId: z
-    .string()
-    .min(22)
-    .max(22)
-    .refine((val) => /^[0-9a-zA-Z]{22}$/.test(val), {
-      message: "projectId must be a 22 characters long base62 string",
-    })
-    .openapi({
-      param: {
-        name: "id",
-        in: "path",
-      },
-      example: "3OHY5rQEfrc1vOpFrJ9q3r",
-    }),
-});
-
-type Params = z.infer<typeof paramsSchema>;
-
-const errorResponseSchema = z.object({
-  error: z.object({
-    name: z.string(),
-    message: z.string(),
+const paramsProjectIdSchema = z.object({
+  projectId: idSchema.openapi({
+    param: {
+      name: "projectId",
+      in: "path",
+    },
+    example: "3OHY5rQEfrc1vOpFrJ9q3r",
   }),
 });
 
+type ParamsProjectId = z.infer<typeof paramsProjectIdSchema>;
+
 export default function hetznerProjectsRoutes(app: OpenAPIHono) {
+  app.openapi(
+    createRoute({
+      method: "get",
+      operationId: "getHetznerProject",
+      path: "/hetzner/projects/{projectId}",
+      request: {
+        params: paramsProjectIdSchema,
+      },
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: responseSpecs[200](
+          selectHetznerProjectSchema.openapi("HetznerProject"),
+          "Get a Hetzner project"
+        ),
+        400: responseSpecs[400],
+        401: responseSpecs[401],
+        404: responseSpecs[404],
+      },
+    }),
+    // @ts-ignore since hono can't figure this out
+    async (c: Context) => {
+      const user = await authenticateRequest(c);
+      if (!user) {
+        return c.json(unauthorizedResponse, 401);
+      }
+
+      const teams = await userTeams(user.id);
+      const { projectId } = (c.req.valid as (type: string) => ParamsProjectId)(
+        "param"
+      );
+      const project: HetznerProject | undefined =
+        await db.query.hetznerProjects.findFirst({
+          where: and(
+            eq(hetznerProjects.id, projectId),
+            inArray(
+              hetznerProjects.teamId,
+              teams.map((t) => t.id)
+            )
+          ),
+        });
+      if (!project) {
+        return c.json(
+          { error: { name: "not_found", message: "Project not found" } },
+          404
+        );
+      }
+      return c.json(project);
+    }
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      operationId: "getHetznerProjects",
+      path: "/hetzner/projects",
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: responseSpecs[200](
+          z
+            .array(selectHetznerProjectSchema.openapi("HetznerProject"))
+            .openapi("HetznerProjects"),
+          "Get all Hetzner projects"
+        ),
+        401: responseSpecs[401],
+      },
+    }),
+    // @ts-ignore since hono can't figure this out
+    async (c: Context) => {
+      const user = await authenticateRequest(c);
+      if (!user) {
+        return c.json(unauthorizedResponse, 401);
+      }
+      const teams = await userTeams(user.id);
+      return c.json(
+        await db.query.hetznerProjects.findMany({
+          where: inArray(
+            hetznerProjects.teamId,
+            teams.map((t) => t.id)
+          ),
+        })
+      );
+    }
+  );
+
   app.openapi(
     createRoute({
       method: "put",
       operationId: "createHetznerProject",
       path: "/hetzner/projects/{projectId}",
       request: {
-        params: paramsSchema,
+        params: paramsProjectIdSchema,
         body: {
           content: {
             "application/json": {
@@ -62,61 +137,29 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
       },
       security: [{ bearerAuth: [] }],
       responses: {
-        200: {
-          content: {
-            "application/json": {
-              schema: selectHetznerProjectSchema.openapi("HetznerProject"),
-            },
-          },
-          description: "Create a Hetzner project",
-        },
-        400: {
-          description: "Bad request",
-          content: {
-            "application/json": {
-              schema: errorResponseSchema,
-            },
-          },
-        },
-        401: {
-          description: "Unauthorized",
-          content: {
-            "application/json": {
-              schema: errorResponseSchema,
-            },
-          },
-        },
+        200: responseSpecs[200](
+          selectHetznerProjectSchema.openapi("HetznerProject"),
+          "Create a Hetzner project"
+        ),
+        400: responseSpecs[400],
+        401: responseSpecs[401],
       },
     }),
     // @ts-ignore since hono can't figure this out
     async (c: Context) => {
-      const authStatus = await clerkClient.authenticateRequest({
-        request: c.req.raw,
-      });
-      if (!authStatus.isSignedIn) {
-        return c.json({ error: "not authorized" }, 401);
-      }
-      const { payload: token } = decodeJwt(authStatus.token);
-      const clerkUserId = token.sub;
-      const user = await db
-        .select()
-        .from(users)
-        .where(eq(users.clerkId, clerkUserId))
-        .limit(1)
-        .then((rows) => rows[0] || null);
+      const user = await authenticateRequest(c);
       if (!user) {
-        return c.json(
-          { error: { name: "not_authorized", message: "not authorized" } },
-          401
-        );
+        return c.json(unauthorizedResponse, 401);
       }
       const spec: HetznerProjectSpec = (
         c.req.valid as (type: string) => HetznerProjectSpec
       )("json");
 
       // id has to be client-generated for idempotent PUT hetzner/projects/{id} to work
-      const { projectId } = (c.req.valid as (type: string) => Params)("param"); // ensure it's a valid base62 uuid
-      if (spec.id !== projectId) {
+      const { projectId } = (c.req.valid as (type: string) => ParamsProjectId)(
+        "param"
+      );
+      if (spec.id && spec.id !== projectId) {
         return c.json(
           {
             error: {
@@ -140,13 +183,8 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
       }
 
       // pull teams for user, make sure they are part of the team in the spec
-      const userTeams = await db
-        .select({ team: teams })
-        .from(usersToTeams)
-        .where(eq(usersToTeams.userId, user.id))
-        .rightJoin(teams, eq(usersToTeams.teamId, teams.id))
-        .then((rows) => rows.map((row) => row.team));
-      const team = userTeams.find((team) => team.id === spec.teamId);
+      const teams = await userTeams(user.id);
+      const team = teams.find((team) => team.id === spec.teamId);
       if (!team) {
         return c.json(
           {
@@ -164,13 +202,83 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
         const workflow = await temporalClient.workflow.start(
           CreateHetznerProject,
           {
-            workflowId: `${user.id}-${team.id}-${spec.hetznerName}`, // for idempotency adopt a unique-enough convention on the workflow id
+            workflowId: `createHetznerProject-${spec.hetznerName}`,
             taskQueue: queueNameForEnv(process.env.NODE_ENV!),
             args: [{ ...spec, id: projectId }],
           }
         );
         const result: HetznerProject = await workflow.result();
         return c.json(result);
+      } catch (e) {
+        if (
+          e instanceof WorkflowFailedError &&
+          e.cause instanceof ApplicationFailure
+        ) {
+          const { type: name, cause, message } = e.cause;
+          return c.json({ error: { name, cause, message } }, 400);
+        }
+        throw e;
+      }
+    }
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      operationId: "deleteHetznerProject",
+      path: "/hetzner/projects/{projectId}",
+      request: {
+        params: paramsProjectIdSchema,
+      },
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: responseSpecs[200](z.object({}), "Hetzner project deleted"),
+        400: responseSpecs[400],
+        401: responseSpecs[401],
+      },
+    }),
+    // @ts-ignore since hono can't figure this out
+    async (c: Context) => {
+      const user = await authenticateRequest(c);
+      if (!user) {
+        return c.json(unauthorizedResponse, 401);
+      }
+
+      const { projectId } = (c.req.valid as (type: string) => ParamsProjectId)(
+        "param"
+      );
+
+      // pull teams for user and make sure project is part of one of their teams
+      const teams = await userTeams(user.id);
+      const project: HetznerProject | undefined =
+        await db.query.hetznerProjects.findFirst({
+          where: and(
+            eq(hetznerProjects.id, projectId),
+            inArray(
+              hetznerProjects.teamId,
+              teams.map((t) => t.id)
+            )
+          ),
+        });
+      if (!project) {
+        return c.json(
+          { error: { name: "not_found", message: "Project not found" } },
+          404
+        );
+      }
+
+      const temporalClient = await createTemporalClient;
+      try {
+        const workflow = await temporalClient.workflow.start(
+          DeleteHetznerProject,
+          {
+            workflowId: `deleteHetznerProject-${projectId}`,
+            taskQueue: queueNameForEnv(process.env.NODE_ENV!),
+            args: [{ projectId: project.id }],
+          }
+        );
+        await workflow.result();
+        return c.json({});
       } catch (e) {
         if (
           e instanceof WorkflowFailedError &&

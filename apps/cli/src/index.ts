@@ -5,7 +5,7 @@ import chalk from "chalk";
 import opener from "opener";
 import inquirer from "inquirer";
 import Metal from "@onmetal/node";
-import { type WhoAmI } from "@onmetal/node/resources/whoami.mjs";
+import { type Config } from "./types";
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import { promisify } from "node:util";
 import { exec as execCallbackBased } from "node:child_process";
@@ -14,10 +14,6 @@ import { request as insecureRequest } from "node:http";
 import { request as secureRequest } from "node:https";
 
 const exec = promisify(execCallbackBased);
-
-interface Config {
-  whoami?: WhoAmI;
-}
 
 // setup / load config
 const configParentDir = path.join(os.homedir(), ".config", "metal");
@@ -38,8 +34,9 @@ const baseURL = process.env.METAL_BASE_URL || "https://www.onmetal.dev/api";
 const baseUrlObj = new URL(baseURL);
 const baseDomainWithProtocol = `${baseUrlObj.protocol}//${baseUrlObj.host}`;
 
-const isLocalhost = baseUrlObj.hostname === "localhost" || baseUrlObj.hostname === "127.0.0.1"
-const nodeRequest = isLocalhost ? insecureRequest : secureRequest
+const isLocalhost =
+  baseUrlObj.hostname === "localhost" || baseUrlObj.hostname === "127.0.0.1";
+const nodeRequest = isLocalhost ? insecureRequest : secureRequest;
 
 const program = new Command();
 const log = console.log;
@@ -149,18 +146,22 @@ const checkUserConfig = () => {
   }
 
   return config as Required<Config>;
-}
+};
 
 program
   .command("up")
   .description("Deploy a project")
-  .option("--token", "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI.")
+  .option(
+    "--token",
+    "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI."
+  )
   .action(async (str, options) => {
     let step = 1;
     log(`[${step}] Checking for token...`);
     const userConfig = checkUserConfig();
     // Token hierachy: commandline > config file > environment variable
-    const token = options.token || userConfig.whoami.token || process.env.METAL_TOKEN;
+    const token =
+      options.token || userConfig.whoami.token || process.env.METAL_TOKEN;
     if (!token) {
       log("Error! You must configure a Metal API token.");
       process.exit(1);
@@ -178,10 +179,13 @@ program
       .filter((path) => !!path && !path.endsWith(".gitignore"));
 
     log(`[${++step}] Compressing files...`);
-    const payloadStream = createTar({
-      gzip: true,
-      cwd: process.cwd(),
-    }, pathsToArchive);
+    const payloadStream = createTar(
+      {
+        gzip: true,
+        cwd: process.cwd(),
+      },
+      pathsToArchive
+    );
 
     log(`[${++step}] Uploading...`);
     const reqOptions = {
@@ -192,12 +196,12 @@ program
       headers: {
         "Content-Type": "application/octet-stream",
         Authorization: `Bearer ${token}`,
-        "Accept": "application/json",
+        Accept: "application/json",
       },
     };
 
     const bodyAsString = await new Promise<string>((resolve, reject) => {
-      const request = nodeRequest(reqOptions, response => {
+      const request = nodeRequest(reqOptions, (response) => {
         let bodyJSONString = "";
         response.on("data", (chunk) => {
           bodyJSONString += chunk;
@@ -232,27 +236,27 @@ program
         {
           method: "GET",
           headers: {
-            "Authorization": `Bearer ${token}`,
-            "Accept": "application/json",
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
           },
         }
       );
 
-      statusRequest.on('response', (res) => {
-        res.on('data', (chunk) => {
+      statusRequest.on("response", (res) => {
+        res.on("data", (chunk) => {
           log(`[${++step}] ${chunk.toString()}`);
         });
-        res.on('error', (err) => {
-          console.error('Failed to read response.');
+        res.on("error", (err) => {
+          console.error("Failed to read response.");
           console.error(err);
           reject(err);
         });
-        res.on('end', () => {
-          resolve('Deployment finished.');
+        res.on("end", () => {
+          resolve("Deployment finished.");
         });
       });
 
-      statusRequest.on('error', (err) => {
+      statusRequest.on("error", (err) => {
         console.error(`Error in status request: ${err.message}`);
         reject(err);
       });
@@ -263,5 +267,10 @@ program
     const result = await statusPromise;
     log(`[END] ${result}`);
   });
+
+import projects from "./projects";
+projects(program.command("projects"), config, baseURL);
+import clusters from "./clusters";
+clusters(program.command("clusters"), config, baseURL);
 
 program.parse();

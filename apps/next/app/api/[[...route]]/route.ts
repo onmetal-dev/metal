@@ -35,8 +35,9 @@ app.onError((err, c) => {
 import whoami from "./whoami";
 whoami(app);
 import hetznerProjectsRoutes from "./hetzner/projects";
-import { WorkflowFailedError } from "@temporalio/client";
 hetznerProjectsRoutes(app);
+import hetznerClustersRoutes from "./hetzner/clusters";
+hetznerClustersRoutes(app);
 
 const securitySchemeKey = "bearerAuth";
 app.openAPIRegistry.registerComponent("securitySchemes", securitySchemeKey, {
@@ -63,10 +64,12 @@ app.doc("/doc", {
   ],
   servers: [
     {
-      url:
-        process.env.NODE_ENV === "production"
-          ? "https://www.onmetal.dev/api"
-          : "http://localhost:3000/api",
+      url: "https://www.onmetal.dev",
+      description: "Production URL",
+    },
+    {
+      url: "http://localhost:3000",
+      description: "Development URL",
     },
   ],
 });

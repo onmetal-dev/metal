@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { ClerkProvider } from "@clerk/nextjs";
 import clsx from "clsx";
 import { dark } from "@clerk/themes";
+import { CommandItemsProvider, CommandMenu } from "@/components/CommandMenu";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -47,21 +48,24 @@ export default function RootLayout({
       <html
         lang="en"
         className={clsx(
-          "h-full scroll-smooth bg-white antialiased",
+          "h-screen scroll-smooth bg-background antialiased",
           inter.variable,
           lexend.variable
         )}
         suppressHydrationWarning
       >
-        <body className="flex h-full flex-col">
-          <ThemeProvider
-            attribute="class"
-            forcedTheme="dark"
-            defaultTheme="dark"
-            disableTransitionOnChange
-          >
-            {children}
-          </ThemeProvider>
+        <body className="flex flex-col">
+          <CommandItemsProvider>
+            <CommandMenu />
+            <ThemeProvider
+              attribute="class"
+              forcedTheme="dark"
+              defaultTheme="dark"
+              disableTransitionOnChange
+            >
+              {children}
+            </ThemeProvider>
+          </CommandItemsProvider>
           <Toaster />
         </body>
       </html>

@@ -124,6 +124,149 @@ And that's it! You now have a management cluster running in hetzner.
 From here you could try deploying a new cluster using the management cluster.
 You can also clean up the kind cluster with `kind delete cluster` which should also automatically remove it from kubectx.
 
+## install external-dns on the mgmt cluster to make setting DNS records easy
+
+We set up DNS records to route to apps running in users clusters this way.
+
+```
+export CF_API_TOKEN=<the key>
+export CF_API_EMAIL=<email on the cf account>
+kubectl create ns external-dns
+kubectl create secret -n external-dns generic cloudflare-api-token --from-literal=apiToken=$CF_API_TOKEN --from-literal=email=$CF_API_EMAIL
+echo 'provider:
+  name: cloudflare
+crd:
+  create: true
+sources:
+  - crd
+cloudflare:
+  proxied: true
+policy: sync
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token
+        key: apiToken
+        namespace: external-dns
+  - name: CF_API_EMAIL
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token
+        key: email
+        namespace: external-dns
+' > /tmp/values.yaml
+helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+helm upgrade --install external-dns external-dns/external-dns --values /tmp/values.yaml --namespace external-dns
+```
+
+Test it out:
+
+```
+echo 'apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: examplednsrecord
+spec:
+  endpoints:
+  - dnsName: "*.bar.onmetal.dev"
+    #recordTTL: 180 # omit to use CFs "auto"
+    recordType: A
+    targets:
+    - 192.168.99.216
+    # cannot proxy local IPs but this is how you would do it if the IP was not a local IP
+    #providerSpecific:
+    #  - name: external-dns.alpha.kubernetes.io/cloudflare-proxied
+    #    value: "true"
+' > /tmp/test-a-record.yaml
+kubectl apply -f /tmp/test-a-record.yaml
+# go check it out in the cloudflare dashboard
+kubectl delete -f /tmp/test-a-record.yaml
+```
+
+## install cert-manager on the mgmt cluster to create certs for users
+
+We'd like for users to be able to run services over HTTPS on subdomains, e.g. <app name>-<env>.up.onmetal.dev.
+To do this, set up cert-manager on the mgmt cluster so that we can create HTTPS certificates using LetsEncrypt.
+When making a cert, Lets Encrypt requries you to prove that you are in control of the domain on the cert.
+You can do this by answering a DNS challenge, i.e. putting a TXT record with a special value that Lets Encrypt provides.
+We manage onmetal.dev DNS in Cloudflare, and luckily cert-manager has [support](https://cert-manager.io/docs/configuration/acme/dns01/cloudflare/) for generating Lets Encrypt certs and using Cloudflare's API to set up the TXT record to answer the DNS challenge.
+
+```
+export CLOUDFLARE_API_KEY=<the key>
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+helm upgrade --install cert-manager jetstack/cert-manager --version v1.14.5 --namespace cert-manager --set installCRDs=true --create-namespace
+kubectl create -n cert-manager secret generic cloudflare-api-key-secret \
+  --from-literal=api-key=$CLOUDFLARE_API_KEY
+echo '---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    email: rgarcia2009@gmail.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-private-key
+    solvers:
+    - dns01:
+        cloudflare:
+          email: rgarcia2009@gmail.com
+          apiTokenSecretRef:
+            name: cloudflare-api-key-secret
+            key: api-key
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-production
+spec:
+  acme:
+    email: certs@onmetal.dev
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-production-private-key
+    solvers:
+    - dns01:
+        cloudflare:
+          email: rgarcia2009@gmail.com
+          apiTokenSecretRef:
+            name: cloudflare-api-key-secret
+            key: api-key
+' | kubectl apply -n cert-manager -f -
+```
+
+Now you can make certificate requests by creating Certificate resources in the mgmt cluster, e.g.:
+
+```
+echo '---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  labels:
+    name: test-subdomain-certificate
+  name: test-subdomain-certificate
+  namespace: cert-manager
+spec:
+  dnsNames:
+  - 'test-service.up.onmetal.dev'
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-production
+  secretName: test-subdomain-certificate
+' | kubectl apply -n cert-manager -f -
+```
+
+This will create a secret named `test-subdomain-certificate` containing the cert.
+This can then be copied to a user's cluster via
+
+```
+kubectl get secret test-subdomain-certificate --namespace=cert-manager -oyaml | yq 'del(.metadata.annotations,.metadata.creationTimestamp,.metadata.labels,.metadata.namespace,.metadata.resourceVersion,.metadata.uid)' | \
+  KUBECONFIG=<other cluster> kubectl apply -n <namespace secret will be used in in other cluster> -f -
+```
+
 ## get the kubernetes web UI up and running
 
 Summary of steps from the [docs](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) + [other docs](https://github.com/kubernetes/dashboard/blob/master/docs/user/access-control/creating-sample-user.md).
