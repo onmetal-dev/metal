@@ -32,7 +32,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Push DB changes
-        run: bun run db:push
+        run: echo $CI && bun run db:push
         env:
           NODE_TLS_REJECT_UNAUTHORIZED: "0"
           POSTGRES_URL: ${{ secrets.POSTGRES_URL_PROD }}
