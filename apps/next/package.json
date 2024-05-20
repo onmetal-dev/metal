@@ -10,7 +10,7 @@
     "build:oci": "nixpacks build ./ --name metal-next --start-cmd 'bun run start:next'",
     "build:temporal": "tsc --build ./temporal/tsconfig.json",
     "build": "concurrently --raw \"npm:build:next\" \"npm:build:temporal\"",
-    "db:push": "drizzle-kit push:pg",
+    "db:push": "NODE_TLS_REJECT_UNAUTHORIZED=0 drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio",
     "db:nuke": "bun run ./app/server/db/nuke.ts",
     "db:psql": "bun exec 'psql $POSTGRES_URL'",
