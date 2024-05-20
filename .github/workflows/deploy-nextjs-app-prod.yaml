@@ -21,7 +21,7 @@ jobs:
       - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '>=20'
+          node-version: ">=20"
 
       - name: Use Bun
         uses: oven-sh/setup-bun@v1
@@ -34,7 +34,7 @@ jobs:
       - name: Push DB changes
         run: bun run db:push
         env:
-          POSTGRES_CA_DATA: ${{ secrets.POSTGRES_CA_DATA_PROD }}
+          NODE_TLS_REJECT_UNAUTHORIZED: "0"
           POSTGRES_URL: ${{ secrets.POSTGRES_URL_PROD }}
 
       - name: Deploy
