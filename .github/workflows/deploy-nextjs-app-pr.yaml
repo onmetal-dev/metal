@@ -40,6 +40,6 @@ jobs:
           POSTGRES_URL: ${{ secrets.POSTGRES_URL_DEV }}
 
       - name: Deploy
-        run: bash <(curl -fsSL cli.new) && railway up --ci --service nextjs-service
+        run: bash <(curl -fsSL cli.new) && railway up --ci --service website
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PR }}
