@@ -9,10 +9,15 @@ import {
   timestamp,
   pgSchema,
   varchar,
+  json,
+  jsonb,
+  check,
 } from "drizzle-orm/pg-core";
+import { customType } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import uuidBase62 from "uuid-base62";
 import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import sqlSchemaForEnv from "./schemaForEnv";
 
 // use base62 uuids to be shorter and more friendly to the eyes
@@ -83,6 +88,8 @@ export const teamRelations = relations(teams, ({ one, many }) => ({
   usersToTeams: many(usersToTeams),
   hetznerProjects: many(hetznerProjects),
   hetznerClusters: many(hetznerClusters),
+  applications: many(applications),
+  applicationConfigs: many(applicationConfigs),
 }));
 
 // usersToTeams tracks a many-to-many relation between users and teams
@@ -94,7 +101,7 @@ export const usersToTeams = metalSchema.table(
       .references(() => users.id),
     teamId: varchar("team_id", { length: 22 })
       .notNull()
-      .references(() => teams.id, { onDelete: "cascade" }),
+      .references(() => teams.id, { onDelete: "cascade", onUpdate: "cascade" }),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.userId, t.teamId] }),
@@ -321,6 +328,171 @@ export const hetznerNodeGroupRelations = relations(
     hetznerCluster: one(hetznerClusters, {
       fields: [hetznerNodeGroups.clusterId],
       references: [hetznerClusters.id],
+    }),
+  })
+);
+
+const portsSchema = z.array(
+  z.object({
+    name: z.string(),
+    port: z.number(),
+    proto: z.enum(["http", "tcp"]),
+  })
+);
+export type Ports = z.infer<typeof portsSchema>;
+
+const externalSchema = z.array(
+  z.object({
+    name: z.string(),
+    portName: z.string(),
+    port: z.number().refine((val) => val === 80 || val === 443),
+    proto: z.enum(["http", "https"]),
+  })
+);
+export type External = z.infer<typeof externalSchema>;
+
+const envSchema = z.array(z.string());
+export type Env = z.infer<typeof envSchema>;
+
+const healthCheckSchema = z.object({
+  protocol: z.enum(["http", "tcp"]),
+  port: z.union([z.number(), z.string()]),
+  path: z.string().optional(),
+  httpHeaders: z
+    .array(z.object({ name: z.string(), value: z.string() }))
+    .optional(),
+  initialDelaySeconds: z.number(),
+  timeoutSeconds: z.number(),
+  periodSeconds: z.number(),
+  failureThreshold: z.number(),
+  successThreshold: z.number(),
+});
+export type HealthCheck = z.infer<typeof healthCheckSchema>;
+
+const dependenciesSchema = z.array(z.string());
+export type Dependencies = z.infer<typeof dependenciesSchema>;
+
+const databasesSchema = z.array(z.string());
+export type Databases = z.infer<typeof databasesSchema>;
+
+const telemetrySchema = z.object({
+  traces: z.object({ enabled: z.boolean() }),
+  metrics: z.object({ enabled: z.boolean() }),
+  logs: z.object({ enabled: z.boolean() }),
+});
+export type Telemetry = z.infer<typeof telemetrySchema>;
+
+// sourceSchema describes where the source code for an application is located.
+// E.g.
+// - upload: the team used `metal up` (in cli or ci) to send us a tar.gz that we used to create an application version + build
+// - github: the team has connected their github account and at the end of a successful CI run publishes to metal with application version + build info + git metadata. We capture git metadata in source
+const sourceSchema = z.object({
+  type: z.enum(["upload", "github"]),
+  upload: z.object({
+    hash: z.string().optional(), // the sha256 of the tar.gz
+    path: z.string().optional(), // where we stored it in our object storage
+  }),
+  github: z.object({
+    repository: z.string(), // org/repo
+    branch: z.string(),
+    commit: z.string(), // full commit sha
+  }),
+});
+export type Source = z.infer<typeof sourceSchema>;
+
+export const applications = metalSchema.table("applications", {
+  ...schemaDefaults,
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // todo: constraint sql`name ~ '^[a-z0-9-]+$'` (when drizzle supports check constraints)
+});
+
+const customJsonb = <TData>(name: string) =>
+  customType<{ data: TData; driverData: string }>({
+    dataType() {
+      return "jsonb";
+    },
+    toDriver(value: TData): string {
+      return JSON.stringify(value);
+    },
+  })(name);
+
+export const applicationConfigs = metalSchema.table(
+  "application_configs",
+  {
+    ...schemaDefaults,
+    teamId: varchar("team_id", { length: 22 })
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    applicationId: varchar("application_id", { length: 22 })
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    source: customJsonb<Source>("source").notNull(),
+    ports: customJsonb<Ports>("ports").notNull(),
+    external: customJsonb<External>("external").notNull(),
+    env: customJsonb<Env>("env").notNull(),
+    healthCheck: customJsonb<HealthCheck>("health_check").notNull(),
+    dependencies: customJsonb<Dependencies>("dependencies").notNull(),
+    databases: customJsonb<Databases>("databases").notNull(),
+    memory: integer("memory").notNull(),
+    cpu: integer("cpu").notNull(),
+    version: text("version").notNull(),
+    // tbd
+    // extraStorage: integer("extra_storage").notNull(),
+    // autoscaling: json("autoscaling").default(sql`'[]'`),
+    // alerts: json("alerts").default(sql`'[]'`),
+    // telemetry: customJsonb<Telemetry>("telemetry")
+    //   .notNull()
+    //   .default(
+    //     sql.raw(
+    //       `'{}'::jsonb CHECK (jsonb_matches_schema('${telemetryJsonSchema}', telemetry))`
+    //     )
+    //   ),
+  },
+  (table) => {
+    return {
+      versionIdx: index("version_idx").on(table.version),
+      createdAtIdx: index("created_at_idx").on(table.createdAt),
+    };
+  }
+);
+
+export const insertApplicationSchema = createInsertSchema(applications);
+export type ApplicationInsert = z.infer<typeof insertApplicationSchema>;
+export const selectApplicationSchema = createSelectSchema(applications);
+export type Application = z.infer<typeof selectApplicationSchema>;
+
+export const insertApplicationConfigSchema =
+  createInsertSchema(applicationConfigs);
+export type ApplicationConfigInsert = z.infer<
+  typeof insertApplicationConfigSchema
+>;
+export const selectApplicationConfigSchema =
+  createSelectSchema(applicationConfigs);
+export type ApplicationConfig = z.infer<typeof selectApplicationConfigSchema>;
+
+export const applicationRelations = relations(
+  applications,
+  ({ one, many }) => ({
+    team: one(teams, {
+      fields: [applications.teamId],
+      references: [teams.id],
+    }),
+    configs: many(applicationConfigs),
+  })
+);
+
+export const applicationConfigRelations = relations(
+  applicationConfigs,
+  ({ one }) => ({
+    team: one(teams, {
+      fields: [applicationConfigs.teamId],
+      references: [teams.id],
+    }),
+    application: one(applications, {
+      fields: [applicationConfigs.applicationId],
+      references: [applications.id],
     }),
   })
 );
