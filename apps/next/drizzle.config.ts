@@ -1,7 +1,5 @@
 import dotenv from "dotenv";
 import type { Config } from "drizzle-kit";
-import tmp from "tmp";
-import { writeFileSync } from "fs";
 import sqlSchemaForEnv from "@/app/server/db/schemaForEnv";
 dotenv.config();
 
