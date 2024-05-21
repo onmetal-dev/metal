@@ -3,7 +3,7 @@ import { clerkClient } from "@clerk/nextjs";
 import { type NextRequest } from "next/server";
 import { exec as execCallbackBased, spawn } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { Writable } from "node:stream";
+import { Readable, Writable } from "node:stream";
 import { dirSync } from "tmp";
 import { promisify } from "node:util";
 import { NixpackPlan } from "@/types/deployment";
@@ -43,7 +43,7 @@ function sleep(time: number) {
 const encoder = new TextEncoder();
 
 // Thanks ChatGPT!
-async function* streamIterator(stderr: NodeJS.ReadableStream) {
+async function* streamIterator(stderr: Readable) {
   for await (const chunk of stderr) {
     yield chunk.toString();
   }
