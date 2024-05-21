@@ -47,12 +47,16 @@ const NavLink = ({ href, Icon, label, isActive }: NavLinkProps) => {
 
 export const SidebarNav = () => {
   const segment = useSelectedLayoutSegment();
+  const isActive = (href: string) => {
+    const lastSegment = href.split("/").pop();
+    return segment === lastSegment;
+  };
 
   const links = [
     {
-      href: "/dashboard/infrastructure",
+      href: "/dashboard/clusters",
       Icon: Server,
-      label: "Infrastructure",
+      label: "Clusters",
     },
     {
       href: "/dashboard/applications",
@@ -80,17 +84,17 @@ export const SidebarNav = () => {
               href={href}
               Icon={Icon}
               label={label}
-              isActive={segment === href}
+              isActive={isActive(href)}
             />
           ))}
         </nav>
         <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
           <NavLink
             key="settings"
-            href="settings"
+            href="/dashboard/settings"
             Icon={Settings}
             label="Settings"
-            isActive={segment === "settings"}
+            isActive={isActive("/dashboard/settings")}
           />
         </nav>
       </TooltipProvider>

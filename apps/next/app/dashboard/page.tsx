@@ -51,19 +51,21 @@ async function findCreateUserTeam({
   userClerkId,
 }: {
   teamName: string;
-  userId: number;
+  userId: string;
   userClerkId: string;
 }): Promise<Team> {
-  const userTeams = await db.query.teams.findMany({
-    where: (team, { eq }) => eq(team.name, teamName),
-    with: {
-      usersToTeams: {
-        where: (userToTeam, { eq }) => eq(userToTeam.userId, userId),
+  const usersPersonalTeam: Team | undefined = await db.query.teams
+    .findMany({
+      where: (team, { eq }) => eq(team.name, teamName),
+      with: {
+        usersToTeams: {
+          where: (userToTeam, { eq }) => eq(userToTeam.userId, userId),
+        },
       },
-    },
-  });
-  if (userTeams.length > 0) {
-    return userTeams[0];
+    })
+    .then((rows) => rows[0] || undefined);
+  if (usersPersonalTeam) {
+    return usersPersonalTeam;
   }
 
   // personal team not found, create it in Clerk
@@ -107,7 +109,7 @@ export default async function Page() {
       "No email address found. This should be required in how we configure Clerk"
     );
   }
-  const clerkEmail = clerkUser.emailAddresses[0];
+  const clerkEmail = clerkUser.emailAddresses[0]!;
   if (!clerkEmail.verification) {
     throw new Error(
       "No email verification status. This should be required in how we configure Clerk"
@@ -135,7 +137,7 @@ export default async function Page() {
   return (
     <EnsureActiveOrgSetAndRedirect
       activeOrgId={userPersonalTeam.clerkId}
-      redirectTo="/dashboard/infrastructure"
+      redirectTo="/dashboard/clusters"
     />
   );
 }

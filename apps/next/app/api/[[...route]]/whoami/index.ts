@@ -1,17 +1,17 @@
-import { db } from "@/app/server/db";
 import {
-  users,
-  teams,
   selectTeamSchema,
   selectUserSchema,
-  usersToTeams,
+  User,
 } from "@/app/server/db/schema";
 import { clerkClient } from "@clerk/nextjs";
-import { decodeJwt } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
 import { type OpenAPIHono, createRoute } from "@hono/zod-openapi";
 import { z } from "zod";
 import { type Context } from "hono";
+import {
+  authenticateRequest,
+  unauthorizedResponse,
+  userTeams,
+} from "../shared";
 
 const whoAmISchema = z
   .object({
@@ -56,29 +56,17 @@ export default function whoami(app: OpenAPIHono) {
         request: c.req.raw,
       });
       if (!authStatus.isSignedIn) {
-        return c.json({ error: "not authorized" }, 401);
+        return c.json(unauthorizedResponse, 401);
       }
-      const { payload: token } = decodeJwt(authStatus.token);
-      const clerkUserId = token.sub;
-      const user = await db
-        .select()
-        .from(users)
-        .where(eq(users.clerkId, clerkUserId))
-        .limit(1)
-        .then((rows) => rows[0] || null);
+      const user: User | undefined = await authenticateRequest(c);
       if (!user) {
-        return c.json({ error: "not authorized" }, 401);
+        return c.json(unauthorizedResponse, 401);
       }
-      const userTeams = await db
-        .select({ team: teams })
-        .from(usersToTeams)
-        .where(eq(usersToTeams.userId, user.id))
-        .rightJoin(teams, eq(usersToTeams.teamId, teams.id))
-        .then((rows) => rows.map((row) => row.team));
+      const teams = await userTeams(user.id);
       return c.json({
         token: authStatus.token,
         user,
-        teams: userTeams,
+        teams,
       });
     }
   );

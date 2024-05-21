@@ -23,7 +23,7 @@ bunx openapi-typescript ./lib/hcloud/hcloud.yaml -o ./lib/hcloud/index.d.ts
 
 Then use it:
 
-```
+```ts
 import createClient from "openapi-fetch";
 import type { paths } from "@lib/hcloud";
 const client = createClient<paths>({
@@ -32,3 +32,9 @@ const client = createClient<paths>({
 });
 const { data, error } = await client.GET("/datacenters");
 ```
+
+## \*.json / \*.tsx
+
+The JSON files are dumps of endpoints that don't change much, e.g. pricing, as of 2024-04-25.
+The tsx files use the typings to export this data as typed data.
+It's useful to import these into various things that might need it, e.g. the cluster creation flow.

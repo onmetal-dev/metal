@@ -5,19 +5,17 @@ import chalk from "chalk";
 import opener from "opener";
 import inquirer from "inquirer";
 import Metal from "@onmetal/node";
-import { type WhoAmI } from "@onmetal/node/resources/whoami.mjs";
+import { type Config } from "./types";
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
 import { promisify } from "node:util";
 import { exec as execCallbackBased } from "node:child_process";
 import { create as createTar } from "tar";
 import { request as insecureRequest } from "node:http";
 import { request as secureRequest } from "node:https";
+import projects from "./projects";
+import clusters from "./clusters";
 
 const exec = promisify(execCallbackBased);
-
-interface Config {
-  whoami?: WhoAmI;
-}
 
 // setup / load config
 const configParentDir = path.join(os.homedir(), ".config", "metal");
@@ -38,8 +36,9 @@ const baseURL = process.env.METAL_BASE_URL || "https://www.onmetal.dev/api";
 const baseUrlObj = new URL(baseURL);
 const baseDomainWithProtocol = `${baseUrlObj.protocol}//${baseUrlObj.host}`;
 
-const isLocalhost = baseUrlObj.hostname === "localhost" || baseUrlObj.hostname === "127.0.0.1"
-const nodeRequest = isLocalhost ? insecureRequest : secureRequest
+const isLocalhost =
+  baseUrlObj.hostname === "localhost" || baseUrlObj.hostname === "127.0.0.1";
+const nodeRequest = isLocalhost ? insecureRequest : secureRequest;
 
 const program = new Command();
 const log = console.log;
@@ -149,19 +148,23 @@ const checkUserConfig = () => {
   }
 
   return config as Required<Config>;
-}
+};
 
 program
   .command("up")
   .argument("[sourceDir]", "[OPTIONAL] The absolute or relative path of the directory you want to deploy. Defaults to the current directory.")
   .description("Deploy a project")
-  .option("--token", "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI.")
+.option(
+  "--token",
+  "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI."
+)
   .action(async (sourceDir, options) => {
     let step = 0;
     log(chalk.green(`[${++step}] Checking for token...`));
     const userConfig = checkUserConfig();
     // Token hierachy: commandline > config file > environment variable
-    const token = options.token || userConfig.whoami.token || process.env.METAL_TOKEN;
+    const token =
+      options.token || userConfig.whoami.token || process.env.METAL_TOKEN;
     if (!token) {
       log("Error! You must configure a Metal API token.");
       process.exit(1);
@@ -189,7 +192,7 @@ program
     }
 
     if (!pathsToCompress.length) {
-      console.error("Error: the list of files to archive is empty. Please check that your working directory is a Git repository and that there are git-tracked files available.");
+      console.error("Error: the list of files to compress is empty. Please check that your working directory is a Git repository and that there are git-tracked files available.");
       process.exit(1);
     }
 
@@ -208,7 +211,7 @@ program
       headers: {
         "Content-Type": "application/octet-stream",
         Authorization: `Bearer ${token}`,
-        "Accept": "application/json",
+        Accept: "application/json",
       },
     };
 
@@ -271,5 +274,8 @@ program
 
     log(chalk.green("[END]"));
   });
+
+projects(program.command("projects"), config, baseURL);
+clusters(program.command("clusters"), config, baseURL);
 
 program.parse();

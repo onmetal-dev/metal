@@ -1,0 +1,1430 @@
+{
+  "pricing": {
+    "currency": "EUR",
+    "vat_rate": "0.000000",
+    "image": {
+      "price_per_gb_month": {
+        "net": "0.0110000000",
+        "gross": "0.0110000000000000"
+      }
+    },
+    "floating_ip": {
+      "price_monthly": {
+        "net": "3.0000000000",
+        "gross": "3.0000000000000000"
+      }
+    },
+    "floating_ips": [
+      {
+        "type": "ipv4",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_monthly": {
+              "net": "3.0000000000",
+              "gross": "3.0000000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_monthly": {
+              "net": "3.0000000000",
+              "gross": "3.0000000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_monthly": {
+              "net": "3.0000000000",
+              "gross": "3.0000000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_monthly": {
+              "net": "3.0000000000",
+              "gross": "3.0000000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_monthly": {
+              "net": "3.0000000000",
+              "gross": "3.0000000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "type": "ipv6",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_monthly": {
+              "net": "1.0000000000",
+              "gross": "1.0000000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_monthly": {
+              "net": "1.0000000000",
+              "gross": "1.0000000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_monthly": {
+              "net": "1.0000000000",
+              "gross": "1.0000000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_monthly": {
+              "net": "1.0000000000",
+              "gross": "1.0000000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_monthly": {
+              "net": "1.0000000000",
+              "gross": "1.0000000000000000"
+            }
+          }
+        ]
+      }
+    ],
+    "primary_ips": [
+      {
+        "type": "ipv4",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_monthly": {
+              "net": "0.5000000000",
+              "gross": "0.5000000000000000"
+            },
+            "price_hourly": {
+              "net": "0.0008000000",
+              "gross": "0.0008000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_monthly": {
+              "net": "0.5000000000",
+              "gross": "0.5000000000000000"
+            },
+            "price_hourly": {
+              "net": "0.0008000000",
+              "gross": "0.0008000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_monthly": {
+              "net": "0.5000000000",
+              "gross": "0.5000000000000000"
+            },
+            "price_hourly": {
+              "net": "0.0008000000",
+              "gross": "0.0008000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_monthly": {
+              "net": "0.5000000000",
+              "gross": "0.5000000000000000"
+            },
+            "price_hourly": {
+              "net": "0.0008000000",
+              "gross": "0.0008000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_monthly": {
+              "net": "0.5000000000",
+              "gross": "0.5000000000000000"
+            },
+            "price_hourly": {
+              "net": "0.0008000000",
+              "gross": "0.0008000000000000"
+            }
+          }
+        ]
+      }
+    ],
+    "traffic": {
+      "price_per_tb": {
+        "net": "1.0000000000",
+        "gross": "1.0000000000000000"
+      }
+    },
+    "server_backup": {
+      "percentage": "20.0000000000"
+    },
+    "volume": {
+      "price_per_gb_month": {
+        "net": "0.0440000000",
+        "gross": "0.0440000000000000"
+      }
+    },
+    "server_types": [
+      {
+        "id": 1,
+        "name": "cx11",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0052000000",
+              "gross": "0.0052000000000000"
+            },
+            "price_monthly": {
+              "net": "3.2900000000",
+              "gross": "3.2900000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0052000000",
+              "gross": "0.0052000000000000"
+            },
+            "price_monthly": {
+              "net": "3.2900000000",
+              "gross": "3.2900000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0052000000",
+              "gross": "0.0052000000000000"
+            },
+            "price_monthly": {
+              "net": "3.2900000000",
+              "gross": "3.2900000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "name": "cx21",
+        "prices": [
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0079000000",
+              "gross": "0.0079000000000000"
+            },
+            "price_monthly": {
+              "net": "4.8500000000",
+              "gross": "4.8500000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0079000000",
+              "gross": "0.0079000000000000"
+            },
+            "price_monthly": {
+              "net": "4.8500000000",
+              "gross": "4.8500000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0079000000",
+              "gross": "0.0079000000000000"
+            },
+            "price_monthly": {
+              "net": "4.8500000000",
+              "gross": "4.8500000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "name": "cx31",
+        "prices": [
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0145000000",
+              "gross": "0.0145000000000000"
+            },
+            "price_monthly": {
+              "net": "9.2000000000",
+              "gross": "9.2000000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0145000000",
+              "gross": "0.0145000000000000"
+            },
+            "price_monthly": {
+              "net": "9.2000000000",
+              "gross": "9.2000000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0145000000",
+              "gross": "0.0145000000000000"
+            },
+            "price_monthly": {
+              "net": "9.2000000000",
+              "gross": "9.2000000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "name": "cx41",
+        "prices": [
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0278000000",
+              "gross": "0.0278000000000000"
+            },
+            "price_monthly": {
+              "net": "16.9000000000",
+              "gross": "16.9000000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0278000000",
+              "gross": "0.0278000000000000"
+            },
+            "price_monthly": {
+              "net": "16.9000000000",
+              "gross": "16.9000000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0278000000",
+              "gross": "0.0278000000000000"
+            },
+            "price_monthly": {
+              "net": "16.9000000000",
+              "gross": "16.9000000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "name": "cx51",
+        "prices": [
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0541000000",
+              "gross": "0.0541000000000000"
+            },
+            "price_monthly": {
+              "net": "32.4000000000",
+              "gross": "32.4000000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0541000000",
+              "gross": "0.0541000000000000"
+            },
+            "price_monthly": {
+              "net": "32.4000000000",
+              "gross": "32.4000000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0541000000",
+              "gross": "0.0541000000000000"
+            },
+            "price_monthly": {
+              "net": "32.4000000000",
+              "gross": "32.4000000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 22,
+        "name": "cpx11",
+        "prices": [
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0063000000",
+              "gross": "0.0063000000000000"
+            },
+            "price_monthly": {
+              "net": "3.8500000000",
+              "gross": "3.8500000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0063000000",
+              "gross": "0.0063000000000000"
+            },
+            "price_monthly": {
+              "net": "3.8500000000",
+              "gross": "3.8500000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0063000000",
+              "gross": "0.0063000000000000"
+            },
+            "price_monthly": {
+              "net": "3.8500000000",
+              "gross": "3.8500000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.0063000000",
+              "gross": "0.0063000000000000"
+            },
+            "price_monthly": {
+              "net": "3.8500000000",
+              "gross": "3.8500000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0063000000",
+              "gross": "0.0063000000000000"
+            },
+            "price_monthly": {
+              "net": "3.8500000000",
+              "gross": "3.8500000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 23,
+        "name": "cpx21",
+        "prices": [
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0112000000",
+              "gross": "0.0112000000000000"
+            },
+            "price_monthly": {
+              "net": "7.0500000000",
+              "gross": "7.0500000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0112000000",
+              "gross": "0.0112000000000000"
+            },
+            "price_monthly": {
+              "net": "7.0500000000",
+              "gross": "7.0500000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0112000000",
+              "gross": "0.0112000000000000"
+            },
+            "price_monthly": {
+              "net": "7.0500000000",
+              "gross": "7.0500000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.0112000000",
+              "gross": "0.0112000000000000"
+            },
+            "price_monthly": {
+              "net": "7.0500000000",
+              "gross": "7.0500000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0112000000",
+              "gross": "0.0112000000000000"
+            },
+            "price_monthly": {
+              "net": "7.0500000000",
+              "gross": "7.0500000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 24,
+        "name": "cpx31",
+        "prices": [
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.0211000000",
+              "gross": "0.0211000000000000"
+            },
+            "price_monthly": {
+              "net": "13.1000000000",
+              "gross": "13.1000000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0211000000",
+              "gross": "0.0211000000000000"
+            },
+            "price_monthly": {
+              "net": "13.1000000000",
+              "gross": "13.1000000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0211000000",
+              "gross": "0.0211000000000000"
+            },
+            "price_monthly": {
+              "net": "13.1000000000",
+              "gross": "13.1000000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0211000000",
+              "gross": "0.0211000000000000"
+            },
+            "price_monthly": {
+              "net": "13.1000000000",
+              "gross": "13.1000000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0211000000",
+              "gross": "0.0211000000000000"
+            },
+            "price_monthly": {
+              "net": "13.1000000000",
+              "gross": "13.1000000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 25,
+        "name": "cpx41",
+        "prices": [
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0409000000",
+              "gross": "0.0409000000000000"
+            },
+            "price_monthly": {
+              "net": "24.7000000000",
+              "gross": "24.7000000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.0409000000",
+              "gross": "0.0409000000000000"
+            },
+            "price_monthly": {
+              "net": "24.7000000000",
+              "gross": "24.7000000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0409000000",
+              "gross": "0.0409000000000000"
+            },
+            "price_monthly": {
+              "net": "24.7000000000",
+              "gross": "24.7000000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0409000000",
+              "gross": "0.0409000000000000"
+            },
+            "price_monthly": {
+              "net": "24.7000000000",
+              "gross": "24.7000000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0409000000",
+              "gross": "0.0409000000000000"
+            },
+            "price_monthly": {
+              "net": "24.7000000000",
+              "gross": "24.7000000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 26,
+        "name": "cpx51",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0872000000",
+              "gross": "0.0872000000000000"
+            },
+            "price_monthly": {
+              "net": "54.4000000000",
+              "gross": "54.4000000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.0872000000",
+              "gross": "0.0872000000000000"
+            },
+            "price_monthly": {
+              "net": "54.4000000000",
+              "gross": "54.4000000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0872000000",
+              "gross": "0.0872000000000000"
+            },
+            "price_monthly": {
+              "net": "54.4000000000",
+              "gross": "54.4000000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0872000000",
+              "gross": "0.0872000000000000"
+            },
+            "price_monthly": {
+              "net": "54.4000000000",
+              "gross": "54.4000000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0872000000",
+              "gross": "0.0872000000000000"
+            },
+            "price_monthly": {
+              "net": "54.4000000000",
+              "gross": "54.4000000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 45,
+        "name": "cax11",
+        "prices": [
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0053000000",
+              "gross": "0.0053000000000000"
+            },
+            "price_monthly": {
+              "net": "3.2900000000",
+              "gross": "3.2900000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0053000000",
+              "gross": "0.0053000000000000"
+            },
+            "price_monthly": {
+              "net": "3.2900000000",
+              "gross": "3.2900000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0053000000",
+              "gross": "0.0053000000000000"
+            },
+            "price_monthly": {
+              "net": "3.2900000000",
+              "gross": "3.2900000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0053000000",
+              "gross": "0.0053000000000000"
+            },
+            "price_monthly": {
+              "net": "3.2900000000",
+              "gross": "3.2900000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 93,
+        "name": "cax21",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0096000000",
+              "gross": "0.0096000000000000"
+            },
+            "price_monthly": {
+              "net": "5.9900000000",
+              "gross": "5.9900000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0096000000",
+              "gross": "0.0096000000000000"
+            },
+            "price_monthly": {
+              "net": "5.9900000000",
+              "gross": "5.9900000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0096000000",
+              "gross": "0.0096000000000000"
+            },
+            "price_monthly": {
+              "net": "5.9900000000",
+              "gross": "5.9900000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0096000000",
+              "gross": "0.0096000000000000"
+            },
+            "price_monthly": {
+              "net": "5.9900000000",
+              "gross": "5.9900000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 94,
+        "name": "cax31",
+        "prices": [
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0192000000",
+              "gross": "0.0192000000000000"
+            },
+            "price_monthly": {
+              "net": "11.9900000000",
+              "gross": "11.9900000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0192000000",
+              "gross": "0.0192000000000000"
+            },
+            "price_monthly": {
+              "net": "11.9900000000",
+              "gross": "11.9900000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0192000000",
+              "gross": "0.0192000000000000"
+            },
+            "price_monthly": {
+              "net": "11.9900000000",
+              "gross": "11.9900000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0192000000",
+              "gross": "0.0192000000000000"
+            },
+            "price_monthly": {
+              "net": "11.9900000000",
+              "gross": "11.9900000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 95,
+        "name": "cax41",
+        "prices": [
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0384000000",
+              "gross": "0.0384000000000000"
+            },
+            "price_monthly": {
+              "net": "23.9900000000",
+              "gross": "23.9900000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0384000000",
+              "gross": "0.0384000000000000"
+            },
+            "price_monthly": {
+              "net": "23.9900000000",
+              "gross": "23.9900000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0384000000",
+              "gross": "0.0384000000000000"
+            },
+            "price_monthly": {
+              "net": "23.9900000000",
+              "gross": "23.9900000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0384000000",
+              "gross": "0.0384000000000000"
+            },
+            "price_monthly": {
+              "net": "23.9900000000",
+              "gross": "23.9900000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 96,
+        "name": "ccx13",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0192000000",
+              "gross": "0.0192000000000000"
+            },
+            "price_monthly": {
+              "net": "11.9900000000",
+              "gross": "11.9900000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0192000000",
+              "gross": "0.0192000000000000"
+            },
+            "price_monthly": {
+              "net": "11.9900000000",
+              "gross": "11.9900000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0192000000",
+              "gross": "0.0192000000000000"
+            },
+            "price_monthly": {
+              "net": "11.9900000000",
+              "gross": "11.9900000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0192000000",
+              "gross": "0.0192000000000000"
+            },
+            "price_monthly": {
+              "net": "11.9900000000",
+              "gross": "11.9900000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.0192000000",
+              "gross": "0.0192000000000000"
+            },
+            "price_monthly": {
+              "net": "11.9900000000",
+              "gross": "11.9900000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 97,
+        "name": "ccx23",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0384000000",
+              "gross": "0.0384000000000000"
+            },
+            "price_monthly": {
+              "net": "23.9900000000",
+              "gross": "23.9900000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0384000000",
+              "gross": "0.0384000000000000"
+            },
+            "price_monthly": {
+              "net": "23.9900000000",
+              "gross": "23.9900000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0384000000",
+              "gross": "0.0384000000000000"
+            },
+            "price_monthly": {
+              "net": "23.9900000000",
+              "gross": "23.9900000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0384000000",
+              "gross": "0.0384000000000000"
+            },
+            "price_monthly": {
+              "net": "23.9900000000",
+              "gross": "23.9900000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.0384000000",
+              "gross": "0.0384000000000000"
+            },
+            "price_monthly": {
+              "net": "23.9900000000",
+              "gross": "23.9900000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 98,
+        "name": "ccx33",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0769000000",
+              "gross": "0.0769000000000000"
+            },
+            "price_monthly": {
+              "net": "47.9900000000",
+              "gross": "47.9900000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0769000000",
+              "gross": "0.0769000000000000"
+            },
+            "price_monthly": {
+              "net": "47.9900000000",
+              "gross": "47.9900000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0769000000",
+              "gross": "0.0769000000000000"
+            },
+            "price_monthly": {
+              "net": "47.9900000000",
+              "gross": "47.9900000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0769000000",
+              "gross": "0.0769000000000000"
+            },
+            "price_monthly": {
+              "net": "47.9900000000",
+              "gross": "47.9900000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.0769000000",
+              "gross": "0.0769000000000000"
+            },
+            "price_monthly": {
+              "net": "47.9900000000",
+              "gross": "47.9900000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 99,
+        "name": "ccx43",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.1538000000",
+              "gross": "0.1538000000000000"
+            },
+            "price_monthly": {
+              "net": "95.9900000000",
+              "gross": "95.9900000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.1538000000",
+              "gross": "0.1538000000000000"
+            },
+            "price_monthly": {
+              "net": "95.9900000000",
+              "gross": "95.9900000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.1538000000",
+              "gross": "0.1538000000000000"
+            },
+            "price_monthly": {
+              "net": "95.9900000000",
+              "gross": "95.9900000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.1538000000",
+              "gross": "0.1538000000000000"
+            },
+            "price_monthly": {
+              "net": "95.9900000000",
+              "gross": "95.9900000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.1538000000",
+              "gross": "0.1538000000000000"
+            },
+            "price_monthly": {
+              "net": "95.9900000000",
+              "gross": "95.9900000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 100,
+        "name": "ccx53",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.3077000000",
+              "gross": "0.3077000000000000"
+            },
+            "price_monthly": {
+              "net": "191.9900000000",
+              "gross": "191.9900000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.3077000000",
+              "gross": "0.3077000000000000"
+            },
+            "price_monthly": {
+              "net": "191.9900000000",
+              "gross": "191.9900000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.3077000000",
+              "gross": "0.3077000000000000"
+            },
+            "price_monthly": {
+              "net": "191.9900000000",
+              "gross": "191.9900000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.3077000000",
+              "gross": "0.3077000000000000"
+            },
+            "price_monthly": {
+              "net": "191.9900000000",
+              "gross": "191.9900000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.3077000000",
+              "gross": "0.3077000000000000"
+            },
+            "price_monthly": {
+              "net": "191.9900000000",
+              "gross": "191.9900000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 101,
+        "name": "ccx63",
+        "prices": [
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.4615000000",
+              "gross": "0.4615000000000000"
+            },
+            "price_monthly": {
+              "net": "287.9900000000",
+              "gross": "287.9900000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.4615000000",
+              "gross": "0.4615000000000000"
+            },
+            "price_monthly": {
+              "net": "287.9900000000",
+              "gross": "287.9900000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.4615000000",
+              "gross": "0.4615000000000000"
+            },
+            "price_monthly": {
+              "net": "287.9900000000",
+              "gross": "287.9900000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.4615000000",
+              "gross": "0.4615000000000000"
+            },
+            "price_monthly": {
+              "net": "287.9900000000",
+              "gross": "287.9900000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.4615000000",
+              "gross": "0.4615000000000000"
+            },
+            "price_monthly": {
+              "net": "287.9900000000",
+              "gross": "287.9900000000000000"
+            }
+          }
+        ]
+      }
+    ],
+    "load_balancer_types": [
+      {
+        "id": 1,
+        "name": "lb11",
+        "prices": [
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0088000000",
+              "gross": "0.0088000000000000"
+            },
+            "price_monthly": {
+              "net": "5.3900000000",
+              "gross": "5.3900000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0088000000",
+              "gross": "0.0088000000000000"
+            },
+            "price_monthly": {
+              "net": "5.3900000000",
+              "gross": "5.3900000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0088000000",
+              "gross": "0.0088000000000000"
+            },
+            "price_monthly": {
+              "net": "5.3900000000",
+              "gross": "5.3900000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.0088000000",
+              "gross": "0.0088000000000000"
+            },
+            "price_monthly": {
+              "net": "5.3900000000",
+              "gross": "5.3900000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0088000000",
+              "gross": "0.0088000000000000"
+            },
+            "price_monthly": {
+              "net": "5.3900000000",
+              "gross": "5.3900000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "name": "lb21",
+        "prices": [
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0253000000",
+              "gross": "0.0253000000000000"
+            },
+            "price_monthly": {
+              "net": "16.4000000000",
+              "gross": "16.4000000000000000"
+            }
+          },
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0253000000",
+              "gross": "0.0253000000000000"
+            },
+            "price_monthly": {
+              "net": "16.4000000000",
+              "gross": "16.4000000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0253000000",
+              "gross": "0.0253000000000000"
+            },
+            "price_monthly": {
+              "net": "16.4000000000",
+              "gross": "16.4000000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.0253000000",
+              "gross": "0.0253000000000000"
+            },
+            "price_monthly": {
+              "net": "16.4000000000",
+              "gross": "16.4000000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0253000000",
+              "gross": "0.0253000000000000"
+            },
+            "price_monthly": {
+              "net": "16.4000000000",
+              "gross": "16.4000000000000000"
+            }
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "name": "lb31",
+        "prices": [
+          {
+            "location": "ash",
+            "price_hourly": {
+              "net": "0.0495000000",
+              "gross": "0.0495000000000000"
+            },
+            "price_monthly": {
+              "net": "32.9000000000",
+              "gross": "32.9000000000000000"
+            }
+          },
+          {
+            "location": "nbg1",
+            "price_hourly": {
+              "net": "0.0495000000",
+              "gross": "0.0495000000000000"
+            },
+            "price_monthly": {
+              "net": "32.9000000000",
+              "gross": "32.9000000000000000"
+            }
+          },
+          {
+            "location": "hel1",
+            "price_hourly": {
+              "net": "0.0495000000",
+              "gross": "0.0495000000000000"
+            },
+            "price_monthly": {
+              "net": "32.9000000000",
+              "gross": "32.9000000000000000"
+            }
+          },
+          {
+            "location": "hil",
+            "price_hourly": {
+              "net": "0.0495000000",
+              "gross": "0.0495000000000000"
+            },
+            "price_monthly": {
+              "net": "32.9000000000",
+              "gross": "32.9000000000000000"
+            }
+          },
+          {
+            "location": "fsn1",
+            "price_hourly": {
+              "net": "0.0495000000",
+              "gross": "0.0495000000000000"
+            },
+            "price_monthly": {
+              "net": "32.9000000000",
+              "gross": "32.9000000000000000"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
