@@ -216,19 +216,38 @@ program
       const request = nodeRequest(reqOptions);
 
       request.on('response', (res) => {
-        res.on('data', (chunk) => {
-          const chunkAsString = chunk.toString();
-          if (!chunkAsString.includes("[<FE>]")) {
-            log(chunkAsString);
+        res.on('data', (output) => {
+          let outputString: string = output.toString();
+          if (!outputString.includes("[<metal>]")) {
+            log(outputString);
             return;
           }
 
-          log(
-            // TODO: If Raf likes the green text, figure out how to greenify Metal lines apart from streamed build updates.
-            chunkAsString
-              .replaceAll('.[<FE>]', '.\n[<FE>]')
-              .replaceAll('[<FE>]', chalk.green(`[${++step}]`))
-          );
+          /* Metal-specific output from the backend is wrapped in special tags and looks like:
+           * [<metal>]Foo bar[</metal>]
+           * So what the lines below do is to:
+           * - put the said lines on new lines if necessary (especially if one chunk contains both Metal and non-Metal output.)
+           * - match those lines.
+           * - replace the [<metal>] with the incremented step number
+           * - remove the [</metal>]
+           * - render those lines in green for easy recognition.
+          */
+
+          outputString = outputString
+            .replaceAll("[</metal>][<metal>]", "[</metal>]\n[<metal>]")
+            .replaceAll(".[<metal>]", ".\n[<metal>]");
+
+          const metalOutput = outputString.match(/\[<metal>\].*\[<\/metal>\]/g);
+          if (metalOutput?.length) {
+            metalOutput.forEach(output => {
+              const formattedOutput = output
+                .replaceAll("[<metal>]", `[${++step}] `)
+                .replaceAll("[</metal>]", "");
+              outputString = outputString.replace(output, chalk.green(formattedOutput));
+            })
+          }
+
+          log(outputString);
         });
         res.on('error', (err) => {
           console.error(chalk.red('Failed to deploy project.'));

@@ -76,14 +76,14 @@ async function* makeIterator(buildTag: string, fileName: string) {
       console.log(`***** METAL: Extract files for ${buildTag} *****`);
     }
 
-    yield encoder.encode(`--> [EXTRACT FILES] ${data}`);
+    yield encoder.encode(`${data}`);
   }
 
   await extractionPromise;
 
-  yield encoder.encode(`--> Deployment started. Tag is ${buildTag}.`);
+  yield encoder.encode(`[<metal>]Deployment started. Tag is ${buildTag}.[</metal>]`);
 
-  yield encoder.encode('[<FE>] Planning build...');
+  yield encoder.encode('[<metal>]Planning build...[</metal>]');
   const { stdout: stdoutJson } = await exec(`nixpacks plan ${tempDirName}`);
   const plan = JSON.parse(stdoutJson) as NixpackPlan;
   // Filtering out 'npm-9_x' because for some reason it's not listed on:
@@ -93,11 +93,11 @@ async function* makeIterator(buildTag: string, fileName: string) {
   writeFileSync(`${tempDirName}/build-plan.json`, JSON.stringify(plan, null, 2), "utf8");
   await sleep(1000);
 
-  yield encoder.encode('[<FE>] Generating Dockerfile...');
+  yield encoder.encode('[<metal>]Generating Dockerfile...[</metal>]');
   await exec(`nixpacks build ${tempDirName} --name ${buildTag} --config build-plan.json --out ${tempDirName}`);
   await exec(`mv ${tempDirName}/.nixpacks/Dockerfile ${tempDirName}/Dockerfile`);
 
-  yield encoder.encode('[<FE>] Building OCI image...');
+  yield encoder.encode('[<metal>]Building OCI image...[</metal>]');
   /* NOTE: the build takes place in the cloud, so a copy of the build image is
   not available locally. Using the "--push" flag works because Docker BuildCloud
   can directly export the built image to DockerHub. If you want to use the
@@ -147,12 +147,12 @@ async function* makeIterator(buildTag: string, fileName: string) {
       console.log(`***** METAL: Docker build for ${buildTag} *****`);
     }
 
-    yield encoder.encode(`--> [DOCKER BUILD] ${data}`);
+    yield encoder.encode(`${data}`);
   }
 
   await dockerPromise;
 
-  yield encoder.encode('[<FE>] OCI image built...');
+  yield encoder.encode('[<metal>]OCI image built...[</metal>]');
 }
 
 export async function POST(request: NextRequest) {
