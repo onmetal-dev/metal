@@ -57,6 +57,7 @@ async function* makeIterator(buildTag: string, fileName: string) {
   const extractionStream = spawn("tar", ["xzfv", fileName, "-C", tempDirName]);
   const extractionPromise = new Promise<void>((resolve, reject) => {
     extractionStream.on("error", (error) => {
+      console.error("Error: ", error);
       reject(error);
     });
     extractionStream.on("exit", (code) => {
@@ -126,7 +127,7 @@ async function* makeIterator(buildTag: string, fileName: string) {
 
   const dockerPromise = new Promise<void>((resolve, reject) => {
     dockerBuildStream.on("error", (err) => {
-      console.log("err", err);
+      console.error("Error: ", err);
       reject(err);
     });
 
