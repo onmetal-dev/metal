@@ -215,8 +215,8 @@ program
     await new Promise<void>((resolve, reject) => {
       const request = nodeRequest(reqOptions);
 
-      request.on('response', (res) => {
-        res.on('data', (output) => {
+      request.on("response", (res) => {
+        res.on("data", (output) => {
           let outputString: string = output.toString();
           if (!outputString.includes("[<metal>]")) {
             log(outputString);
@@ -249,12 +249,12 @@ program
 
           log(outputString);
         });
-        res.on('error', (err) => {
-          console.error(chalk.red('Failed to deploy project.'));
+        res.on("error", (err) => {
+          console.error(chalk.red("Failed to deploy project."));
           console.error(err);
           reject(err);
         });
-        res.on('end', () => {
+        res.on("end", () => {
           log(chalk.green(`[${++step}] Deployment finished.`));
           resolve();
         });

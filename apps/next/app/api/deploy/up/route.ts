@@ -54,12 +54,12 @@ async function* makeIterator(buildTag: string, fileName: string) {
     tmpdir: UPS_DIRECTORY,
     name: buildTag,
   });
-  const extractionStream = spawn('tar', ['xzfv', fileName, '-C', tempDirName]);
+  const extractionStream = spawn("tar", ["xzfv", fileName, "-C", tempDirName]);
   const extractionPromise = new Promise<void>((resolve, reject) => {
-    extractionStream.on('error', (error) => {
+    extractionStream.on("error", (error) => {
       reject(error);
     });
-    extractionStream.on('exit', (code) => {
+    extractionStream.on("exit", (code) => {
       if (code !== 0) {
         reject(new Error(`Tarball extraction failed with code ${code}`));
         return;
@@ -83,21 +83,21 @@ async function* makeIterator(buildTag: string, fileName: string) {
 
   yield encoder.encode(`[<metal>]Deployment started. Tag is ${buildTag}.[</metal>]`);
 
-  yield encoder.encode('[<metal>]Planning build...[</metal>]');
+  yield encoder.encode("[<metal>]Planning build...[</metal>]");
   const { stdout: stdoutJson } = await exec(`nixpacks plan ${tempDirName}`);
   const plan = JSON.parse(stdoutJson) as NixpackPlan;
-  // Filtering out 'npm-9_x' because for some reason it's not listed on:
+  // Filtering out "npm-9_x" because for some reason it's not listed on:
   // https://search.nixos.org/packages
   plan.phases.setup.nixPkgs =
-    plan.phases.setup.nixPkgs.filter(nixPackage => nixPackage !== 'npm-9_x');
+    plan.phases.setup.nixPkgs.filter(nixPackage => nixPackage !== "npm-9_x");
   writeFileSync(`${tempDirName}/build-plan.json`, JSON.stringify(plan, null, 2), "utf8");
   await sleep(1000);
 
-  yield encoder.encode('[<metal>]Generating Dockerfile...[</metal>]');
+  yield encoder.encode("[<metal>]Generating Dockerfile...[</metal>]");
   await exec(`nixpacks build ${tempDirName} --name ${buildTag} --config build-plan.json --out ${tempDirName}`);
   await exec(`mv ${tempDirName}/.nixpacks/Dockerfile ${tempDirName}/Dockerfile`);
 
-  yield encoder.encode('[<metal>]Building OCI image...[</metal>]');
+  yield encoder.encode("[<metal>]Building OCI image...[</metal>]");
   /* NOTE: the build takes place in the cloud, so a copy of the build image is
   not available locally. Using the "--push" flag works because Docker BuildCloud
   can directly export the built image to DockerHub. If you want to use the
@@ -119,18 +119,18 @@ async function* makeIterator(buildTag: string, fileName: string) {
   ];
 
   if (hasCustomDockerConfig) {
-    dockerFlags.unshift('--config', `${tempDirName}/.docker/config.json`);
+    dockerFlags.unshift("--config", `${tempDirName}/.docker/config.json`);
   }
 
   const dockerBuildStream = spawn("docker", dockerFlags);
 
   const dockerPromise = new Promise<void>((resolve, reject) => {
-    dockerBuildStream.on('error', (err) => {
-      console.log('err', err);
+    dockerBuildStream.on("error", (err) => {
+      console.log("err", err);
       reject(err);
     });
 
-    dockerBuildStream.on('exit', (code) => {
+    dockerBuildStream.on("exit", (code) => {
       if (code !== 0) {
         reject(new Error(`Docker build failed with code ${code}`));
         return;
@@ -152,7 +152,7 @@ async function* makeIterator(buildTag: string, fileName: string) {
 
   await dockerPromise;
 
-  yield encoder.encode('[<metal>]OCI image built...[</metal>]');
+  yield encoder.encode("[<metal>]OCI image built...[</metal>]");
 }
 
 export async function POST(request: NextRequest) {
