@@ -64,6 +64,7 @@ export const selectUserSchema = createSelectSchema(users);
 
 export const userRelations = relations(users, ({ many }) => ({
   usersToTeams: many(usersToTeams), // user can belong to many teams, a team can have many users
+  deployments: many(deployments),
 }));
 
 export const teams = metalSchema.table("teams", {
@@ -87,6 +88,10 @@ export const teamRelations = relations(teams, ({ one, many }) => ({
   applications: many(applications),
   applicationConfigs: many(applicationConfigs),
   builds: many(builds),
+  environments: many(environments),
+  sharedVariables: many(sharedVariables),
+  appEnvVariables: many(appEnvVariables),
+  deployments: many(deployments),
 }));
 
 // usersToTeams tracks a many-to-many relation between users and teams
@@ -441,8 +446,13 @@ const builderSchema = z.object({
       ),
   }),
 });
-
 export type Builder = z.infer<typeof builderSchema>;
+
+const resourcesSchema = z.object({
+  memory: z.number(),
+  cpu: z.number(),
+});
+export type Resources = z.infer<typeof resourcesSchema>;
 
 export const applications = metalSchema.table("applications", {
   ...schemaDefaults,
@@ -480,8 +490,7 @@ export const applicationConfigs = metalSchema.table(
     healthCheck: customJsonb<HealthCheck>("health_check").notNull(),
     dependencies: customJsonb<Dependencies>("dependencies").notNull(),
     databases: customJsonb<Databases>("databases").notNull(),
-    memory: integer("memory").notNull(),
-    cpu: integer("cpu").notNull(),
+    resources: customJsonb<Resources>("resources").notNull(),
     version: text("version").notNull(),
     // tbd
     // extraStorage: integer("extra_storage").notNull(),
@@ -612,5 +621,160 @@ export const buildRelations = relations(builds, ({ one }) => ({
   applicationConfig: one(applicationConfigs, {
     fields: [builds.applicationConfigId],
     references: [applicationConfigs.id],
+  }),
+}));
+
+export const environments = metalSchema.table("environments", {
+  ...schemaDefaults,
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // todo: constraint sql`name ~ '^[a-z0-9-]+$'` (when drizzle supports check constraints)
+});
+
+export const environmentRelations = relations(environments, ({ one }) => ({
+  team: one(teams, {
+    fields: [environments.teamId],
+    references: [teams.id],
+  }),
+}));
+
+// variablesSchema describes the name and value of an environment variable
+const variablesSchema = z.array(
+  z.object({
+    name: z.string(),
+    value: z.string(),
+  })
+);
+export type Variables = z.infer<typeof variablesSchema>;
+
+export const sharedVariables = metalSchema.table("shared_variables", {
+  ...schemaDefaults,
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  variables: customJsonb<Variables>("variables").notNull(),
+});
+
+export const sharedVariableRelations = relations(
+  sharedVariables,
+  ({ one }) => ({
+    team: one(teams, {
+      fields: [sharedVariables.teamId],
+      references: [teams.id],
+    }),
+  })
+);
+
+export const appEnvVariables = metalSchema.table("app_env_variables", {
+  ...schemaDefaults,
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  applicationId: varchar("application_id", { length: 22 })
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
+  environmentId: varchar("environment_id", { length: 22 })
+    .notNull()
+    .references(() => environments.id, { onDelete: "cascade" }),
+  variables: customJsonb<Variables>("variables").notNull(),
+});
+
+export const appEnvVariableRelations = relations(
+  appEnvVariables,
+  ({ one }) => ({
+    team: one(teams, {
+      fields: [appEnvVariables.teamId],
+      references: [teams.id],
+    }),
+    application: one(applications, {
+      fields: [appEnvVariables.applicationId],
+      references: [applications.id],
+    }),
+    environment: one(environments, {
+      fields: [appEnvVariables.environmentId],
+      references: [environments.id],
+    }),
+  })
+);
+
+export const deploymentTypeEnum = pgEnum("deployment_type_enum", [
+  "deploy",
+  "scale",
+  "rollback",
+  "restart",
+  "suspend",
+  "unsuspend",
+]);
+
+export const deploymentStatusEnum = pgEnum("deployment_status_enum", [
+  "deploying",
+  "paused",
+  "aborted",
+  "resumed",
+  "running",
+  "cancelled",
+  "failed",
+  "stopped",
+  "stopping",
+  "suspended",
+]);
+
+export const deployments = metalSchema.table("deployments", {
+  ...schemaDefaults,
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 22 }).references(() => users.id, {
+    onDelete: "cascade",
+  }), // could be null if we can't track down who initiated the deployment
+  applicationId: varchar("application_id", { length: 22 })
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
+  applicationConfigId: varchar("application_config_id", { length: 22 })
+    .notNull()
+    .references(() => applicationConfigs.id, { onDelete: "cascade" }),
+  environmentId: varchar("environment_id", { length: 22 })
+    .notNull()
+    .references(() => environments.id, { onDelete: "cascade" }),
+  buildId: varchar("build_id", { length: 22 })
+    .notNull()
+    .references(() => builds.id, { onDelete: "cascade" }),
+  variables: customJsonb<Variables>("variables").notNull(), // snapshot since we want rollbacks to work
+  type: deploymentTypeEnum("type").notNull(),
+  rolloutStatus: deploymentStatusEnum("rollout_status").notNull(),
+  // rolloutStrategy: // within the cluster, the rollout strategy. todo, all-at-once for now
+  resources: customJsonb<Resources>("resources").notNull(),
+  referenceDeploymentId: varchar("reference_deployment_id", { length: 22 }),
+  count: integer("count"), // only set for scale deployments
+  // clusterSelector: // todo: clusters you want to deploy into
+  // clusterRolloutStrategy: // todo: how to rollout to clusters
+  // clusterRolloutStatus: // todo: status of the rollout per cluster
+});
+
+export const deploymentRelations = relations(deployments, ({ one }) => ({
+  team: one(teams, {
+    fields: [deployments.teamId],
+    references: [teams.id],
+  }),
+  user: one(users, {
+    fields: [deployments.userId],
+    references: [users.id],
+  }),
+  application: one(applications, {
+    fields: [deployments.applicationId],
+    references: [applications.id],
+  }),
+  applicationConfig: one(applicationConfigs, {
+    fields: [deployments.applicationConfigId],
+    references: [applicationConfigs.id],
+  }),
+  environment: one(environments, {
+    fields: [deployments.environmentId],
+    references: [environments.id],
+  }),
+  build: one(builds, {
+    fields: [deployments.buildId],
+    references: [builds.id],
   }),
 }));
