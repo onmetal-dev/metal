@@ -1,23 +1,19 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  customType,
   index,
   integer,
+  pgEnum,
+  pgSchema,
   primaryKey,
   text,
-  pgEnum,
   timestamp,
-  pgSchema,
   varchar,
-  json,
-  jsonb,
-  check,
 } from "drizzle-orm/pg-core";
-import { customType } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import uuidBase62 from "uuid-base62";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import sqlSchemaForEnv from "./schemaForEnv";
 
 // use base62 uuids to be shorter and more friendly to the eyes
@@ -90,6 +86,7 @@ export const teamRelations = relations(teams, ({ one, many }) => ({
   hetznerClusters: many(hetznerClusters),
   applications: many(applications),
   applicationConfigs: many(applicationConfigs),
+  builds: many(builds),
 }));
 
 // usersToTeams tracks a many-to-many relation between users and teams
@@ -400,6 +397,53 @@ const sourceSchema = z.object({
 });
 export type Source = z.infer<typeof sourceSchema>;
 
+const phaseSchema = z.object({
+  cmd: z.string().optional(),
+  dependsOn: z.array(z.string()).optional(),
+});
+
+// builderSchema describes what builder to use (in an application config) or what builder was used (in a build)
+const builderSchema = z.object({
+  type: z.enum(["nixpacks"]), // todo: "dockerfile", "pack", "image"
+  nixpacks: z.object({
+    // a subset of what's supported here: https://nixpacks.com/docs/guides/configuring-builds
+    providers: z.array(z.string()).optional(),
+    buildImage: z.string().optional(),
+    phases: z
+      .object({
+        setup: z.object({
+          nixPkgs: z.array(z.string()).optional(),
+          nixLibs: z.array(z.string()).optional(),
+          aptPkgs: z.array(z.string()).optional(),
+        }),
+        build: z.object({
+          cmd: z.string().optional(),
+          dependsOn: z.array(z.string()).optional(),
+        }),
+        start: z.object({
+          cmd: z.string().optional(),
+        }),
+      })
+      .passthrough()
+      .refine(
+        (data) => {
+          // Ensure all additional user-defined phases follow the phase schema
+          return Object.entries(data).every(([key, value]) => {
+            if (["setup", "build", "start"].includes(key)) {
+              return true;
+            }
+            return phaseSchema.safeParse(value).success;
+          });
+        },
+        {
+          message: "All user-defined phases must follow the standard schema",
+        }
+      ),
+  }),
+});
+
+export type Builder = z.infer<typeof builderSchema>;
+
 export const applications = metalSchema.table("applications", {
   ...schemaDefaults,
   teamId: varchar("team_id", { length: 22 })
@@ -429,6 +473,7 @@ export const applicationConfigs = metalSchema.table(
       .notNull()
       .references(() => applications.id, { onDelete: "cascade" }),
     source: customJsonb<Source>("source").notNull(),
+    builder: customJsonb<Builder>("builder").notNull(),
     ports: customJsonb<Ports>("ports").notNull(),
     external: customJsonb<External>("external").notNull(),
     env: customJsonb<Env>("env").notNull(),
@@ -496,3 +541,76 @@ export const applicationConfigRelations = relations(
     }),
   })
 );
+
+export const buildStatusEnum = pgEnum("build_status_enum", [
+  "pending",
+  "running",
+  "completed",
+  "failed",
+]);
+export type BuildStatusEnum = (typeof buildStatusEnum.enumValues)[number];
+
+// buildArtifactSchema describes the end result of a build: a built image, or in the case of a serverless app, a tarball with code.
+const buildArtifactSchema = z.object({
+  image: z
+    .object({
+      repository: z
+        .string()
+        .optional()
+        .describe(
+          "If empty, dockerhub is assumed. Otherwise can be something like registry.k8s.io"
+        ),
+      name: z
+        .string()
+        .describe(
+          "The name of the image. Required. E.g. busybox, stefanprodan/podinfo."
+        ),
+      tag: z
+        .string()
+        .describe("The tag of the image. If not specified, latest is assumed."),
+      digest: z
+        .string()
+        .describe(
+          "Instead of a tag you can use a digest. E.g. sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9"
+        ),
+    })
+    .optional(),
+  tarball: z
+    .object({
+      url: z.string(),
+    })
+    .optional(),
+});
+
+export type BuildArtifact = z.infer<typeof buildArtifactSchema>;
+
+export const builds = metalSchema.table("builds", {
+  ...schemaDefaults,
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  applicationId: varchar("application_id", { length: 22 })
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
+  applicationConfigId: varchar("application_config_id", { length: 22 })
+    .notNull()
+    .references(() => applicationConfigs.id, { onDelete: "cascade" }),
+  status: buildStatusEnum("status").notNull(),
+  logs: text("logs").notNull(),
+  artifact: customJsonb<BuildArtifact>("artifact").notNull(),
+});
+
+export const buildRelations = relations(builds, ({ one }) => ({
+  team: one(teams, {
+    fields: [builds.teamId],
+    references: [teams.id],
+  }),
+  application: one(applications, {
+    fields: [builds.applicationId],
+    references: [applications.id],
+  }),
+  applicationConfig: one(applicationConfigs, {
+    fields: [builds.applicationConfigId],
+    references: [applicationConfigs.id],
+  }),
+}));
