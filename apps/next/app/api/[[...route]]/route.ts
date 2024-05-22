@@ -1,9 +1,13 @@
-import { handle } from "hono/vercel";
-import { OpenAPIHono } from "@hono/zod-openapi";
-import { otelTracer } from "./tracing";
 import { serviceName } from "@/lib/constants";
+import { OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-
+import { handle } from "hono/vercel";
+import applicationsRoutes from "./applications";
+import hetznerClustersRoutes from "./hetzner/clusters";
+import hetznerProjectsRoutes from "./hetzner/projects";
+import teamRoutes from "./teams";
+import { otelTracer } from "./tracing";
+import whoami from "./whoami";
 export const runtime = "nodejs";
 
 // After deliberating between trpc and hono I decided hono since it was
@@ -32,12 +36,11 @@ app.onError((err, c) => {
   );
 });
 
-import whoami from "./whoami";
 whoami(app);
-import hetznerProjectsRoutes from "./hetzner/projects";
 hetznerProjectsRoutes(app);
-import hetznerClustersRoutes from "./hetzner/clusters";
 hetznerClustersRoutes(app);
+applicationsRoutes(app);
+teamRoutes(app);
 
 const securitySchemeKey = "bearerAuth";
 app.openAPIRegistry.registerComponent("securitySchemes", securitySchemeKey, {
@@ -76,4 +79,4 @@ app.doc("/doc", {
 
 const h = handle(app);
 
-export { h as GET, h as POST, h as PUT, h as DELETE };
+export { h as DELETE, h as GET, h as POST, h as PUT };
