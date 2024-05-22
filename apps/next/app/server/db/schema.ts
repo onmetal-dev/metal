@@ -459,8 +459,41 @@ export const applications = metalSchema.table("applications", {
   teamId: varchar("team_id", { length: 22 })
     .notNull()
     .references(() => teams.id, { onDelete: "cascade" }),
+  creatorId: varchar("creator_id", { length: 22 })
+    .references(() => users.id)
+    .notNull(), // could be null if we can't track down who initiated the deployment
   name: text("name").notNull(), // todo: constraint sql`name ~ '^[a-z0-9-]+$'` (when drizzle supports check constraints)
 });
+
+export const applicationRelations = relations(
+  applications,
+  ({ one, many }) => ({
+    team: one(teams, {
+      fields: [applications.teamId],
+      references: [teams.id],
+    }),
+    creator: one(users, {
+      fields: [applications.creatorId],
+      references: [users.id],
+    }),
+    configs: many(applicationConfigs),
+  })
+);
+
+export const insertApplicationSchema = createInsertSchema(applications);
+export type ApplicationInsert = z.infer<typeof insertApplicationSchema>;
+export const selectApplicationSchema = createSelectSchema(applications);
+export type Application = z.infer<typeof selectApplicationSchema>;
+export const applicationSpec = insertApplicationSchema
+  .omit({
+    createdAt: true,
+    updatedAt: true,
+  })
+  .refine((data) => /^[a-z0-9-_]+$/.test(data.name), {
+    message: "Name must match the regex ^[a-z0-9-_]+$",
+    path: ["name"],
+  });
+export type ApplicationSpec = z.infer<typeof applicationSpec>;
 
 const customJsonb = <TData>(name: string) =>
   customType<{ data: TData; driverData: string }>({
@@ -512,11 +545,6 @@ export const applicationConfigs = metalSchema.table(
   }
 );
 
-export const insertApplicationSchema = createInsertSchema(applications);
-export type ApplicationInsert = z.infer<typeof insertApplicationSchema>;
-export const selectApplicationSchema = createSelectSchema(applications);
-export type Application = z.infer<typeof selectApplicationSchema>;
-
 export const insertApplicationConfigSchema =
   createInsertSchema(applicationConfigs);
 export type ApplicationConfigInsert = z.infer<
@@ -525,17 +553,6 @@ export type ApplicationConfigInsert = z.infer<
 export const selectApplicationConfigSchema =
   createSelectSchema(applicationConfigs);
 export type ApplicationConfig = z.infer<typeof selectApplicationConfigSchema>;
-
-export const applicationRelations = relations(
-  applications,
-  ({ one, many }) => ({
-    team: one(teams, {
-      fields: [applications.teamId],
-      references: [teams.id],
-    }),
-    configs: many(applicationConfigs),
-  })
-);
 
 export const applicationConfigRelations = relations(
   applicationConfigs,
@@ -725,7 +742,7 @@ export const deployments = metalSchema.table("deployments", {
   teamId: varchar("team_id", { length: 22 })
     .notNull()
     .references(() => teams.id, { onDelete: "cascade" }),
-  userId: varchar("user_id", { length: 22 }).references(() => users.id, {
+  creatorId: varchar("creator_id", { length: 22 }).references(() => users.id, {
     onDelete: "cascade",
   }), // could be null if we can't track down who initiated the deployment
   applicationId: varchar("application_id", { length: 22 })
@@ -758,7 +775,7 @@ export const deploymentRelations = relations(deployments, ({ one }) => ({
     references: [teams.id],
   }),
   user: one(users, {
-    fields: [deployments.userId],
+    fields: [deployments.creatorId],
     references: [users.id],
   }),
   application: one(applications, {
