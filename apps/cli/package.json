@@ -13,8 +13,7 @@
     "@types/bun": "^1.1.0",
     "@types/inquirer": "^9.0.7",
     "@types/opener": "^1.4.3",
-    "eslint": "^8",
-    "eslint-config-next": "14.1.4"
+    "eslint": "^8"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
