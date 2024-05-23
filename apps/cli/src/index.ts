@@ -1,19 +1,19 @@
-import { Command } from "commander";
-import path from "path";
-import os from "os";
-import chalk from "chalk";
-import opener from "opener";
-import inquirer from "inquirer";
 import Metal from "@onmetal/node";
-import { type Config } from "./types";
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
-import { promisify } from "node:util";
+import chalk from "chalk";
+import { Command } from "commander";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import inquirer from "inquirer";
 import { exec as execCallbackBased } from "node:child_process";
-import { create as createTar } from "tar";
 import { request as insecureRequest } from "node:http";
 import { request as secureRequest } from "node:https";
-import projects from "./projects";
+import { promisify } from "node:util";
+import opener from "opener";
+import os from "os";
+import path from "path";
+import { create as createTar } from "tar";
 import clusters from "./clusters";
+import projects from "./projects";
+import { type Config } from "./types";
 
 const exec = promisify(execCallbackBased);
 
