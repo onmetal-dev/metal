@@ -1,4 +1,4 @@
-import { getDirectoryNameForUps } from "@/app/server/util/functions";
+import { DIR_FOR_CLIENT_DEPLOYMENTS } from "@/app/server/util/constants";
 import { clerkClient } from "@clerk/nextjs";
 import { type NextRequest } from "next/server";
 import { exec as execCallbackBased, spawn } from "node:child_process";
@@ -11,7 +11,6 @@ import { NixpackPlan } from "@/types/deployment";
 export const dynamic = "force-dynamic";
 
 const exec = promisify(execCallbackBased);
-const UPS_DIRECTORY = getDirectoryNameForUps();
 const org = process.env.DOCKERHUB_ORG;
 const repo = process.env.DOCKERHUB_REPO;
 const cloudBuilderName = process.env.CLOUD_BUILDER_NAME;
@@ -51,7 +50,7 @@ async function* streamIterator(stderr: Readable) {
 
 async function* makeIterator(buildTag: string, fileName: string) {
   const { name: tempDirName } = dirSync({
-    tmpdir: UPS_DIRECTORY,
+    tmpdir: DIR_FOR_CLIENT_DEPLOYMENTS,
     name: buildTag,
   });
   const extractionStream = spawn("tar", ["xzfv", fileName, "-C", tempDirName]);
@@ -169,8 +168,8 @@ export async function POST(request: NextRequest) {
   }
 
   const tag = `up_${Date.now()}`;
-  if (!existsSync(UPS_DIRECTORY)) {
-    mkdirSync(UPS_DIRECTORY);
+  if (!existsSync(DIR_FOR_CLIENT_DEPLOYMENTS)) {
+    mkdirSync(DIR_FOR_CLIENT_DEPLOYMENTS);
   }
 
   const fileName = `${tag}.gz`;
