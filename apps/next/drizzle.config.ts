@@ -1,20 +1,20 @@
+import sqlSchemaForEnv from "@/app/server/db/schemaForEnv";
 import dotenv from "dotenv";
 import type { Config } from "drizzle-kit";
-import tmp from "tmp";
-import { writeFileSync } from "fs";
-import sqlSchemaForEnv from "@/app/server/db/schemaForEnv";
 dotenv.config();
-
-let connectionString = process.env.POSTGRES_URL!;
 
 export default {
   schema: "./app/server/db/schema.ts",
   out: "./drizzle",
-  driver: "pg",
+  dialect: "postgresql",
   dbCredentials: {
-    connectionString,
+    url: process.env.POSTGRES_URL!,
   },
   schemaFilter: sqlSchemaForEnv(process.env.NODE_ENV, process.env.CI),
   strict: process.env.CI !== "true",
   verbose: true,
+  migrations: {
+    table: "migrations",
+    schema: sqlSchemaForEnv(process.env.NODE_ENV, process.env.CI),
+  },
 } satisfies Config;
