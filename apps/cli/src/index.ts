@@ -160,7 +160,6 @@ program
 )
   .action(async (sourceDir, options) => {
     let step = 0;
-    log(chalk.green(`[${++step}] Checking for token...`));
     const userConfig = checkUserConfig();
     // Token hierachy: commandline > config file > environment variable
     const token =
