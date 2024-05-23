@@ -11,6 +11,7 @@ import opener from "opener";
 import os from "os";
 import path from "path";
 import { create as createTar } from "tar";
+import apps from "./apps";
 import clusters from "./clusters";
 import projects from "./projects";
 import { type Config } from "./types";
@@ -152,12 +153,15 @@ const checkUserConfig = () => {
 
 program
   .command("up")
-  .argument("[sourceDir]", "[OPTIONAL] The absolute or relative path of the directory you want to deploy. Defaults to the current directory.")
+  .argument(
+    "[sourceDir]",
+    "[OPTIONAL] The absolute or relative path of the directory you want to deploy. Defaults to the current directory."
+  )
   .description("Deploy a project")
-.option(
-  "--token",
-  "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI."
-)
+  .option(
+    "--token",
+    "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI."
+  )
   .action(async (sourceDir, options) => {
     let step = 0;
     const userConfig = checkUserConfig();
@@ -191,15 +195,20 @@ program
     }
 
     if (!pathsToCompress.length) {
-      console.error("Error: the list of files to compress is empty. Please check that your working directory is a Git repository and that there are git-tracked files available.");
+      console.error(
+        "Error: the list of files to compress is empty. Please check that your working directory is a Git repository and that there are git-tracked files available."
+      );
       process.exit(1);
     }
 
     log(chalk.green(`[${++step}] Compressing files...`));
-    const payloadStream = createTar({
-      gzip: true,
-      cwd: workingDir,
-    }, pathsToCompress);
+    const payloadStream = createTar(
+      {
+        gzip: true,
+        cwd: workingDir,
+      },
+      pathsToCompress
+    );
 
     log(chalk.green(`[${++step}] Uploading...`));
     const reqOptions = {
@@ -233,7 +242,7 @@ program
            * - replace the [<metal>] with the incremented step number
            * - remove the [</metal>]
            * - render those lines in green for easy recognition.
-          */
+           */
 
           outputString = outputString
             .replaceAll("[</metal>][<metal>]", "[</metal>]\n[<metal>]")
@@ -241,12 +250,15 @@ program
 
           const metalOutput = outputString.match(/\[<metal>\].*\[<\/metal>\]/g);
           if (metalOutput?.length) {
-            metalOutput.forEach(output => {
+            metalOutput.forEach((output) => {
               const formattedOutput = output
                 .replaceAll("[<metal>]", `[${++step}] `)
                 .replaceAll("[</metal>]", "");
-              outputString = outputString.replace(output, chalk.green(formattedOutput));
-            })
+              outputString = outputString.replace(
+                output,
+                chalk.green(formattedOutput)
+              );
+            });
           }
 
           log(outputString);
@@ -276,5 +288,6 @@ program
 
 projects(program.command("projects"), config, baseURL);
 clusters(program.command("clusters"), config, baseURL);
+apps(program.command("apps"), config, baseURL);
 
 program.parse();

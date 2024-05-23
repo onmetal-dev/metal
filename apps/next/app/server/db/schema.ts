@@ -1,23 +1,19 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  customType,
   index,
   integer,
+  pgEnum,
+  pgSchema,
   primaryKey,
   text,
-  pgEnum,
   timestamp,
-  pgSchema,
   varchar,
-  json,
-  jsonb,
-  check,
 } from "drizzle-orm/pg-core";
-import { customType } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import uuidBase62 from "uuid-base62";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import sqlSchemaForEnv from "./schemaForEnv";
 
 // use base62 uuids to be shorter and more friendly to the eyes
@@ -68,6 +64,7 @@ export const selectUserSchema = createSelectSchema(users);
 
 export const userRelations = relations(users, ({ many }) => ({
   usersToTeams: many(usersToTeams), // user can belong to many teams, a team can have many users
+  deployments: many(deployments),
 }));
 
 export const teams = metalSchema.table("teams", {
@@ -90,6 +87,11 @@ export const teamRelations = relations(teams, ({ one, many }) => ({
   hetznerClusters: many(hetznerClusters),
   applications: many(applications),
   applicationConfigs: many(applicationConfigs),
+  builds: many(builds),
+  environments: many(environments),
+  sharedVariables: many(sharedVariables),
+  appEnvVariables: many(appEnvVariables),
+  deployments: many(deployments),
 }));
 
 // usersToTeams tracks a many-to-many relation between users and teams
@@ -400,13 +402,98 @@ const sourceSchema = z.object({
 });
 export type Source = z.infer<typeof sourceSchema>;
 
+const phaseSchema = z.object({
+  cmd: z.string().optional(),
+  dependsOn: z.array(z.string()).optional(),
+});
+
+// builderSchema describes what builder to use (in an application config) or what builder was used (in a build)
+const builderSchema = z.object({
+  type: z.enum(["nixpacks"]), // todo: "dockerfile", "pack", "image"
+  nixpacks: z.object({
+    // a subset of what's supported here: https://nixpacks.com/docs/guides/configuring-builds
+    providers: z.array(z.string()).optional(),
+    buildImage: z.string().optional(),
+    phases: z
+      .object({
+        setup: z.object({
+          nixPkgs: z.array(z.string()).optional(),
+          nixLibs: z.array(z.string()).optional(),
+          aptPkgs: z.array(z.string()).optional(),
+        }),
+        build: z.object({
+          cmd: z.string().optional(),
+          dependsOn: z.array(z.string()).optional(),
+        }),
+        start: z.object({
+          cmd: z.string().optional(),
+        }),
+      })
+      .passthrough()
+      .refine(
+        (data) => {
+          // Ensure all additional user-defined phases follow the phase schema
+          return Object.entries(data).every(([key, value]) => {
+            if (["setup", "build", "start"].includes(key)) {
+              return true;
+            }
+            return phaseSchema.safeParse(value).success;
+          });
+        },
+        {
+          message: "All user-defined phases must follow the standard schema",
+        }
+      ),
+  }),
+});
+export type Builder = z.infer<typeof builderSchema>;
+
+const resourcesSchema = z.object({
+  memory: z.number(),
+  cpu: z.number(),
+});
+export type Resources = z.infer<typeof resourcesSchema>;
+
 export const applications = metalSchema.table("applications", {
   ...schemaDefaults,
   teamId: varchar("team_id", { length: 22 })
     .notNull()
     .references(() => teams.id, { onDelete: "cascade" }),
+  creatorId: varchar("creator_id", { length: 22 })
+    .references(() => users.id)
+    .notNull(), // could be null if we can't track down who initiated the deployment
   name: text("name").notNull(), // todo: constraint sql`name ~ '^[a-z0-9-]+$'` (when drizzle supports check constraints)
 });
+
+export const applicationRelations = relations(
+  applications,
+  ({ one, many }) => ({
+    team: one(teams, {
+      fields: [applications.teamId],
+      references: [teams.id],
+    }),
+    creator: one(users, {
+      fields: [applications.creatorId],
+      references: [users.id],
+    }),
+    configs: many(applicationConfigs),
+  })
+);
+
+export const insertApplicationSchema = createInsertSchema(applications);
+export type ApplicationInsert = z.infer<typeof insertApplicationSchema>;
+export const selectApplicationSchema = createSelectSchema(applications);
+export type Application = z.infer<typeof selectApplicationSchema>;
+export const applicationSpec = insertApplicationSchema
+  .omit({
+    createdAt: true,
+    updatedAt: true,
+  })
+  .refine((data) => /^[a-z0-9-_]+$/.test(data.name), {
+    message: "Name must match the regex ^[a-z0-9-_]+$",
+    path: ["name"],
+  });
+export type ApplicationSpec = z.infer<typeof applicationSpec>;
 
 const customJsonb = <TData>(name: string) =>
   customType<{ data: TData; driverData: string }>({
@@ -429,14 +516,14 @@ export const applicationConfigs = metalSchema.table(
       .notNull()
       .references(() => applications.id, { onDelete: "cascade" }),
     source: customJsonb<Source>("source").notNull(),
+    builder: customJsonb<Builder>("builder").notNull(),
     ports: customJsonb<Ports>("ports").notNull(),
     external: customJsonb<External>("external").notNull(),
     env: customJsonb<Env>("env").notNull(),
     healthCheck: customJsonb<HealthCheck>("health_check").notNull(),
     dependencies: customJsonb<Dependencies>("dependencies").notNull(),
     databases: customJsonb<Databases>("databases").notNull(),
-    memory: integer("memory").notNull(),
-    cpu: integer("cpu").notNull(),
+    resources: customJsonb<Resources>("resources").notNull(),
     version: text("version").notNull(),
     // tbd
     // extraStorage: integer("extra_storage").notNull(),
@@ -458,11 +545,6 @@ export const applicationConfigs = metalSchema.table(
   }
 );
 
-export const insertApplicationSchema = createInsertSchema(applications);
-export type ApplicationInsert = z.infer<typeof insertApplicationSchema>;
-export const selectApplicationSchema = createSelectSchema(applications);
-export type Application = z.infer<typeof selectApplicationSchema>;
-
 export const insertApplicationConfigSchema =
   createInsertSchema(applicationConfigs);
 export type ApplicationConfigInsert = z.infer<
@@ -471,17 +553,6 @@ export type ApplicationConfigInsert = z.infer<
 export const selectApplicationConfigSchema =
   createSelectSchema(applicationConfigs);
 export type ApplicationConfig = z.infer<typeof selectApplicationConfigSchema>;
-
-export const applicationRelations = relations(
-  applications,
-  ({ one, many }) => ({
-    team: one(teams, {
-      fields: [applications.teamId],
-      references: [teams.id],
-    }),
-    configs: many(applicationConfigs),
-  })
-);
 
 export const applicationConfigRelations = relations(
   applicationConfigs,
@@ -496,3 +567,231 @@ export const applicationConfigRelations = relations(
     }),
   })
 );
+
+export const buildStatusEnum = pgEnum("build_status_enum", [
+  "pending",
+  "running",
+  "completed",
+  "failed",
+]);
+export type BuildStatusEnum = (typeof buildStatusEnum.enumValues)[number];
+
+// buildArtifactSchema describes the end result of a build: a built image, or in the case of a serverless app, a tarball with code.
+const buildArtifactSchema = z.object({
+  image: z
+    .object({
+      repository: z
+        .string()
+        .optional()
+        .describe(
+          "If empty, dockerhub is assumed. Otherwise can be something like registry.k8s.io"
+        ),
+      name: z
+        .string()
+        .describe(
+          "The name of the image. Required. E.g. busybox, stefanprodan/podinfo."
+        ),
+      tag: z
+        .string()
+        .describe("The tag of the image. If not specified, latest is assumed."),
+      digest: z
+        .string()
+        .describe(
+          "Instead of a tag you can use a digest. E.g. sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9"
+        ),
+    })
+    .optional(),
+  tarball: z
+    .object({
+      url: z.string(),
+    })
+    .optional(),
+});
+
+export type BuildArtifact = z.infer<typeof buildArtifactSchema>;
+
+export const builds = metalSchema.table("builds", {
+  ...schemaDefaults,
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  applicationId: varchar("application_id", { length: 22 })
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
+  applicationConfigId: varchar("application_config_id", { length: 22 })
+    .notNull()
+    .references(() => applicationConfigs.id, { onDelete: "cascade" }),
+  status: buildStatusEnum("status").notNull(),
+  logs: text("logs").notNull(),
+  artifact: customJsonb<BuildArtifact>("artifact").notNull(),
+});
+
+export const buildRelations = relations(builds, ({ one }) => ({
+  team: one(teams, {
+    fields: [builds.teamId],
+    references: [teams.id],
+  }),
+  application: one(applications, {
+    fields: [builds.applicationId],
+    references: [applications.id],
+  }),
+  applicationConfig: one(applicationConfigs, {
+    fields: [builds.applicationConfigId],
+    references: [applicationConfigs.id],
+  }),
+}));
+
+export const environments = metalSchema.table("environments", {
+  ...schemaDefaults,
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // todo: constraint sql`name ~ '^[a-z0-9-]+$'` (when drizzle supports check constraints)
+});
+
+export const environmentRelations = relations(environments, ({ one }) => ({
+  team: one(teams, {
+    fields: [environments.teamId],
+    references: [teams.id],
+  }),
+}));
+
+// variablesSchema describes the name and value of an environment variable
+const variablesSchema = z.array(
+  z.object({
+    name: z.string(),
+    value: z.string(),
+  })
+);
+export type Variables = z.infer<typeof variablesSchema>;
+
+export const sharedVariables = metalSchema.table("shared_variables", {
+  ...schemaDefaults,
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  variables: customJsonb<Variables>("variables").notNull(),
+});
+
+export const sharedVariableRelations = relations(
+  sharedVariables,
+  ({ one }) => ({
+    team: one(teams, {
+      fields: [sharedVariables.teamId],
+      references: [teams.id],
+    }),
+  })
+);
+
+export const appEnvVariables = metalSchema.table("app_env_variables", {
+  ...schemaDefaults,
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  applicationId: varchar("application_id", { length: 22 })
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
+  environmentId: varchar("environment_id", { length: 22 })
+    .notNull()
+    .references(() => environments.id, { onDelete: "cascade" }),
+  variables: customJsonb<Variables>("variables").notNull(),
+});
+
+export const appEnvVariableRelations = relations(
+  appEnvVariables,
+  ({ one }) => ({
+    team: one(teams, {
+      fields: [appEnvVariables.teamId],
+      references: [teams.id],
+    }),
+    application: one(applications, {
+      fields: [appEnvVariables.applicationId],
+      references: [applications.id],
+    }),
+    environment: one(environments, {
+      fields: [appEnvVariables.environmentId],
+      references: [environments.id],
+    }),
+  })
+);
+
+export const deploymentTypeEnum = pgEnum("deployment_type_enum", [
+  "deploy",
+  "scale",
+  "rollback",
+  "restart",
+  "suspend",
+  "unsuspend",
+]);
+
+export const deploymentStatusEnum = pgEnum("deployment_status_enum", [
+  "deploying",
+  "paused",
+  "aborted",
+  "resumed",
+  "running",
+  "cancelled",
+  "failed",
+  "stopped",
+  "stopping",
+  "suspended",
+]);
+
+export const deployments = metalSchema.table("deployments", {
+  ...schemaDefaults,
+  teamId: varchar("team_id", { length: 22 })
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  creatorId: varchar("creator_id", { length: 22 }).references(() => users.id, {
+    onDelete: "cascade",
+  }), // could be null if we can't track down who initiated the deployment
+  applicationId: varchar("application_id", { length: 22 })
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
+  applicationConfigId: varchar("application_config_id", { length: 22 })
+    .notNull()
+    .references(() => applicationConfigs.id, { onDelete: "cascade" }),
+  environmentId: varchar("environment_id", { length: 22 })
+    .notNull()
+    .references(() => environments.id, { onDelete: "cascade" }),
+  buildId: varchar("build_id", { length: 22 })
+    .notNull()
+    .references(() => builds.id, { onDelete: "cascade" }),
+  variables: customJsonb<Variables>("variables").notNull(), // snapshot since we want rollbacks to work
+  type: deploymentTypeEnum("type").notNull(),
+  rolloutStatus: deploymentStatusEnum("rollout_status").notNull(),
+  // rolloutStrategy: // within the cluster, the rollout strategy. todo, all-at-once for now
+  resources: customJsonb<Resources>("resources").notNull(),
+  referenceDeploymentId: varchar("reference_deployment_id", { length: 22 }),
+  count: integer("count"), // only set for scale deployments
+  // clusterSelector: // todo: clusters you want to deploy into
+  // clusterRolloutStrategy: // todo: how to rollout to clusters
+  // clusterRolloutStatus: // todo: status of the rollout per cluster
+});
+
+export const deploymentRelations = relations(deployments, ({ one }) => ({
+  team: one(teams, {
+    fields: [deployments.teamId],
+    references: [teams.id],
+  }),
+  user: one(users, {
+    fields: [deployments.creatorId],
+    references: [users.id],
+  }),
+  application: one(applications, {
+    fields: [deployments.applicationId],
+    references: [applications.id],
+  }),
+  applicationConfig: one(applicationConfigs, {
+    fields: [deployments.applicationConfigId],
+    references: [applicationConfigs.id],
+  }),
+  environment: one(environments, {
+    fields: [deployments.environmentId],
+    references: [environments.id],
+  }),
+  build: one(builds, {
+    fields: [deployments.buildId],
+    references: [builds.id],
+  }),
+}));
