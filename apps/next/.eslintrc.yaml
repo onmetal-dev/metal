@@ -11,4 +11,4 @@ rules:
     - double
     - allowTemplateLiterals: true
   # TypeScript handles this. Details: https://eslint.org/docs/latest/rules/no-undef#handled_by_typescript
-  no-undef: 'off'
+  no-undef: "off"
