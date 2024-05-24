@@ -1,11 +1,11 @@
-import { trace } from "@opentelemetry/api";
-import { hetznerClusters, HetznerCluster, Team, teams } from "@db/schema";
 import { db } from "@db/index";
-import { eq } from "drizzle-orm";
-import tmp from "tmp";
-import fs from "fs";
+import { HetznerCluster, Team, hetznerClusters, teams } from "@db/schema";
 import { serviceName } from "@lib/constants";
-import { tracedExec, mgmtClusterKubeconfigFile } from "./shared";
+import { trace } from "@opentelemetry/api";
+import { eq } from "drizzle-orm";
+import fs from "fs";
+import tmp from "tmp";
+import { mgmtClusterKubeconfigFile, tracedExec } from "./shared";
 
 export async function deleteHetznerCluster({
   clusterId,
@@ -41,6 +41,21 @@ export async function deleteHetznerCluster({
         creatorId: cluster.creatorId,
       };
       span.setAttributes(spanAttributes);
+
+      // delete pvcs first so that there are no orphaned pvcs
+      if (cluster.kubeconfig) {
+        const clusterKubeconfigFile = tmp.fileSync();
+        fs.writeFileSync(clusterKubeconfigFile.name, cluster.kubeconfig);
+        const namespacesWithPvcs = ["monitoring", "minio-tenant", "registry"];
+        for (const namespace of namespacesWithPvcs) {
+          await tracedExec({
+            spanName: "exec-kubectl-delete-pvcs",
+            spanAttributes,
+            command: `KUBECONFIG=${clusterKubeconfigFile.name} kubectl delete pvc -n ${namespace} --all`,
+          });
+        }
+      }
+
       const mgmtKubeconfig = mgmtClusterKubeconfigFile();
       for (const command of [
         `KUBECONFIG=${mgmtKubeconfig} kubectl delete --ignore-not-found=true cluster ${cluster.name}`,
