@@ -11,6 +11,9 @@ import opener from "opener";
 import os from "os";
 import path from "path";
 import { create as createTar } from "tar";
+import apps from "./apps";
+import clusters from "./clusters";
+import projects from "./projects";
 import { type Config } from "./types";
 
 const exec = promisify(execCallbackBased);
@@ -76,7 +79,7 @@ program
   .command("login")
   .description("Login to onmetal.dev")
   .option("--token", "or METAL_TOKEN. Provide a token manually, useful for CI")
-  .action(async (str, options) => {
+  .action(async (options) => {
     if (config.whoami) {
       log(
         `Already logged in as ${config.whoami.user.email}. Use ${chalk.red(
@@ -150,14 +153,17 @@ const checkUserConfig = () => {
 
 program
   .command("up")
+  .argument(
+    "[sourceDir]",
+    "[OPTIONAL] The absolute or relative path of the directory you want to deploy. Defaults to the current directory."
+  )
   .description("Deploy a project")
   .option(
     "--token",
     "Manually provide a Metal token, or set the METAL_TOKEN environment variable. Useful for CI."
   )
-  .action(async (str, options) => {
-    let step = 1;
-    log(`[${step}] Checking for token...`);
+  .action(async (sourceDir, options) => {
+    let step = 0;
     const userConfig = checkUserConfig();
     // Token hierachy: commandline > config file > environment variable
     const token =
@@ -167,27 +173,44 @@ program
       process.exit(1);
     }
 
-    log(`[${++step}] Collating files to deploy...`);
-    const { stdout, stderr } = await exec(`git ls-files`);
-    if (stderr) {
-      console.error(stderr);
+    log(chalk.green(`[${++step}] Collating files to deploy...`));
+    const workingDir = sourceDir || process.cwd();
+
+    let pathsToCompress: string[] = [];
+    try {
+      const { stdout, stderr } = await exec(`cd ${workingDir} && git ls-files`);
+      if (stderr) {
+        console.error("Failed to use Git list your files.");
+        console.error(stderr);
+        process.exit(1);
+      }
+
+      pathsToCompress = stdout
+        .split("\n")
+        .filter((path) => !!path);
+    } catch (error) {
+      console.error("Error compiling a list of files to archive.");
+      console.error(error);
       process.exit(1);
     }
 
-    const pathsToArchive = stdout
-      .split("\n")
-      .filter((path) => !!path && !path.endsWith(".gitignore"));
+    if (!pathsToCompress.length) {
+      console.error(
+        "Error: the list of files to compress is empty. Please check that your working directory is a Git repository and that there are git-tracked files available."
+      );
+      process.exit(1);
+    }
 
-    log(`[${++step}] Compressing files...`);
+    log(chalk.green(`[${++step}] Compressing files...`));
     const payloadStream = createTar(
       {
         gzip: true,
-        cwd: process.cwd(),
+        cwd: workingDir,
       },
-      pathsToArchive
+      pathsToCompress
     );
 
-    log(`[${++step}] Uploading...`);
+    log(chalk.green(`[${++step}] Uploading...`));
     const reqOptions = {
       host: baseUrlObj.hostname,
       port: baseUrlObj.port || 80,
@@ -200,25 +223,39 @@ program
       },
     };
 
-    const bodyAsString = await new Promise<string>((resolve, reject) => {
-      const request = nodeRequest(reqOptions, (response) => {
-        let bodyJSONString = "";
-        response.on("data", (chunk) => {
-          bodyJSONString += chunk;
-        });
+    await new Promise<void>((resolve, reject) => {
+      const request = nodeRequest(reqOptions);
 
-        response.on("error", (err) => {
-          console.error(`Problem with response from upload: ${err.message}`);
+      request.on("response", (res) => {
+        res.on("data", (output) => {
+          let outputString: string = output.toString();
+          if (!outputString.includes("[<metal>]")) {
+            log(outputString);
+            return;
+          }
+
+          /* Metal-specific output from the backend is wrapped in special tags and looks like:
+           * [<metal>]Foo bar[</metal>]
+           */
+          outputString = outputString
+            .replaceAll("[</metal>]", "\n")
+            .replaceAll("[<metal>]", () => `[${++step}] `)
+
+          log(outputString);
+        });
+        res.on("error", (err) => {
+          console.error(chalk.red("Failed to deploy project."));
+          console.error(err);
           reject(err);
         });
-
-        response.on("end", () => {
-          resolve(bodyJSONString);
+        res.on("end", () => {
+          log(chalk.green(`[${++step}] Deployment finished.`));
+          resolve();
         });
       });
 
       request.on("error", (err) => {
-        console.error(`Problem with upload request: ${err.message}`);
+        console.error(chalk.red(`Problem with upload request: ${err.message}`));
         reject(err);
       });
 
@@ -226,51 +263,9 @@ program
       payloadStream.pipe(request);
     });
 
-    const body = JSON.parse(bodyAsString);
-    log(`--> Deployment started. Tag is ${body.tag}`);
-
-    log(`[${++step}] Checking deployment status...`);
-    const statusPromise = new Promise<string>((resolve, reject) => {
-      const statusRequest = nodeRequest(
-        `${baseDomainWithProtocol}/api/deploy/${body.tag}/status`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        }
-      );
-
-      statusRequest.on("response", (res) => {
-        res.on("data", (chunk) => {
-          log(`[${++step}] ${chunk.toString()}`);
-        });
-        res.on("error", (err) => {
-          console.error("Failed to read response.");
-          console.error(err);
-          reject(err);
-        });
-        res.on("end", () => {
-          resolve("Deployment finished.");
-        });
-      });
-
-      statusRequest.on("error", (err) => {
-        console.error(`Error in status request: ${err.message}`);
-        reject(err);
-      });
-
-      statusRequest.end();
-    });
-
-    const result = await statusPromise;
-    log(`[END] ${result}`);
+    log(chalk.green("[END]"));
   });
 
-import apps from "./apps";
-import clusters from "./clusters";
-import projects from "./projects";
 projects(program.command("projects"), config, baseURL);
 clusters(program.command("clusters"), config, baseURL);
 apps(program.command("apps"), config, baseURL);

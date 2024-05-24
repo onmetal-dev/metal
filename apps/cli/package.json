@@ -12,7 +12,8 @@
   "devDependencies": {
     "@types/bun": "^1.1.0",
     "@types/inquirer": "^9.0.7",
-    "@types/opener": "^1.4.3"
+    "@types/opener": "^1.4.3",
+    "eslint": "^8"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
