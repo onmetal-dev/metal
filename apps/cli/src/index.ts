@@ -236,30 +236,10 @@ program
 
           /* Metal-specific output from the backend is wrapped in special tags and looks like:
            * [<metal>]Foo bar[</metal>]
-           * So what the lines below do is to:
-           * - put the said lines on new lines if necessary (especially if one chunk contains both Metal and non-Metal output.)
-           * - match those lines.
-           * - replace the [<metal>] with the incremented step number
-           * - remove the [</metal>]
-           * - render those lines in green for easy recognition.
            */
-
           outputString = outputString
-            .replaceAll("[</metal>][<metal>]", "[</metal>]\n[<metal>]")
-            .replaceAll(".[<metal>]", ".\n[<metal>]");
-
-          const metalOutput = outputString.match(/\[<metal>\].*\[<\/metal>\]/g);
-          if (metalOutput?.length) {
-            metalOutput.forEach((output) => {
-              const formattedOutput = output
-                .replaceAll("[<metal>]", `[${++step}] `)
-                .replaceAll("[</metal>]", "");
-              outputString = outputString.replace(
-                output,
-                chalk.green(formattedOutput)
-              );
-            });
-          }
+            .replaceAll("[</metal>]", "\n")
+            .replaceAll("[<metal>]", () => `[${++step}] `)
 
           log(outputString);
         });

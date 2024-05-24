@@ -1,5 +1,6 @@
 import { NixpackPlan } from "@/types/deployment";
 import { clerkClient } from "@clerk/nextjs";
+import chalk from "chalk";
 import { type NextRequest } from "next/server";
 import { exec as execCallbackBased, spawn } from "node:child_process";
 import {
@@ -88,10 +89,10 @@ async function* makeIterator(buildTag: string, fileName: string) {
   await extractionPromise;
 
   yield encoder.encode(
-    `[<metal>]Deployment started. Tag is ${buildTag}.[</metal>]`
+    chalk.green(`[<metal>]Deployment started. Tag is ${buildTag}.[</metal>]`)
   );
 
-  yield encoder.encode("[<metal>]Planning build...[</metal>]");
+  yield encoder.encode(chalk.green("[<metal>]Planning build...[</metal>]"));
   const { stdout: stdoutJson } = await exec(`nixpacks plan ${tempDirName}`);
   const plan = JSON.parse(stdoutJson) as NixpackPlan;
   // Filtering out "npm-9_x" because for some reason it's not listed on:
@@ -106,7 +107,9 @@ async function* makeIterator(buildTag: string, fileName: string) {
   );
   await sleep(1000);
 
-  yield encoder.encode("[<metal>]Generating Dockerfile...[</metal>]");
+  yield encoder.encode(
+    chalk.green("[<metal>]Generating Dockerfile...[</metal>]")
+  );
   await exec(
     `nixpacks build ${tempDirName} --name ${buildTag} --config build-plan.json --out ${tempDirName}`
   );
@@ -114,7 +117,7 @@ async function* makeIterator(buildTag: string, fileName: string) {
     `mv ${tempDirName}/.nixpacks/Dockerfile ${tempDirName}/Dockerfile`
   );
 
-  yield encoder.encode("[<metal>]Building OCI image...[</metal>]");
+  yield encoder.encode(chalk.green("[<metal>]Building OCI image...[</metal>]"));
   const { username, password } = pullUserDockerCredentials();
   const hasCustomDockerCredentials = username && password;
   if (hasCustomDockerCredentials) {
@@ -200,7 +203,7 @@ async function* makeIterator(buildTag: string, fileName: string) {
 
   await dockerPromise;
 
-  yield encoder.encode("[<metal>]OCI image built...[</metal>]");
+  yield encoder.encode(chalk.green("[<metal>]OCI image built...[</metal>]"));
 }
 
 export async function POST(request: NextRequest) {
