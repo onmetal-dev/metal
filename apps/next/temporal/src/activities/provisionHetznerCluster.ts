@@ -1,29 +1,29 @@
-import { trace } from "@opentelemetry/api";
+import { db } from "@db/index";
 import {
-  hetznerClusters,
   HetznerCluster,
-  hetznerNodeGroups,
   HetznerNodeGroup,
-  hetznerProjects,
   HetznerProject,
   Team,
+  hetznerClusters,
+  hetznerNodeGroups,
+  hetznerProjects,
   teams,
 } from "@db/schema";
-import { db } from "@db/index";
-import { eq } from "drizzle-orm";
-import tmp from "tmp";
-import fs from "fs";
 import { serviceName } from "@lib/constants";
+import { trace } from "@opentelemetry/api";
+import { eq } from "drizzle-orm";
+import fs from "fs";
+import path from "path";
+import tmp from "tmp";
 import * as ub62 from "uuid-base62";
 import {
-  tracedExec,
-  mgmtClusterKubeconfigFile,
-  generateAwsAccessKeyId,
-  generateAwsSecretAccessKey,
   findOrCreateNamespace,
   findOrCreateSecret,
+  generateAwsAccessKeyId,
+  generateAwsSecretAccessKey,
+  mgmtClusterKubeconfigFile,
+  tracedExec,
 } from "./shared";
-import path from "path";
 
 export async function provisionHetznerCluster({
   clusterId,
@@ -505,6 +505,7 @@ spec:
   }
 
   // set up dns in the mgmt cluster to point *.<cluster name>.up.onmetal.dev at the cluster LB
+  // TODO: this actually points at the instance, not the LB. Fix that
   const tmpDirForDNSAndCert = tmp.dirSync();
   await fs.writeFileSync(
     path.join(tmpDirForDNSAndCert.name, "dns.yaml"),
@@ -779,7 +780,7 @@ tenant:
       `kind: HTTPRoute
 apiVersion: gateway.networking.k8s.io/v1beta1
 metadata:
-  name: minio-tenant-route
+  name: minio-tenant
   namespace: minio-tenant
 spec:
   parentRefs:
@@ -906,7 +907,7 @@ config:
         exporters: ["otlp/quickwit"]`
     );
     for (const command of [
-      `KUBECONFIG=${clusterKubeconfigFile.name} kubectl exec -n minio-tenant svc/minio -- /bin/bash -c "mc config host add ${cluster.name} http://minio.minio-tenant.svc.cluster.local:80 ${minioRootCreds.user} ${minioRootCreds.password} && mc mb ${cluster.name}/quickwit && mc admin user add ${cluster.name} ${minioQuickwitCreds.user} ${minioQuickwitCreds.password} && mc admin policy attach ${cluster.name} readwrite --user ${minioQuickwitCreds.user}"`,
+      `KUBECONFIG=${clusterKubeconfigFile.name} kubectl exec -n minio-tenant svc/minio -- /bin/bash -c "mc config host add ${cluster.name} http://minio.minio-tenant.svc.cluster.local:80 ${minioRootCreds.user} ${minioRootCreds.password} && mc mb --ignore-existing ${cluster.name}/quickwit && mc admin user add ${cluster.name} ${minioQuickwitCreds.user} ${minioQuickwitCreds.password} && mc admin policy attach ${cluster.name} readwrite --user ${minioQuickwitCreds.user}"`,
       `KUBECONFIG=${clusterKubeconfigFile.name} helm repo add quickwit https://helm.quickwit.io`,
       `KUBECONFIG=${clusterKubeconfigFile.name} helm upgrade --install --namespace monitoring --version 0.5.15 quickwit quickwit/quickwit --values quickwit-values.yaml`,
       `KUBECONFIG=${clusterKubeconfigFile.name} helm repo add opentelemetry https://open-telemetry.github.io/opentelemetry-helm-charts`,
@@ -966,6 +967,174 @@ query:
         spanAttributes,
         command,
         directory: tmpDirForJaeger.name,
+      });
+    }
+  }
+
+  // set up and expose a docker registry
+  const dockerRegistryExists = await helmReleaseExists(
+    clusterKubeconfigFile.name,
+    "registry",
+    "registry"
+  );
+  if (!dockerRegistryExists) {
+    await findOrCreateNamespace(clusterKubeconfigFile.name, "registry");
+    const registryHttpBasicCreds = await findOrCreateSecret(
+      clusterKubeconfigFile.name,
+      "registry",
+      "registry-http-basic-credentials",
+      {
+        user: generateAwsAccessKeyId(),
+        password: generateAwsSecretAccessKey(),
+      }
+    );
+    const tmpDirForRegistry = tmp.dirSync();
+    await tracedExec({
+      spanName: "htpasswd-for-registry",
+      spanAttributes,
+      command: `htpasswd -Bbc ./auth ${registryHttpBasicCreds.user} ${registryHttpBasicCreds.password}`,
+      directory: tmpDirForRegistry.name,
+    });
+    const htpasswd = fs
+      .readFileSync(path.join(tmpDirForRegistry.name, "auth"), "utf8")
+      .trim();
+
+    const registryConfig = `
+version: 0.1
+http:
+  secret: hownowbrowncow
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]
+auth:
+  htpasswd:
+    realm: basic-realm
+    path: /etc/docker/auth/htpasswd
+log:
+  level: debug
+  fields:
+    service: registry
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+  delete:
+    enabled: true
+  maintenance:
+    uploadpurging:
+      enabled: true
+      age: 168h
+      interval: 24h
+      dryrun: false
+    readonly:
+      enabled: false
+`;
+    await fs.writeFileSync(
+      path.join(tmpDirForRegistry.name, "docker-registry-config.yaml"),
+      `
+kind: Secret
+apiVersion: v1
+metadata:
+  name: docker-registry-config
+  namespace: registry
+data:
+  config.yml: ${Buffer.from(registryConfig).toString("base64")}
+`
+    );
+    await fs.writeFileSync(
+      path.join(tmpDirForRegistry.name, "docker-registry-auth.yaml"),
+      `
+kind: Secret
+apiVersion: v1
+metadata:
+  name: docker-registry-auth
+  namespace: registry
+data:
+  htpasswd: ${Buffer.from(htpasswd).toString("base64")}
+`
+    );
+    await fs.writeFileSync(
+      path.join(tmpDirForRegistry.name, "registry-values.yaml"),
+      `
+fullnameOverride: docker-registry
+ui:
+  enabled: false
+redis:
+  enabled: false
+storj:
+  enabled: false
+externalConfig:
+  secretRef:
+    name: docker-registry-config
+extraVolumeMounts:
+- name: auth
+  mountPath: /etc/docker/auth
+  readOnly: true
+- name: data
+  mountPath: /var/lib/registry/
+extraVolumes:
+- name: auth
+  secret:
+    secretName: docker-registry-auth
+- name: data
+  persistentVolumeClaim:
+    claimName: docker-registry-pvc
+`
+    );
+    fs.writeFileSync(
+      path.join(tmpDirForRegistry.name, "docker-registry-pvc.yaml"),
+      `
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: docker-registry-pvc
+  namespace: registry
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: hcloud-volumes`
+    );
+    await fs.writeFileSync(
+      path.join(tmpDirForRegistry.name, "httproute.yaml"),
+      `kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: docker-registry
+  namespace: registry
+spec:
+  parentRefs:
+  - kind: Gateway
+    name: cilium
+    namespace: gateway
+    port: 443
+  hostnames:
+  - 'registry.${cluster.name}.up.onmetal.dev'
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: docker-registry
+      kind: Service
+      port: 5000`
+    );
+    for (const command of [
+      `KUBECONFIG=${clusterKubeconfigFile.name} kubectl create -n registry -f docker-registry-pvc.yaml`,
+      `KUBECONFIG=${clusterKubeconfigFile.name} kubectl apply -n registry -f docker-registry-config.yaml`,
+      `KUBECONFIG=${clusterKubeconfigFile.name} kubectl apply -n registry -f docker-registry-auth.yaml`,
+      `KUBECONFIG=${clusterKubeconfigFile.name} helm repo add mya https://mya.sh`,
+      `KUBECONFIG=${clusterKubeconfigFile.name} helm upgrade --install --namespace registry --version 22.4.11 registry mya/registry --values registry-values.yaml`,
+      `KUBECONFIG=${clusterKubeconfigFile.name} kubectl apply -n registry -f httproute.yaml`,
+      `KUBECONFIG=${clusterKubeconfigFile.name} kubectl create secret docker-registry regcred-${cluster.name} --docker-server=registry.${cluster.name}.up.onmetal.dev --docker-username=${registryHttpBasicCreds.user} --docker-password=${registryHttpBasicCreds.password} --docker-email="doesntmatter@onmetal.dev"`,
+    ]) {
+      await tracedExec({
+        spanName: "install-docker-registry",
+        spanAttributes,
+        command,
+        directory: tmpDirForRegistry.name,
       });
     }
   }
@@ -1096,7 +1265,7 @@ spec:
 kind: HTTPRoute
 apiVersion: gateway.networking.k8s.io/v1beta1
 metadata:
-  name: test-service-rollout-http-route
+  name: test-service-rollout
   namespace: test-service
 spec:
   parentRefs:
