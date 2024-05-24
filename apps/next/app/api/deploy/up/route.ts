@@ -1,4 +1,3 @@
-import { DIR_FOR_CLIENT_DEPLOYMENTS } from "@/app/server/util/constants";
 import { NixpackPlan } from "@/types/deployment";
 import { clerkClient } from "@clerk/nextjs";
 import { type NextRequest } from "next/server";
@@ -20,6 +19,7 @@ const org = process.env.DOCKERHUB_ORG;
 const repo = process.env.DOCKERHUB_REPO;
 const builderLongName = process.env.CLOUD_BUILDER_LONG_NAME || "";
 const builderName = process.env.CLOUD_BUILDER_NAME || "";
+const DIR_FOR_DEPLOYMENTS = "ups";
 
 // This code below is heavily based on:
 // https://nextjs.org/docs/app/building-your-application/routing/route-handlers#streaming
@@ -56,7 +56,7 @@ async function* streamIterator(stderr: Readable) {
 
 async function* makeIterator(buildTag: string, fileName: string) {
   const { name: tempDirName } = dirSync({
-    tmpdir: DIR_FOR_CLIENT_DEPLOYMENTS,
+    tmpdir: DIR_FOR_DEPLOYMENTS,
     name: buildTag,
   });
   const extractionStream = spawn("tar", ["xzfv", fileName, "-C", tempDirName]);
@@ -216,8 +216,8 @@ export async function POST(request: NextRequest) {
   }
 
   const tag = `up_${Date.now()}`;
-  if (!existsSync(DIR_FOR_CLIENT_DEPLOYMENTS)) {
-    mkdirSync(DIR_FOR_CLIENT_DEPLOYMENTS);
+  if (!existsSync(DIR_FOR_DEPLOYMENTS)) {
+    mkdirSync(DIR_FOR_DEPLOYMENTS);
   }
 
   const fileName = `${tag}.gz`;
