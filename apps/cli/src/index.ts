@@ -187,7 +187,7 @@ program
 
       pathsToCompress = stdout
         .split("\n")
-        .filter((path) => !!path && !path.endsWith(".gitignore"));
+        .filter((path) => !!path);
     } catch (error) {
       console.error("Error compiling a list of files to archive.");
       console.error(error);
