@@ -1,0 +1,33 @@
+FROM debian:bookworm-slim
+SHELL ["/bin/bash", "-c"]
+RUN apt update && apt upgrade -y
+RUN apt install wget curl unzip -y
+
+# install node 20
+RUN curl -sL https://deb.nodesource.com/setup_20.x | bash -
+RUN apt update && apt upgrade -y
+RUN apt install nodejs -y
+
+# install bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH "$PATH:/root/.bun/bin"
+
+# install additional tools
+RUN curl -LO "https://dl.k8s.io/release/v1.30.1/bin/linux/amd64/kubectl" && chmod +x ./kubectl && mv ./kubectl /usr/local/bin
+RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh
+RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash && mv kustomize /usr/local/bin/
+
+# install clusterctl
+RUN curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.7.2/clusterctl-linux-amd64 -o clusterctl && install -o root -g root -m 0755 clusterctl /usr/local/bin/clusterctl
+RUN curl -LO "https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64" && chmod +x ./kubectl-argo-rollouts-linux-amd64 && mv ./kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x mc && mv mc /usr/local/bin
+
+# install the app
+ADD . /app
+WORKDIR /app
+RUN bun install --no-save --frozen-lockfile
+RUN bun run build:worker
+RUN rm -rf node_modules
+RUN bun install --no-save --frozen-lockfile --production
+RUN bun pm cache rm
+CMD bun run start:worker

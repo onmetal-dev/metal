@@ -1,17 +1,17 @@
-import { trace } from "@opentelemetry/api";
+import { db } from "@db/index";
 import {
-  hetznerProjects,
   HetznerProject,
   Team,
-  teams,
   hetznerClusters,
+  hetznerProjects,
+  teams,
 } from "@db/schema";
-import { db } from "@db/index";
-import { eq } from "drizzle-orm";
 import { serviceName } from "@lib/constants";
-import { ApplicationFailure } from "@temporalio/activity";
-import createClient from "openapi-fetch";
 import type { paths } from "@lib/hcloud";
+import { trace } from "@opentelemetry/api";
+import { ApplicationFailure } from "@temporalio/activity";
+import { eq } from "drizzle-orm";
+import createClient from "openapi-fetch";
 
 export async function deleteHetznerProject({
   projectId,

@@ -1,14 +1,14 @@
-import { Worker, NativeConnection } from "@temporalio/worker";
-import * as activities from "./activities";
-import { Resource } from "@opentelemetry/resources";
-import { SEMRESATTRS_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
-import { NodeSDK } from "@opentelemetry/sdk-node";
+import { queueNameForEnv, serviceName } from "@lib/constants";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { Resource } from "@opentelemetry/resources";
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { SEMRESATTRS_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import {
   OpenTelemetryActivityInboundInterceptor,
   makeWorkflowExporter,
 } from "@temporalio/interceptors-opentelemetry/lib/worker";
-import { queueNameForEnv, serviceName } from "@lib/constants";
+import { NativeConnection, Worker } from "@temporalio/worker";
+import * as activities from "./activities";
 
 run().catch((err) => console.log(err));
 

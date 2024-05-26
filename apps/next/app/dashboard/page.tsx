@@ -56,12 +56,8 @@ async function findCreateUserTeam({
 }): Promise<Team> {
   const usersPersonalTeam: Team | undefined = await db.query.teams
     .findMany({
-      where: (team, { eq }) => eq(team.name, teamName),
-      with: {
-        usersToTeams: {
-          where: (userToTeam, { eq }) => eq(userToTeam.userId, userId),
-        },
-      },
+      where: (team, { eq, and }) =>
+        and(eq(team.name, teamName), eq(team.creatorId, userId)),
     })
     .then((rows) => rows[0] || undefined);
   if (usersPersonalTeam) {
