@@ -3,6 +3,11 @@ SHELL ["/bin/bash", "-c"]
 RUN apt update && apt upgrade -y
 RUN apt install curl unzip -y
 
+# install additional tools
+RUN apt install -y kubectl clusterctl wget kustomize helm jq yq apache2-utils
+RUN curl -LO "https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64" && chmod +x ./kubectl-argo-rollouts-linux-amd64 && mv ./kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x mc && mv mc /usr/local/bin
+
 # install node 20
 RUN curl -sL https://deb.nodesource.com/setup_20.x | bash -
 RUN apt update && apt upgrade -y
