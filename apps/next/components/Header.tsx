@@ -10,10 +10,10 @@ import { Container } from "@/components/Container";
 import { LogoWide } from "@/components/LogoWide";
 import { NavLink } from "@/components/NavLink";
 import { Menu, X } from "lucide-react";
-import { UserButton, SignInButton, SignUpButton } from "@clerk/nextjs";
+import { SignInButton } from "@clerk/nextjs";
 import { SignedIn, SignedOut } from "@clerk/clerk-react";
 import { useTheme } from "next-themes";
-import { dark } from "@clerk/themes";
+import { UserButton } from "./UserButton";
 
 function MobileNavLink({
   href,
@@ -127,17 +127,19 @@ export function Header() {
           <div className="flex items-center gap-x-5 md:gap-x-8">
             <SignedOut>
               <div className="hidden md:block">
-                <SignInButton mode="modal">
-                  <Button variant="outline" className="rounded-3xl">
+                <Button
+                  variant="outline"
+                  className="rounded-3xl cursor-pointer"
+                  asChild
+                >
+                  <SignInButton mode="modal">
                     <span>Sign in</span>
-                  </Button>
-                </SignInButton>
-              </div>
-              <SignUpButton mode="redirect" redirectUrl="/register">
-                <Button className="rounded-3xl">
-                  <span>Get started today</span>
+                  </SignInButton>
                 </Button>
-              </SignUpButton>
+              </div>
+              <Button variant="default" className="rounded-3xl" asChild>
+                <Link href="/register">Get started today</Link>
+              </Button>
             </SignedOut>
             <SignedIn>
               <UserButton
