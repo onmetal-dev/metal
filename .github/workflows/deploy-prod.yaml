@@ -40,6 +40,6 @@ jobs:
       - name: Deploy
         run: |
           bash <(curl -fsSL cli.new) && \
-          bunx concurrently "railway up --ci --service website" "railway up --ci --service worker"
+          bunx concurrently "railway up --ci --service website" "railway up --ci --service worke"
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PROD }}
