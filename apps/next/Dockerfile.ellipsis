@@ -1,0 +1,19 @@
+FROM debian:bookworm-slim
+SHELL ["/bin/bash", "-c"]
+RUN apt update && apt upgrade -y
+RUN apt install curl unzip git -y
+
+# install node 20
+RUN curl -sL https://deb.nodesource.com/setup_20.x | bash -
+RUN apt update && apt upgrade -y
+RUN apt install nodejs -y
+
+# install bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH "$PATH:/root/.bun/bin"
+
+# install the app
+ADD . /repo
+WORKDIR /repo
+RUN cd apps/next && bun install --no-save --frozen-lockfile
+CMD cd apps/next bun run concurrently "bun dev:website" "bun dev:worker"
