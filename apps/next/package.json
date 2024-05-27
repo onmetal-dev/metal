@@ -6,21 +6,20 @@
   },
   "private": true,
   "scripts": {
-    "build:next": "next build",
-    "build:oci": "nixpacks build ./ --name metal-next --start-cmd 'bun run start:next'",
-    "build:temporal": "tsc --build ./temporal/tsconfig.json",
-    "build": "concurrently --raw \"npm:build:next\" \"npm:build:temporal\"",
+    "build:website": "next build",
+    "build:worker": "tsc --build ./temporal/tsconfig.json",
+    "build": "concurrently --raw \"npm:build:website\" \"npm:build:worker\"",
     "db:push": "NODE_TLS_REJECT_UNAUTHORIZED=0 drizzle-kit push",
     "db:studio": "NODE_TLS_REJECT_UNAUTHORIZED=0 bunx drizzle-kit studio",
     "db:nuke": "bun run ./app/server/db/nuke.ts",
     "db:psql": "bun exec 'psql $POSTGRES_URL'",
-    "dev:next": "next dev --turbo",
+    "dev:website": "next dev --turbo",
     "dev:otel-collector": "cd hack/opentelemetry-collector-dev-setup && docker-compose up > /dev/null 2>&1",
-    "dev:temporal": "cd temporal && tsx --env-file ../.env --watch --watch-preserve-output src/worker.ts",
+    "dev:worker": "cd temporal && tsx --env-file ../.env --watch --watch-preserve-output src/worker.ts",
     "dev": "concurrently --raw \"npm:dev:*\"",
     "lint": "next lint",
-    "start:next": "next start",
-    "start:worker": "cd temporal && tsx ./src/worker.ts"
+    "start:website": "next start",
+    "start:worker": "bunx tsx ./temporal/src/worker.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^4.29.11",

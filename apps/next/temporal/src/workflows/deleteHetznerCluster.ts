@@ -15,7 +15,7 @@ export async function DeleteHetznerCluster({
 }): Promise<void> {
   try {
     return await deleteHetznerCluster({ clusterId });
-  } catch (e) {
+  } catch (e: any) {
     if (e instanceof ActivityFailure && e.cause instanceof ApplicationFailure) {
       throw e.cause;
     }

@@ -16,7 +16,7 @@ export async function ProvisionHetznerCluster({
 }): Promise<void> {
   try {
     await provisionHetznerCluster({ clusterId });
-  } catch (e) {
+  } catch (e: any) {
     if (e instanceof ActivityFailure && e.cause instanceof ApplicationFailure) {
       throw e.cause;
     }

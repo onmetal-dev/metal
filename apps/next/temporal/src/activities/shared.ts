@@ -1,29 +1,12 @@
-import { SpanStatusCode, trace } from "@opentelemetry/api";
-import {
-  hetznerClusters,
-  HetznerClusterSpec,
-  HetznerClusterInsert,
-  HetznerCluster,
-  HetznerNodeGroupSpec,
-  HetznerNodeGroupInsert,
-  hetznerNodeGroups,
-  HetznerNodeGroup,
-  hetznerProjects,
-  HetznerProject,
-  Team,
-  teams,
-} from "@db/schema";
-import { db } from "@db/index";
-import { eq } from "drizzle-orm";
 import * as k8s from "@kubernetes/client-node";
-import { dump } from "js-yaml";
-import util from "util";
-import { exec as execCB, ExecException } from "child_process";
-const exec = util.promisify(execCB);
-import tmp from "tmp";
-import fs from "fs";
 import { serviceName } from "@lib/constants";
-import * as ub62 from "uuid-base62";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
+import { ExecException, exec as execCB } from "child_process";
+import fs from "fs";
+import { dump } from "js-yaml";
+import tmp from "tmp";
+import util from "util";
+const exec = util.promisify(execCB);
 
 const requiredEnvVars = [
   "HETZNER_MANAGEMENT_CLUSTER_NAME",

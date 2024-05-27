@@ -16,7 +16,7 @@ export async function DeleteHetznerProject({
 }): Promise<void> {
   try {
     return await deleteHetznerProject({ projectId });
-  } catch (e) {
+  } catch (e: any) {
     // if root cause is an application failure, we want to unwrap it to
     // a) make it easier to extract the user-facing type and message from the ApplicationFailure
     // b) bubble up the non-retryable flag at the Workflow level (i.e. don't retry the workflow if the activity throws a non-retryable ApplicationError)
