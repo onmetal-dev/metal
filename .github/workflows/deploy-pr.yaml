@@ -36,7 +36,6 @@ jobs:
       - name: Push DB changes
         run: bun run db:push
         env:
-          NODE_TLS_REJECT_UNAUTHORIZED: "0"
           POSTGRES_URL: ${{ secrets.POSTGRES_URL_DEV }}
 
       - name: Deploy
