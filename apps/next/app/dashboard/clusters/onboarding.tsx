@@ -9,7 +9,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import hetznerLogoImage from "@/images/hetzner-square-200.jpg";
 import Image from "next/image";
-import { serverActionInitialState, serverActionState } from "./shared";
+import { serverActionInitialState, ServerActionState } from "@lib/action";
 import { preventDefaultEnter } from "@/lib/utils";
 
 export function Onboarding() {
@@ -78,7 +78,7 @@ export function Onboarding() {
   );
 }
 
-const Result = ({ state }: { state: serverActionState }) => {
+const Result = ({ state }: { state: ServerActionState }) => {
   const status = useFormStatus();
   return (
     <>

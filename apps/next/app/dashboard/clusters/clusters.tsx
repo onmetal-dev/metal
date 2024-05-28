@@ -35,7 +35,7 @@ import { useCommandItems } from "@/components/CommandMenu";
 import { useRouter } from "next/navigation";
 import { deleteHetznerCluster } from "./actions";
 import { useFormState, useFormStatus } from "react-dom";
-import { serverActionInitialState } from "./shared";
+import { serverActionInitialState } from "@lib/action";
 import { useToast } from "@/components/ui/use-toast";
 
 function FlagForLocation(locationName: string): React.ReactNode {

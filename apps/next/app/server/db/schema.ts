@@ -795,3 +795,30 @@ export const deploymentRelations = relations(deployments, ({ one }) => ({
     references: [builds.id],
   }),
 }));
+
+// waitlist is a list of users who are on the waitlist
+export const waitlistedEmails = metalSchema.table(
+  "waitlisted_emails",
+  {
+    ...schemaDefaults,
+    email: varchar("email", { length: 255 }).notNull().unique(),
+  },
+  (table) => ({
+    createdAtIdx: index().on(table.createdAt),
+  })
+);
+export const insertWaitlistedEmailSchema = createInsertSchema(waitlistedEmails);
+export type WaitlistedEmailInsert = z.infer<typeof insertWaitlistedEmailSchema>;
+export const selectWaitlistedEmailSchema = createSelectSchema(waitlistedEmails);
+export type WaitlistedEmail = z.infer<typeof selectWaitlistedEmailSchema>;
+
+// invitedEmails are emails of people who have been invited to join
+export const invitedEmails = metalSchema.table("invited_emails", {
+  ...schemaDefaults,
+  email: varchar("email", { length: 255 }).notNull().unique(),
+});
+
+export const insertInvitedEmailSchema = createInsertSchema(invitedEmails);
+export type InvitedEmailInsert = z.infer<typeof insertInvitedEmailSchema>;
+export const selectInvitedEmailSchema = createSelectSchema(invitedEmails);
+export type InvitedEmail = z.infer<typeof selectInvitedEmailSchema>;

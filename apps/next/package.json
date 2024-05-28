@@ -53,6 +53,7 @@
     "@temporalio/worker": "^1.9.3",
     "@temporalio/workflow": "^1.9.3",
     "@vercel/otel": "^1.8.1",
+    "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "cmdk": "^1.0.0",
@@ -67,6 +68,7 @@
     "next-themes": "^0.3.0",
     "openapi-fetch": "^0.9.3",
     "postgres": "^3.4.4",
+    "rate-limiter-flexible": "^5.0.3",
     "react": "^18",
     "react-country-flag": "^3.1.0",
     "react-dom": "^18",
@@ -76,11 +78,13 @@
     "tailwind-merge": "^2.2.2",
     "tailwindcss-animate": "^1.0.7",
     "tmp": "^0.2.3",
-    "uuid-base62": "^0.1.0"
+    "uuid-base62": "^0.1.0",
+    "zod-validation-error": "^3.3.0"
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",
     "@types/bun": "^1.1.0",
+    "@types/canvas-confetti": "^1.6.4",
     "@types/node": "^20",
     "@types/opener": "^1.4.3",
     "@types/react": "^18",

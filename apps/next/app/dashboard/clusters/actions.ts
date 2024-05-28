@@ -1,7 +1,4 @@
 "use server";
-import { auth } from "@clerk/nextjs";
-import uuidBase62 from "uuid-base62";
-import { serverActionState } from "./shared";
 import { db } from "@/app/server/db";
 import {
   HetznerCluster,
@@ -14,24 +11,27 @@ import {
   teams,
   users,
 } from "@/app/server/db/schema";
-import { eq } from "drizzle-orm";
+import { queueNameForEnv } from "@/lib/constants";
 import { createTemporalClient } from "@/lib/temporal-client";
 import {
   CreateHetznerProject,
   DeleteHetznerCluster,
 } from "@/temporal/src/workflows";
-import { queueNameForEnv } from "@/lib/constants";
+import { auth } from "@clerk/nextjs";
+import { ServerActionState } from "@lib/action";
 import {
   ApplicationFailure,
   WorkflowFailedError,
   WorkflowNotFoundError,
 } from "@temporalio/client";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import uuidBase62 from "uuid-base62";
 
 export async function createHetznerProject(
-  prevState: serverActionState,
+  prevState: ServerActionState,
   formData: FormData
-): Promise<serverActionState> {
+): Promise<ServerActionState> {
   const { userId, getToken, orgId } = auth();
   if (!userId) {
     return { isError: true, message: "You're not signed in." };
@@ -109,9 +109,9 @@ export async function createHetznerProject(
 }
 
 export async function deleteHetznerCluster(
-  prevState: serverActionState,
+  prevState: ServerActionState,
   formData: FormData
-): Promise<serverActionState> {
+): Promise<ServerActionState> {
   const clusterId: string = formData.get("clusterId") as string;
   const cluster: HetznerCluster | undefined = await db
     .select()
