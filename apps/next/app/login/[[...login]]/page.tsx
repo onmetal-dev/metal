@@ -8,7 +8,10 @@ export default function Login({
 }) {
   return (
     <SlimLayout>
-      <SignIn redirectUrl={searchParams.next} />
+      <SignIn
+        redirectUrl={searchParams.next}
+        signUpUrl="/" /* / is where the waitlist form lives */
+      />
     </SlimLayout>
   );
 }

@@ -132,24 +132,17 @@ export function Header() {
                   className="rounded-3xl cursor-pointer"
                   asChild
                 >
-                  <SignInButton mode="modal">
+                  <SignInButton mode="redirect">
                     <span>Sign in</span>
                   </SignInButton>
                 </Button>
               </div>
-              <Button variant="default" className="rounded-3xl" asChild>
+              {/* <Button variant="default" className="rounded-3xl" asChild>
                 <Link href="/register">Get started today</Link>
-              </Button>
+              </Button> */}
             </SignedOut>
             <SignedIn>
-              <UserButton
-                afterSignOutUrl="/"
-                appearance={{
-                  variables: {
-                    colorBackground: "hsl(217.2 32.6% 17.5%)", // --muted
-                  },
-                }}
-              />
+              <UserButton />
             </SignedIn>
             <div className="-mr-1 md:hidden">
               <MobileNavigation />
