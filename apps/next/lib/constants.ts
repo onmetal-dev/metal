@@ -22,3 +22,5 @@ export function queueNameForEnv(env: string) {
 }
 
 export const hetznerRedHex = "#D50C2D";
+
+export const whiteishHex = "#f8f8f8";

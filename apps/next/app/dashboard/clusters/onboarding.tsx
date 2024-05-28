@@ -4,7 +4,7 @@ import * as React from "react";
 import { Step, type StepItem, Stepper, useStepper } from "@/components/stepper";
 import { Input } from "@/components/ui/input";
 import { createHetznerProject } from "./actions";
-import { hetznerRedHex } from "@/lib/constants";
+import { hetznerRedHex, whiteishHex } from "@/lib/constants";
 import { useFormState, useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import hetznerLogoImage from "@/images/hetzner-square-200.jpg";
@@ -97,7 +97,10 @@ const HetznerLogin = () => {
       <p className="text-sm text-muted-foreground">
         Return here after successful login
       </p>
-      <Button asChild style={{ backgroundColor: hetznerRedHex }}>
+      <Button
+        asChild
+        style={{ backgroundColor: hetznerRedHex, color: whiteishHex }}
+      >
         <a href="https://accounts.hetzner.com/login" target="_blank">
           Log in
         </a>
@@ -119,7 +122,11 @@ const HetznerProject = ({
       <p className="text-sm text-muted-foreground">
         Create a new project in the Hetzner Cloud console.
       </p>
-      <Button asChild style={{ backgroundColor: hetznerRedHex }} type="button">
+      <Button
+        asChild
+        style={{ backgroundColor: hetznerRedHex, color: whiteishHex }}
+        type="button"
+      >
         <a href="https://console.hetzner.cloud/projects" target="_blank">
           Create a new project
         </a>
