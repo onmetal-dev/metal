@@ -31,6 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider
+      telemetry={false}
       afterSignInUrl={"/dashboard"}
       afterSignUpUrl={"/dashboard"}
       appearance={{

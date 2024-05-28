@@ -13,8 +13,8 @@ import {
 } from "@/app/server/db/schema";
 import { eq } from "drizzle-orm";
 import {
-  User as ClerkUser,
-  Organization as ClerkOrganization,
+  type User as ClerkUser,
+  type Organization as ClerkOrganization,
 } from "@clerk/nextjs/server";
 import { EnsureActiveOrgSetAndRedirect } from "@/components/EnsureActiveOrgSetAndRedirect";
 

@@ -1,6 +1,7 @@
 import { db } from "@/app/server/db";
-import { clerkClient, decodeJwt } from "@clerk/nextjs/server";
 import { Team, User, teams, users, usersToTeams } from "@/app/server/db/schema";
+import { decodeJwt } from "@clerk/backend/jwt";
+import { clerkClient } from "@clerk/clerk-sdk-node";
 import { eq } from "drizzle-orm";
 import { Context } from "hono";
 import z from "zod";
@@ -8,9 +9,7 @@ import z from "zod";
 export async function authenticateRequest(
   c: Context
 ): Promise<User | undefined> {
-  const authStatus = await clerkClient.authenticateRequest({
-    request: c.req.raw,
-  });
+  const authStatus = await clerkClient.authenticateRequest(c.req.raw);
   if (!authStatus.isSignedIn) {
     return undefined;
   }

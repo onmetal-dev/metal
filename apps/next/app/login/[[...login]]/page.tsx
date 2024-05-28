@@ -8,7 +8,7 @@ export default function Login({
 }) {
   return (
     <SlimLayout>
-      <SignIn redirectUrl={searchParams.next} />
+      <SignIn fallbackRedirectUrl={searchParams.next} />
     </SlimLayout>
   );
 }

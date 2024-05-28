@@ -1,5 +1,5 @@
 "use server";
-import { auth } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 import uuidBase62 from "uuid-base62";
 import { serverActionState } from "./shared";
 import { db } from "@/app/server/db";

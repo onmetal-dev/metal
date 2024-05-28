@@ -10,8 +10,7 @@ import { Container } from "@/components/Container";
 import { LogoWide } from "@/components/LogoWide";
 import { NavLink } from "@/components/NavLink";
 import { Menu, X } from "lucide-react";
-import { SignInButton } from "@clerk/nextjs";
-import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import { SignInButton, SignedIn, SignedOut } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import { UserButton } from "./UserButton";
 

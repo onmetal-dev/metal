@@ -1,13 +1,13 @@
 import { db } from "@/app/server/db";
 import { users } from "@/app/server/db/schema";
-import { clerkClient } from "@clerk/nextjs";
-import { decodeJwt } from "@clerk/nextjs/server";
+import { decodeJwt } from "@clerk/backend/jwt";
+import { clerkClient } from "@clerk/clerk-sdk-node";
 import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const authStatus = await clerkClient.authenticateRequest({ request });
+  const authStatus = await clerkClient.authenticateRequest(request);
   if (!authStatus.isSignedIn) {
     return new Response(JSON.stringify({}), {
       status: 401,
