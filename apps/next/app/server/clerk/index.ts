@@ -45,11 +45,7 @@ export async function findCreateClerkOrganizationCreatedByUser({
     return userClerkOrg;
   }
 
-  const { totalCount } = await clerkClient.users.getOrganizationMembershipList({
-    userId: createdByClerkId,
-  });
-  const newTotalCount = 1 + totalCount;
-  const name = `[${newTotalCount}] ${userFirstName}'s Projects`;
+  const name = `${userFirstName}'s Projects`;
   return await clerkClient.organizations.createOrganization({
     name,
     createdBy: createdByClerkId,
