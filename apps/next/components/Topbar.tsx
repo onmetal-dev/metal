@@ -56,24 +56,7 @@ export const Topbar = () => {
         <OrganizationSwitcher
           hidePersonal
           organizationProfileUrl="/dashboard/settings"
-          createOrganizationUrl="/dashboard/create-team"
-        >
-          <OrganizationSwitcher.OrganizationProfileLink
-            label="Homepage"
-            url="/"
-            labelIcon={<DotIcon />}
-          />
-          <OrganizationSwitcher.OrganizationProfilePage
-            label="Terms"
-            labelIcon={<DotIcon />}
-            url="terms"
-          >
-            <div>
-              <h1>Custom Terms Page</h1>
-              <p>This is the custom terms page</p>
-            </div>
-          </OrganizationSwitcher.OrganizationProfilePage>
-        </OrganizationSwitcher>
+          createOrganizationUrl="/dashboard/create-team" />
       </div>
       <UserButton />
       {/* todo: I think I want to override the Clerk dropdown to make it feel less Clerk-y */}
@@ -103,17 +86,5 @@ export const Topbar = () => {
             </DropdownMenuContent>
           </DropdownMenu> */}
     </header>
-  );
-};
-
-const DotIcon = () => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 512 512"
-      fill="currentColor"
-    >
-      <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512z" />
-    </svg>
   );
 };
