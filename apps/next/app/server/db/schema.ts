@@ -49,7 +49,7 @@ export const users = metalSchema.table(
     clerkId: text("clerk_id").unique().notNull(),
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
-    email: text("email").notNull(),
+    email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified").notNull().default(false),
     githubId: text("github_id").$type<string | null>(),
   },
