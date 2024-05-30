@@ -9,7 +9,7 @@ const isPublicRoute = createRouteMatcher([
   "/login",
   "/login-to-cli",
   "/api/doc",
-  "__nextjs_original-stack-frame",
+  "/__nextjs_original-stack-frame",
 ]);
 
 export default clerkMiddleware((auth, request) => {

@@ -630,7 +630,7 @@ grafana:
   const { stdout: secretData } = await tracedExec({
     spanName: "get-secret-data",
     spanAttributes,
-    command: `KUBECONFIG=${mgmtKubeconfig} kubectl get secret ${cluster.name}-certificate --namespace=cert-manager -oyaml | yq '.data' --tojson | jq -c .`,
+    command: `KUBECONFIG=${mgmtKubeconfig} kubectl get secret ${cluster.name}-certificate --namespace=cert-manager -oyaml | yq '.data' -o json | jq -r -c .`,
   });
   const tmpDirForCertCopy = tmp.dirSync();
   await fs.writeFileSync(
@@ -647,7 +647,7 @@ kind: Secret
 metadata:
   name: ${cluster.name}-certificate
   namespace: gateway
-data: ${secretData}
+data: ${secretData.trim()}
 `
   );
   await tracedExec({

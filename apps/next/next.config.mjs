@@ -1,3 +1,5 @@
+import TerserPlugin from 'terser-webpack-plugin';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -20,7 +22,24 @@ const nextConfig = {
   experimental: {
     // for opentelemetry tracing
     instrumentationHook: true,
-  }
+  },
+  webpack: (
+    config,
+    { buildId, dev, isServer, defaultLoaders, nextRuntime, webpack }
+  ) => {
+    config.optimization = {
+      minimize: true,
+      minimizer: [
+        new TerserPlugin({
+          terserOptions: {
+            keep_fnames: true, // don't strip function names in production https://docs.temporal.io/dev-guide/typescript/debugging#works-in-dev-but-not-in-prod
+          },
+        }),
+      ],
+    }
+    return config
+  },
+
 };
 
 export default nextConfig;

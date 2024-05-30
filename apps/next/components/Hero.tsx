@@ -1,8 +1,5 @@
-//import Image from "next/image";
-
-import { Button } from "@/components/ui/button";
 import { Container } from "@/components/Container";
-import Link from "next/link";
+import Waitlist from "./Waitlist";
 // import logoLaravel from '@/images/logos/laravel.svg'
 // import logoMirage from '@/images/logos/mirage.svg'
 // import logoStatamic from '@/images/logos/statamic.svg'
@@ -31,9 +28,11 @@ export function Hero() {
         The missing PaaS for Hetzner.
       </p>
       <div className="mt-10 flex justify-center gap-x-6 ">
-        <Button variant="default" className="rounded-3xl" asChild>
+        {/* <Button variant="default" className="rounded-3xl" asChild>
           <Link href="/register">Sign up</Link>
-        </Button>
+        </Button> */}
+        <Waitlist />
+        {/* <SignUpButton /> */}
         {/* <Button variant="outline" className="ml-3 rounded-3xl" asChild>
           <a
             href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"

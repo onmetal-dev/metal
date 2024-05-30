@@ -15,11 +15,11 @@
     "db:psql": "bun exec 'psql $POSTGRES_URL'",
     "dev:website": "next dev --turbo",
     "dev:otel-collector": "cd hack/opentelemetry-collector-dev-setup && docker-compose up > /dev/null 2>&1",
-    "dev:worker": "cd temporal && tsx --env-file ../.env --watch --watch-preserve-output src/worker.ts",
+    "dev:worker": "tsx --tsconfig ./temporal/tsconfig.json --env-file .env --watch --watch-preserve-output ./temporal/src/worker.ts",
     "dev": "concurrently --raw \"npm:dev:*\"",
     "lint": "next lint",
     "start:website": "next start",
-    "start:worker": "bunx tsx ./temporal/src/worker.ts"
+    "start:worker": "bunx tsx --tsconfig ./temporal/tsconfig.json ./temporal/src/worker.ts"
   },
   "dependencies": {
     "@clerk/backend": "^1.2.1",
@@ -54,7 +54,9 @@
     "@temporalio/interceptors-opentelemetry": "^1.9.3",
     "@temporalio/worker": "^1.9.3",
     "@temporalio/workflow": "^1.9.3",
+    "@tsconfig/node20": "^20.1.4",
     "@vercel/otel": "^1.8.1",
+    "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "cmdk": "^1.0.0",
@@ -69,6 +71,7 @@
     "next-themes": "^0.3.0",
     "openapi-fetch": "^0.9.3",
     "postgres": "^3.4.4",
+    "rate-limiter-flexible": "^5.0.3",
     "react": "^18",
     "react-country-flag": "^3.1.0",
     "react-dom": "^18",
@@ -78,11 +81,12 @@
     "tailwind-merge": "^2.2.2",
     "tailwindcss-animate": "^1.0.7",
     "tmp": "^0.2.3",
-    "uuid-base62": "^0.1.0"
+    "uuid-base62": "^0.1.0",
+    "zod-validation-error": "^3.3.0"
   },
   "devDependencies": {
-    "@tsconfig/node20": "^20.1.4",
     "@types/bun": "^1.1.0",
+    "@types/canvas-confetti": "^1.6.4",
     "@types/node": "^20",
     "@types/opener": "^1.4.3",
     "@types/react": "^18",
@@ -97,6 +101,7 @@
     "openapi-typescript": "^6.7.5",
     "postcss": "^8",
     "tailwindcss": "^3.3.0",
+    "terser-webpack-plugin": "^5.3.10",
     "typescript": "^5.4.5"
   }
 }

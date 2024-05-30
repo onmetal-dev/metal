@@ -42,16 +42,19 @@ export async function deleteHetznerCluster({
       };
       span.setAttributes(spanAttributes);
 
-      // delete pvcs first so that there are no orphaned pvcs
+      // delete things that involve pvcs so that there are no orphaned pvcs
       if (cluster.kubeconfig) {
         const clusterKubeconfigFile = tmp.fileSync();
         fs.writeFileSync(clusterKubeconfigFile.name, cluster.kubeconfig);
-        const namespacesWithPvcs = ["monitoring", "minio-tenant", "registry"];
-        for (const namespace of namespacesWithPvcs) {
+        for (const command of [
+          `KUBECONFIG=${clusterKubeconfigFile.name} helm uninstall kube-prometheus --cascade foreground -n monitoring`,
+          `KUBECONFIG=${clusterKubeconfigFile.name} helm uninstall minio-tenant --cascade foreground -n minio-tenant`,
+          `KUBECONFIG=${clusterKubeconfigFile.name} helm uninstall registry --cascade foreground -n registry`,
+        ]) {
           await tracedExec({
-            spanName: "exec-kubectl-delete-pvcs",
+            spanName: "exec-kubectl-delete-things-with-pvcs",
             spanAttributes,
-            command: `KUBECONFIG=${clusterKubeconfigFile.name} kubectl delete pvc -n ${namespace} --all`,
+            command,
           });
         }
       }

@@ -19,3 +19,4 @@ Navigate to the following URLs to check them out:
 - `railway link` and choose the dev environment and website.
 - `railway up` => launches your local code for the website in the dev env
 - or `railway up -s worker` => launches your local code for the worker in the dev env
+- You might also need to `railway shell -s website` and `bun run db:push` in order for the dev environment's configured database (the dev tembo instance's `metalprod` schema) to be updated
