@@ -11,12 +11,13 @@ import {
   users,
   usersToTeams,
 } from "@/app/server/db/schema";
-import { eq } from "drizzle-orm";
-import {
-  type User as ClerkUser,
-  type Organization as ClerkOrganization,
-} from "@clerk/nextjs/server";
 import { EnsureActiveOrgSetAndRedirect } from "@/components/EnsureActiveOrgSetAndRedirect";
+import {
+  auth,
+  type Organization as ClerkOrganization,
+  type User as ClerkUser,
+} from "@clerk/nextjs/server";
+import { eq } from "drizzle-orm";
 
 async function findCreateUserWithClerkId({
   clerkId,
@@ -45,30 +46,47 @@ async function findCreateUserWithClerkId({
   return newUser;
 }
 
-async function findCreateUserTeam({
-  teamName,
-  userId,
-  userClerkId,
-}: {
-  teamName: string;
+type ParamsForFindCreateUserTeam = {
+  userFirstName: string;
   userId: string;
   userClerkId: string;
-}): Promise<Team> {
-  const usersPersonalTeam: Team | undefined = await db.query.teams
-    .findMany({
-      where: (team, { eq, and }) =>
-        and(eq(team.name, teamName), eq(team.creatorId, userId)),
-    })
-    .then((rows) => rows[0] || undefined);
-  if (usersPersonalTeam) {
-    return usersPersonalTeam;
+  userClerkOrganizationId: string | null | undefined;
+};
+async function findCreateUserTeam({
+  userFirstName,
+  userId,
+  userClerkId,
+  userClerkOrganizationId,
+}: ParamsForFindCreateUserTeam): Promise<Team> {
+  /*
+  - If a user is already has a Metal account and then uses Clerk's <OrganizationSwitcher />
+  to create a new org, the Clerk org will exist but won't have an associated Metal team. This
+  function will handle that.
+  - If a user is newly registered, they won't have any organizations or teams. This
+  function will handle that too.
+   */
+  if (userClerkOrganizationId) {
+    const usersPersonalTeam: Team | undefined = await db.query.teams
+      .findMany({
+        where: (team, { eq, and }) =>
+          and(
+            eq(team.clerkId, userClerkOrganizationId),
+            eq(team.creatorId, userId)
+          ),
+      })
+      .then((rows) => rows[0] || undefined);
+    if (usersPersonalTeam) {
+      return usersPersonalTeam;
+    }
   }
 
   // personal team not found, create it in Clerk
   // then tx our db: insert team, insert usersToTeams
+  console.log(`Creating team for User ${userId}`);
   const clerkOrg: ClerkOrganization =
     await findCreateClerkOrganizationCreatedByUser({
-      name: teamName,
+      organizationId: userClerkOrganizationId,
+      userFirstName,
       createdByClerkId: userClerkId,
     });
   let team: Team | undefined;
@@ -111,6 +129,7 @@ export default async function Page() {
       "No email verification status. This should be required in how we configure Clerk"
     );
   }
+
   const userInsert: UserInsert = {
     clerkId: clerkUser.id,
     email: clerkEmail.emailAddress,
@@ -122,10 +141,12 @@ export default async function Page() {
     clerkId: clerkUser.id,
     userInsert,
   });
+  const { orgId } = auth();
   const userPersonalTeam = await findCreateUserTeam({
-    teamName: `${user.firstName}'s Projects`,
+    userFirstName: user.firstName,
     userId: user.id,
     userClerkId: clerkUser.id,
+    userClerkOrganizationId: orgId,
   });
 
   // in the future we may not do this.. but in the beginning this is where the

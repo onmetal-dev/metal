@@ -26,36 +26,30 @@ export async function mustGetClerkUser(): Promise<ClerkUser> {
   return clerkUser;
 }
 
-export async function findCreateClerkOrganizationCreatedByUser({
-  name,
-  createdByClerkId,
-}: {
-  name: string;
+type ParamsForFindCreateClerkOrganization = {
+  organizationId: string | null | undefined;
+  userFirstName: string;
   createdByClerkId: string;
-}): Promise<ClerkOrganization> {
-  const { data: orgs } = await clerkClient.users.getOrganizationMembershipList({
+};
+export async function findCreateClerkOrganizationCreatedByUser({
+  organizationId,
+  userFirstName,
+  createdByClerkId,
+}: ParamsForFindCreateClerkOrganization): Promise<ClerkOrganization> {
+  const userClerkOrg = organizationId
+    ? await clerkClient.organizations.getOrganization({
+        organizationId,
+      })
+    : undefined;
+  if (userClerkOrg) {
+    return userClerkOrg;
+  }
+
+  const { totalCount } = await clerkClient.users.getOrganizationMembershipList({
     userId: createdByClerkId,
   });
-  /* TODO-MET-30:
-  const { data: orgs, totalCount } =
-    await clerkClient.users.getOrganizationMembershipList({
-      userId: createdByClerkId,
-    });
-  let hasReadAllUserOrgs = orgs.length >= totalCount;
-  while (!hasReadAllUserOrgs) {
-    const moreData = await clerkClient.users.getOrganizationMembershipList({
-      userId: createdByClerkId,
-      offset: orgs.length,
-    });
-    orgs.push(...moreData.data);
-    hasReadAllUserOrgs = orgs.length >= totalCount;
-  }
-  */
-  for (const org of orgs) {
-    if (org.organization.name === name) {
-      return org.organization;
-    }
-  }
+  const newTotalCount = 1 + totalCount;
+  const name = `[${newTotalCount}] ${userFirstName}'s Projects`;
   return await clerkClient.organizations.createOrganization({
     name,
     createdBy: createdByClerkId,
