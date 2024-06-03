@@ -19,7 +19,8 @@
     "dev": "concurrently --raw \"npm:dev:*\"",
     "lint": "next lint",
     "start:website": "next start",
-    "start:worker": "bunx tsx --tsconfig ./tsconfig.worker.json ./temporal/src/worker.ts"
+    "start:worker": "bunx tsx --tsconfig ./tsconfig.worker.json ./temporal/src/worker.ts",
+    "test": "bun test"
   },
   "dependencies": {
     "@clerk/backend": "^1.2.1",
@@ -108,6 +109,8 @@
     "drizzle-kit": "^0.21.4",
     "eslint": "^8",
     "eslint-config-next": "14.1.4",
+    "msw": "^2.3.1",
+    "openapi-msw": "^0.6.1",
     "openapi-typescript": "^6.7.5",
     "postcss": "^8",
     "tailwindcss": "^3.3.0",
