@@ -30,6 +30,14 @@ type ParamsForFindCreateClerkOrganization = {
   userFirstName: string;
   createdByClerkId: string;
 };
+
+/**
+ * This function is used to find or create a Clerk organization for the current user.
+ * It first checks if the current user's organization was created by the current user.
+ * If it was, it returns that organization. If not, it creates a new organization with the name `${userFirstName}'s Projects` and returns it.
+ * The check `userClerkOrg?.createdBy === userId` is used to determine if the organization was created by the user.
+ * This function does not check if the user is currently a member of the organization, as it is intended to find or create an organization that was created by the user, not necessarily one that they are currently a member of.
+ */
 export async function findCreateClerkOrganizationCreatedByUser({
   userFirstName,
   createdByClerkId,
