@@ -27,21 +27,20 @@ export async function mustGetClerkUser(): Promise<ClerkUser> {
 }
 
 type ParamsForFindCreateClerkOrganization = {
-  organizationId: string | null | undefined;
   userFirstName: string;
   createdByClerkId: string;
 };
 export async function findCreateClerkOrganizationCreatedByUser({
-  organizationId,
   userFirstName,
   createdByClerkId,
 }: ParamsForFindCreateClerkOrganization): Promise<ClerkOrganization> {
-  const userClerkOrg = organizationId
+  const { orgId, userId } = auth();
+  const userClerkOrg = orgId
     ? await clerkClient.organizations.getOrganization({
-        organizationId,
+        organizationId: orgId,
       })
     : undefined;
-  if (userClerkOrg) {
+  if (userClerkOrg?.createdBy === userId) {
     return userClerkOrg;
   }
 

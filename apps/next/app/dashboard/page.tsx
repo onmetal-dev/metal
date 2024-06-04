@@ -85,7 +85,6 @@ async function findCreateUserTeam({
   console.log(`Creating team for User ${userId}`);
   const clerkOrg: ClerkOrganization =
     await findCreateClerkOrganizationCreatedByUser({
-      organizationId: userClerkOrganizationId,
       userFirstName,
       createdByClerkId: userClerkId,
     });
