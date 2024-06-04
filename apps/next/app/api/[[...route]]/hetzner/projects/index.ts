@@ -1,26 +1,26 @@
+import { db } from "@/app/server/db";
 import {
   HetznerProject,
-  selectHetznerProjectSchema,
-  hetznerProjectSpec,
   HetznerProjectSpec,
+  hetznerProjectSpec,
   hetznerProjects,
+  selectHetznerProjectSchema,
 } from "@/app/server/db/schema";
-import { db } from "@/app/server/db";
-import { and, eq, inArray } from "drizzle-orm";
-import { type OpenAPIHono, createRoute } from "@hono/zod-openapi";
-import { z } from "zod";
-import { type Context } from "hono";
+import { queueNameForEnv } from "@/lib/constants";
 import { createTemporalClient } from "@/lib/temporal-client";
 import { CreateHetznerProject } from "@/temporal/src/workflows";
-import { ApplicationFailure, WorkflowFailedError } from "@temporalio/client";
-import { queueNameForEnv } from "@/lib/constants";
 import { DeleteHetznerProject } from "@/temporal/src/workflows/deleteHetznerProject";
+import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+import { ApplicationFailure, WorkflowFailedError } from "@temporalio/client";
+import { and, eq, inArray } from "drizzle-orm";
+import { type Context } from "hono";
+import { z } from "zod";
 import {
-  responseSpecs,
+  authenticateUser,
   idSchema,
+  responseSpecs,
   unauthorizedResponse,
   userTeams,
-  authenticateRequest,
 } from "../../shared";
 
 const paramsProjectIdSchema = z.object({
@@ -57,7 +57,7 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
     }),
     // @ts-ignore since hono can't figure this out
     async (c: Context) => {
-      const user = await authenticateRequest(c);
+      const user = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }
@@ -104,7 +104,7 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
     }),
     // @ts-ignore since hono can't figure this out
     async (c: Context) => {
-      const user = await authenticateRequest(c);
+      const user = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }
@@ -147,7 +147,7 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
     }),
     // @ts-ignore since hono can't figure this out
     async (c: Context) => {
-      const user = await authenticateRequest(c);
+      const user = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }
@@ -239,7 +239,7 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
     }),
     // @ts-ignore since hono can't figure this out
     async (c: Context) => {
-      const user = await authenticateRequest(c);
+      const user = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }

@@ -7,11 +7,7 @@ import { clerkClient } from "@clerk/clerk-sdk-node";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import { type Context } from "hono";
 import { z } from "zod";
-import {
-  authenticateRequest,
-  unauthorizedResponse,
-  userTeams,
-} from "../shared";
+import { authenticateUser, unauthorizedResponse, userTeams } from "../shared";
 
 const whoAmISchema = z
   .object({
@@ -56,7 +52,7 @@ export default function whoami(app: OpenAPIHono) {
       if (!authStatus.isSignedIn) {
         return c.json(unauthorizedResponse, 401);
       }
-      const user: User | undefined = await authenticateRequest(c);
+      const user: User | undefined = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }

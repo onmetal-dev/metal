@@ -6,9 +6,7 @@ import { eq } from "drizzle-orm";
 import { Context } from "hono";
 import z from "zod";
 
-export async function authenticateRequest(
-  c: Context
-): Promise<User | undefined> {
+export async function authenticateUser(c: Context): Promise<User | undefined> {
   const authStatus = await clerkClient.authenticateRequest(c.req.raw);
   if (!authStatus.isSignedIn) {
     return undefined;

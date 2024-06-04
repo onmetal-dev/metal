@@ -32,8 +32,8 @@ export default function RootLayout({
   return (
     <ClerkProvider
       telemetry={false}
-      afterSignInUrl={"/dashboard"}
-      afterSignUpUrl={"/dashboard"}
+      signInFallbackRedirectUrl="/dashboard"
+      signUpFallbackRedirectUrl="/dashboard"
       appearance={{
         baseTheme: dark,
         variables: {
