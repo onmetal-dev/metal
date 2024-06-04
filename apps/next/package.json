@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "build:website": "next build",
-    "build:worker": "tsc --build ./temporal/tsconfig.json",
+    "build:worker": "tsc --build ./tsconfig.worker.json",
     "build": "concurrently --raw \"npm:build:website\" \"npm:build:worker\"",
     "db:push": "drizzle-kit push",
     "db:studio": "bunx drizzle-kit studio",
@@ -15,11 +15,11 @@
     "db:psql": "bun exec 'psql $POSTGRES_URL'",
     "dev:website": "next dev --turbo",
     "dev:otel-collector": "cd hack/opentelemetry-collector-dev-setup && docker-compose up > /dev/null 2>&1",
-    "dev:worker": "tsx --tsconfig ./temporal/tsconfig.json --env-file .env --watch --watch-preserve-output ./temporal/src/worker.ts",
+    "dev:worker": "tsx --tsconfig ./tsconfig.worker.json --env-file .env --watch --watch-preserve-output ./temporal/src/worker.ts",
     "dev": "concurrently --raw \"npm:dev:*\"",
     "lint": "next lint",
     "start:website": "next start",
-    "start:worker": "bunx tsx --tsconfig ./temporal/tsconfig.json ./temporal/src/worker.ts"
+    "start:worker": "bunx tsx --tsconfig ./tsconfig.worker.json ./temporal/src/worker.ts"
   },
   "dependencies": {
     "@clerk/backend": "^1.2.1",
