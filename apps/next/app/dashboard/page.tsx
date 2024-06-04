@@ -46,38 +46,41 @@ async function findCreateUserWithClerkId({
   return newUser;
 }
 
+const ensureTeamForClerkOrg = async (): Promise<Team | undefined> => {
+  /*
+  - If a user is already has a Metal account and then uses Clerk's <OrganizationSwitcher />
+  to create a new org, the new Clerk org will exist but won't have an associated Metal team. This
+  function will ensure that none of the user's prior teams are not matched, thus
+  signaling to clients of this function that they need to create a new team.
+  - If a user is newly registered, they won't have any organizations or teams. This
+  function will detect that too and return no team.
+   */
+  const { orgId, userId } = auth();
+  if (orgId) {
+    const usersPersonalTeam = await db.query.teams
+      .findMany({
+        where: (team, { eq, and }) =>
+          and(eq(team.clerkId, orgId), eq(team.creatorId, userId)),
+      })
+      .then((rows) => rows[0] || undefined);
+
+    return usersPersonalTeam;
+  }
+};
+
 type ParamsForFindCreateUserTeam = {
   userFirstName: string;
   userId: string;
   userClerkId: string;
-  userClerkOrganizationId: string | null | undefined;
 };
 async function findCreateUserTeam({
   userFirstName,
   userId,
   userClerkId,
-  userClerkOrganizationId,
 }: ParamsForFindCreateUserTeam): Promise<Team> {
-  /*
-  - If a user is already has a Metal account and then uses Clerk's <OrganizationSwitcher />
-  to create a new org, the Clerk org will exist but won't have an associated Metal team. This
-  function will handle that.
-  - If a user is newly registered, they won't have any organizations or teams. This
-  function will handle that too.
-   */
-  if (userClerkOrganizationId) {
-    const usersPersonalTeam: Team | undefined = await db.query.teams
-      .findMany({
-        where: (team, { eq, and }) =>
-          and(
-            eq(team.clerkId, userClerkOrganizationId),
-            eq(team.creatorId, userId)
-          ),
-      })
-      .then((rows) => rows[0] || undefined);
-    if (usersPersonalTeam) {
-      return usersPersonalTeam;
-    }
+  const teamForClerkOrg = await ensureTeamForClerkOrg();
+  if (teamForClerkOrg) {
+    return teamForClerkOrg;
   }
 
   // personal team not found, create it in Clerk
@@ -140,12 +143,10 @@ export default async function Page() {
     clerkId: clerkUser.id,
     userInsert,
   });
-  const { orgId } = auth();
   const userPersonalTeam = await findCreateUserTeam({
     userFirstName: user.firstName,
     userId: user.id,
     userClerkId: clerkUser.id,
-    userClerkOrganizationId: orgId,
   });
 
   // in the future we may not do this.. but in the beginning this is where the
