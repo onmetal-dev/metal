@@ -6,7 +6,7 @@ const isPublicRoute = createRouteMatcher([
   // Allow signed out users to access these routes:
   "/",
   "/register",
-  "/login",
+  "/login(.*)",
   "/login-to-cli",
   "/api/doc",
   "/__nextjs_original-stack-frame",
