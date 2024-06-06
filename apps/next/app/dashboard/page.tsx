@@ -68,27 +68,30 @@ const ensureTeamForClerkOrg = async (): Promise<Team | undefined> => {
   }
 };
 
-type ParamsForFindCreateUserTeam = {
-  userFirstName: string;
-  userId: string;
-  userClerkId: string;
-};
 async function findCreateUserTeam({
-  userFirstName,
+  teamName,
   userId,
   userClerkId,
-}: ParamsForFindCreateUserTeam): Promise<Team> {
-  const teamForClerkOrg = await ensureTeamForClerkOrg();
-  if (teamForClerkOrg) {
-    return teamForClerkOrg;
+}: {
+  teamName: string;
+  userId: string;
+  userClerkId: string;
+}): Promise<Team> {
+  const usersPersonalTeam: Team | undefined = await db.query.teams
+    .findMany({
+      where: (team, { eq, and }) =>
+        and(eq(team.name, teamName), eq(team.creatorId, userId)),
+    })
+    .then((rows) => rows[0] || undefined);
+  if (usersPersonalTeam) {
+    return usersPersonalTeam;
   }
 
   // personal team not found, create it in Clerk
   // then tx our db: insert team, insert usersToTeams
-  console.log(`Creating team for User ${userId}`);
   const clerkOrg: ClerkOrganization =
     await findCreateClerkOrganizationCreatedByUser({
-      userFirstName,
+      name: teamName,
       createdByClerkId: userClerkId,
     });
   let team: Team | undefined;
@@ -131,7 +134,6 @@ export default async function Page() {
       "No email verification status. This should be required in how we configure Clerk"
     );
   }
-
   const userInsert: UserInsert = {
     clerkId: clerkUser.id,
     email: clerkEmail.emailAddress,
@@ -144,7 +146,7 @@ export default async function Page() {
     userInsert,
   });
   const userPersonalTeam = await findCreateUserTeam({
-    userFirstName: user.firstName,
+    teamName: `${user.firstName}'s Projects`,
     userId: user.id,
     userClerkId: clerkUser.id,
   });

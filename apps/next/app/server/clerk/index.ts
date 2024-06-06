@@ -26,25 +26,24 @@ export async function mustGetClerkUser(): Promise<ClerkUser> {
   return clerkUser;
 }
 
-type ParamsForFindCreateClerkOrganization = {
-  userFirstName: string;
-  createdByClerkId: string;
-};
 export async function findCreateClerkOrganizationCreatedByUser({
-  userFirstName,
+  name,
   createdByClerkId,
-}: ParamsForFindCreateClerkOrganization): Promise<ClerkOrganization> {
-  const { orgId, userId } = auth();
-  const userClerkOrg = orgId
-    ? await clerkClient.organizations.getOrganization({
-        organizationId: orgId,
-      })
-    : undefined;
-  if (userClerkOrg?.createdBy === userId) {
-    return userClerkOrg;
+}: {
+  name: string;
+  createdByClerkId: string;
+}): Promise<ClerkOrganization> {
+  const { data: orgs } = await clerkClient.users.getOrganizationMembershipList({
+    userId: createdByClerkId,
+  });
+  for (const org of orgs) {
+    if (
+      org.organization.name === name &&
+      org.organization.createdBy === createdByClerkId
+    ) {
+      return org.organization;
+    }
   }
-
-  const name = `${userFirstName}'s Projects`;
   return await clerkClient.organizations.createOrganization({
     name,
     createdBy: createdByClerkId,
