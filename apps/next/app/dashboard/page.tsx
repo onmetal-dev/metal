@@ -46,25 +46,50 @@ async function findCreateUserWithClerkId({
   return newUser;
 }
 
-const ensureTeamForClerkOrg = async (): Promise<Team | undefined> => {
-  /*
-  - If a user is already has a Metal account and then uses Clerk's <OrganizationSwitcher />
-  to create a new org, the new Clerk org will exist but won't have an associated Metal team. This
-  function will ensure that none of the user's prior teams are not matched, thus
-  signaling to clients of this function that they need to create a new team.
-  - If a user is newly registered, they won't have any organizations or teams. This
-  function will detect that too and return no team.
-   */
-  const { orgId, userId } = auth();
-  if (orgId) {
-    const usersPersonalTeam = await db.query.teams
-      .findMany({
-        where: (team, { eq, and }) =>
-          and(eq(team.clerkId, orgId), eq(team.creatorId, userId)),
-      })
-      .then((rows) => rows[0] || undefined);
+const ensureTeamForClerkOrg = async ({
+  clerkOrgId,
+  teamName,
+  userId,
+}: {
+  clerkOrgId: string;
+  teamName: string;
+  userId: string;
+}): Promise<void> => {
+  /* Fixes an issue where if a user already has a Metal account and then uses
+  Clerk's <OrganizationSwitcher /> to create a new org, the new Clerk org will
+  exist but won't have an associated Metal team. This function will create a
+  team for the  and then add the user to it.
+  */
+  let usersPersonalTeam = await db.query.teams
+    .findMany({
+      where: (team, { eq, and }) =>
+        and(eq(team.clerkId, clerkOrgId), eq(team.creatorId, userId)),
+    })
+    .then((rows) => rows[0] || undefined);
 
-    return usersPersonalTeam;
+  if (!usersPersonalTeam) {
+    await db.transaction(async (tx) => {
+      const insertions = await tx
+        .insert(teams)
+        .values({
+          clerkId: clerkOrgId,
+          name: teamName,
+          creatorId: userId,
+        })
+        .returning();
+      usersPersonalTeam = insertions[0];
+      if (!usersPersonalTeam) {
+        tx.rollback();
+        throw new Error("User team not found despite just creating it");
+      }
+      await tx.insert(usersToTeams).values({
+        userId,
+        teamId: usersPersonalTeam.id,
+      });
+    });
+    if (!usersPersonalTeam) {
+      throw new Error("unexpeced error while ensuring team existence");
+    }
   }
 };
 
@@ -145,11 +170,20 @@ export default async function Page() {
     clerkId: clerkUser.id,
     userInsert,
   });
+  const teamName = `${user.firstName}'s Projects`;
   const userPersonalTeam = await findCreateUserTeam({
-    teamName: `${user.firstName}'s Projects`,
+    teamName,
     userId: user.id,
     userClerkId: clerkUser.id,
   });
+  const { orgId } = auth();
+  if (orgId) {
+    await ensureTeamForClerkOrg({
+      teamName,
+      userId: user.id,
+      clerkOrgId: orgId,
+    });
+  }
 
   // in the future we may not do this.. but in the beginning this is where the
   // onboarding happens (i.e. creating a cluster)
