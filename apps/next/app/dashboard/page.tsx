@@ -60,14 +60,14 @@ const ensureTeamForClerkOrg = async ({
   exist but won't have an associated Metal team. This function will create a
   team for the  and then add the user to it.
   */
-  let usersPersonalTeam = await db.query.teams
+  let team = await db.query.teams
     .findMany({
       where: (team, { eq, and }) =>
         and(eq(team.clerkId, clerkOrgId), eq(team.creatorId, userId)),
     })
     .then((rows) => rows[0] || undefined);
 
-  if (!usersPersonalTeam) {
+  if (!team) {
     await db.transaction(async (tx) => {
       const insertions = await tx
         .insert(teams)
@@ -77,17 +77,17 @@ const ensureTeamForClerkOrg = async ({
           creatorId: userId,
         })
         .returning();
-      usersPersonalTeam = insertions[0];
-      if (!usersPersonalTeam) {
+      team = insertions[0];
+      if (!team) {
         tx.rollback();
         throw new Error("User team not found despite just creating it");
       }
       await tx.insert(usersToTeams).values({
         userId,
-        teamId: usersPersonalTeam.id,
+        teamId: team.id,
       });
     });
-    if (!usersPersonalTeam) {
+    if (!team) {
       throw new Error("unexpeced error while ensuring team existence");
     }
   }
