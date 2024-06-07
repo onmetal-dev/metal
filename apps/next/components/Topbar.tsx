@@ -56,7 +56,8 @@ export const Topbar = () => {
         <OrganizationSwitcher
           hidePersonal
           organizationProfileUrl="/dashboard/settings"
-          createOrganizationUrl="/dashboard/create-team" />
+          createOrganizationUrl="/dashboard/create-team"
+        />
       </div>
       <UserButton />
       {/* todo: I think I want to override the Clerk dropdown to make it feel less Clerk-y */}
