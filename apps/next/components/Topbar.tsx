@@ -56,7 +56,6 @@ export const Topbar = () => {
         <OrganizationSwitcher
           hidePersonal
           organizationProfileUrl="/dashboard/settings"
-          createOrganizationUrl="/dashboard/create-team"
         />
       </div>
       <UserButton />
