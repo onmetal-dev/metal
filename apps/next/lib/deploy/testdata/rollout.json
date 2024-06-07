@@ -1,0 +1,171 @@
+{
+  "apiVersion": "argoproj.io/v1alpha1",
+  "kind": "Rollout",
+  "metadata": {
+    "annotations": {
+      "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"argoproj.io/v1alpha1\",\"kind\":\"Rollout\",\"metadata\":{\"annotations\":{},\"name\":\"raf-test\",\"namespace\":\"raf-test\"},\"spec\":{\"replicas\":2,\"revisionHistoryLimit\":2,\"selector\":{\"matchLabels\":{\"app\":\"raf-test\"}},\"strategy\":{\"canary\":{\"canaryService\":\"raf-test-canary\",\"stableService\":\"raf-test-stable\",\"steps\":[{\"setWeight\":100}],\"trafficRouting\":{\"plugins\":{\"argoproj-labs/gatewayAPI\":{\"httpRoutes\":[{\"name\":\"raf-test-https-rollout\"}],\"namespace\":\"raf-test\"}}}}},\"template\":{\"metadata\":{\"labels\":{\"app\":\"raf-test\"}},\"spec\":{\"containers\":[{\"env\":[{\"name\":\"PORT\",\"value\":\"80\"},{\"name\":\"NODE_IP\",\"valueFrom\":{\"fieldRef\":{\"fieldPath\":\"status.hostIP\"}}},{\"name\":\"OTEL_EXPORTER_OTLP_ENDPOINT\",\"value\":\"http://$(NODE_IP):4317\"}],\"image\":\"registry.quick-azure.up.onmetal.dev/raf-test:7ojbutasSzKYqzhupZdhPT\",\"name\":\"raf-test\",\"ports\":[{\"containerPort\":80,\"name\":\"http\",\"protocol\":\"TCP\"}],\"resources\":{\"requests\":{\"cpu\":0.25,\"memory\":\"256M\"}}}],\"imagePullSecrets\":[{\"name\":\"regcred-quick-azure\"}]}}}}\n",
+      "rollout.argoproj.io/revision": "10"
+    },
+    "creationTimestamp": "2024-06-11T14:26:34Z",
+    "generation": 27,
+    "name": "raf-test",
+    "namespace": "raf-test",
+    "resourceVersion": "3861108",
+    "uid": "59584ecf-f6d6-408b-b3a4-6366114346fe"
+  },
+  "spec": {
+    "replicas": 2,
+    "revisionHistoryLimit": 2,
+    "selector": {
+      "matchLabels": {
+        "app": "raf-test"
+      }
+    },
+    "strategy": {
+      "canary": {
+        "canaryService": "raf-test-canary",
+        "stableService": "raf-test-stable",
+        "steps": [
+          {
+            "setWeight": 100
+          }
+        ],
+        "trafficRouting": {
+          "plugins": {
+            "argoproj-labs/gatewayAPI": {
+              "httpRoutes": [
+                {
+                  "name": "raf-test-https-rollout"
+                }
+              ],
+              "namespace": "raf-test"
+            }
+          }
+        }
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "raf-test"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "env": [
+              {
+                "name": "PORT",
+                "value": "80"
+              },
+              {
+                "name": "NODE_IP",
+                "valueFrom": {
+                  "fieldRef": {
+                    "fieldPath": "status.hostIP"
+                  }
+                }
+              },
+              {
+                "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                "value": "http://$(NODE_IP):4317"
+              }
+            ],
+            "image": "registry.quick-azure.up.onmetal.dev/raf-test:7ojbutasSzKYqzhupZdhPT",
+            "name": "raf-test",
+            "ports": [
+              {
+                "containerPort": 80,
+                "name": "http",
+                "protocol": "TCP"
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "250m",
+                "memory": "256M"
+              }
+            }
+          }
+        ],
+        "imagePullSecrets": [
+          {
+            "name": "regcred-quick-azure"
+          }
+        ]
+      }
+    }
+  },
+  "status": {
+    "HPAReplicas": 2,
+    "availableReplicas": 2,
+    "blueGreen": {},
+    "canary": {
+      "weights": {
+        "canary": {
+          "podTemplateHash": "75cb9d47b5",
+          "serviceName": "raf-test-canary",
+          "weight": 0
+        },
+        "stable": {
+          "podTemplateHash": "75cb9d47b5",
+          "serviceName": "raf-test-stable",
+          "weight": 100
+        },
+        "verified": true
+      }
+    },
+    "conditions": [
+      {
+        "lastTransitionTime": "2024-06-11T20:46:35Z",
+        "lastUpdateTime": "2024-06-11T20:46:35Z",
+        "message": "Rollout is paused",
+        "reason": "RolloutPaused",
+        "status": "False",
+        "type": "Paused"
+      },
+      {
+        "lastTransitionTime": "2024-06-11T20:49:18Z",
+        "lastUpdateTime": "2024-06-11T20:49:18Z",
+        "message": "Rollout has minimum availability",
+        "reason": "AvailableReason",
+        "status": "True",
+        "type": "Available"
+      },
+      {
+        "lastTransitionTime": "2024-06-11T20:57:25Z",
+        "lastUpdateTime": "2024-06-11T20:57:25Z",
+        "message": "RolloutCompleted",
+        "reason": "RolloutCompleted",
+        "status": "True",
+        "type": "Completed"
+      },
+      {
+        "lastTransitionTime": "2024-06-11T20:57:55Z",
+        "lastUpdateTime": "2024-06-11T20:57:55Z",
+        "message": "Rollout is healthy",
+        "reason": "RolloutHealthy",
+        "status": "True",
+        "type": "Healthy"
+      },
+      {
+        "lastTransitionTime": "2024-06-11T20:46:35Z",
+        "lastUpdateTime": "2024-06-11T20:57:55Z",
+        "message": "ReplicaSet \"raf-test-75cb9d47b5\" has successfully progressed.",
+        "reason": "NewReplicaSetAvailable",
+        "status": "True",
+        "type": "Progressing"
+      }
+    ],
+    "currentPodHash": "75cb9d47b5",
+    "currentStepHash": "6c94bfbdd6",
+    "currentStepIndex": 1,
+    "observedGeneration": "27",
+    "phase": "Healthy",
+    "readyReplicas": 2,
+    "replicas": 2,
+    "selector": "app=raf-test",
+    "stableRS": "75cb9d47b5",
+    "updatedReplicas": 2
+  }
+}

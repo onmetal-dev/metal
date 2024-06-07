@@ -1,0 +1,197 @@
+// Bun Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ArgoDeployment should synthesize the correct Kubernetes manifest 1`] = `
+[
+  {
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+      "labels": {
+        "app": "raf-test",
+      },
+      "name": "raf-test-stable-c8cefa39",
+      "namespace": "raf-test",
+    },
+    "spec": {
+      "externalIPs": [],
+      "ports": [
+        {
+          "name": "http",
+          "port": 80,
+          "protocol": "TCP",
+        },
+      ],
+      "selector": {
+        "app": "raf-test",
+      },
+      "type": "ClusterIP",
+    },
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+      "labels": {
+        "app": "raf-test",
+      },
+      "name": "raf-test-canary-c8df02b3",
+      "namespace": "raf-test",
+    },
+    "spec": {
+      "externalIPs": [],
+      "ports": [
+        {
+          "name": "http",
+          "port": 80,
+          "protocol": "TCP",
+        },
+      ],
+      "selector": {
+        "app": "raf-test",
+      },
+      "type": "ClusterIP",
+    },
+  },
+  {
+    "apiVersion": "gateway.networking.k8s.io/v1",
+    "kind": "HTTPRoute",
+    "metadata": {
+      "labels": {
+        "app": "raf-test",
+      },
+      "name": "raf-test-https-443-to-http-80-c89c9570",
+      "namespace": "raf-test",
+    },
+    "spec": {
+      "hostnames": [
+        "raf-test.quick-azure.up.onmetal.dev",
+      ],
+      "parentRefs": [
+        {
+          "kind": "Gateway",
+          "name": "cilium",
+          "namespace": "gateway",
+          "port": 443,
+        },
+      ],
+      "rules": [
+        {
+          "backendRefs": [
+            {
+              "kind": "Service",
+              "name": "raf-test-stable-c8cefa39",
+              "port": 80,
+            },
+            {
+              "kind": "Service",
+              "name": "raf-test-canary-c8df02b3",
+              "port": 80,
+            },
+          ],
+          "matches": [
+            {
+              "path": {
+                "type": "PathPrefix",
+                "value": "/",
+              },
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    "apiVersion": "argoproj.io/v1alpha1",
+    "kind": "Rollout",
+    "metadata": {
+      "labels": {
+        "app": "raf-test",
+      },
+      "name": "raf-test-rollout-c82e0dd7",
+      "namespace": "raf-test",
+    },
+    "spec": {
+      "replicas": 2,
+      "revisionHistoryLimit": 5,
+      "selector": {
+        "matchLabels": {
+          "app": "raf-test",
+        },
+      },
+      "strategy": {
+        "canary": {
+          "canaryService": "raf-test-canary-c8df02b3",
+          "stableService": "raf-test-stable-c8cefa39",
+          "steps": [
+            {
+              "setWeight": 100,
+            },
+          ],
+          "trafficRouting": {
+            "plugins": {
+              "argoproj-labs/gatewayAPI": {
+                "httpRoutes": [
+                  {
+                    "name": "raf-test-https-443-to-http-80-c89c9570",
+                  },
+                ],
+                "namespace": "raf-test",
+              },
+            },
+          },
+        },
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app": "raf-test",
+          },
+        },
+        "spec": {
+          "containers": [
+            {
+              "env": [
+                {
+                  "name": "PORT",
+                  "value": "80",
+                },
+                {
+                  "name": "NODE_IP",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "fieldPath": "status.hostIP",
+                    },
+                  },
+                },
+                {
+                  "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                  "value": "http://$(NODE_IP):4317",
+                },
+              ],
+              "image": "registry.quick-azure.up.onmetal.dev/raf-test:7ojbutasSzKYqzhupZdhPT",
+              "name": "raf-test",
+              "ports": [
+                {
+                  "containerPort": 80,
+                  "name": "http",
+                },
+              ],
+              "resources": {
+                "requests": {
+                  "cpu": 0.1,
+                  "memory": "256M",
+                },
+              },
+            },
+          ],
+          "imagePullSecrets": [
+            {
+              "name": "regcred-quick-azure",
+            },
+          ],
+        },
+      },
+    },
+  },
+]
+`;

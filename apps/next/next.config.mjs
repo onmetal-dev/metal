@@ -25,10 +25,17 @@ const nextConfig = {
   },
   webpack: (
     config,
-    { buildId, dev, isServer, defaultLoaders, nextRuntime, webpack }
+    { buildId, dev, isServer, defaultLoaders, nextRuntime, webpack },
   ) => {
-    config.optimization = {
-      minimize: true,
+      if (isServer) {
+          config.devtool = "eval-source-map"
+          // https://github.com/open-telemetry/opentelemetry-js/issues/4173#issuecomment-1822938936
+          config.ignoreWarnings = [
+            { module: /opentelemetry/ },
+          ]
+      }
+      config.optimization = {
+        minimize: true,
       minimizer: [
         new TerserPlugin({
           terserOptions: {

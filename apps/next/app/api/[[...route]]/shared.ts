@@ -36,6 +36,13 @@ export const idSchema = z
     message: "projectId must be a 22 characters long base62 string",
   });
 
+export const nameSchema = z
+  .string()
+  .refine((val) => /^[0-9a-zA-Z-_]+$/.test(val), {
+    message:
+      "name must be a string of alphanumeric characters, hyphens, or underscores",
+  });
+
 export const errorResponseSchema = z.object({
   error: z.object({
     name: z.string(),

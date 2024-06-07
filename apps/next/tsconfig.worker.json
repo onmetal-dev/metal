@@ -22,6 +22,8 @@
     "./app/server/db/index.ts",
     "./lib/constants.ts",
     "./lib/hcloud/index.d.ts",
+    "./lib/tracedExec.ts",
+    "./lib/k8s.ts",
     "./types/*"
   ],
   "exclude": ["node_modules"]
