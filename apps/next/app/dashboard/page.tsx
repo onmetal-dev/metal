@@ -62,8 +62,7 @@ const ensureTeamForClerkOrg = async ({
   */
   let team = await db.query.teams
     .findMany({
-      where: (team, { eq, and }) =>
-        and(eq(team.clerkId, clerkOrgId), eq(team.creatorId, userId)),
+      where: (team, { eq, and }) => and(eq(team.clerkId, clerkOrgId)),
     })
     .then((rows) => rows[0] || undefined);
 
