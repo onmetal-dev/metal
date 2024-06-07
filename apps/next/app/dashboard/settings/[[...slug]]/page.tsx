@@ -5,7 +5,20 @@ import { DollarSign, IceCreamCone } from "lucide-react";
 import BillingPage from "./_profile-pages/billing-page";
 
 const OrganizationProfilePage = () => (
-  <OrganizationProfile path="/dashboard/settings" routing="path">
+  <OrganizationProfile
+    path="/dashboard/settings"
+    routing="path"
+    appearance={{
+      // The styles are used to make the settings box full-page-width. Comment them out and
+      // see how the settings box only fills about 70% of the screen.
+      elements: {
+        rootBox: "w-full border border-slate-300 dark:border-slate-700",
+        cardBox: "w-full grid-cols-8",
+        navbar: "col-span-1",
+        scrollBox: "col-span-7",
+      },
+    }}
+  >
     <OrganizationProfile.Page
       label="Billing"
       labelIcon={<DollarSign className="h-3.5 w-3.5" />}
