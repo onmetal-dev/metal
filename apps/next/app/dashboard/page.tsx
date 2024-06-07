@@ -14,6 +14,7 @@ import {
 import { EnsureActiveOrgSetAndRedirect } from "@/components/EnsureActiveOrgSetAndRedirect";
 import {
   auth,
+  clerkClient,
   type Organization as ClerkOrganization,
   type User as ClerkUser,
 } from "@clerk/nextjs/server";
@@ -48,11 +49,9 @@ async function findCreateUserWithClerkId({
 
 const ensureTeamForClerkOrg = async ({
   clerkOrgId,
-  teamName,
   userId,
 }: {
   clerkOrgId: string;
-  teamName: string;
   userId: string;
 }): Promise<void> => {
   /* Fixes an issue where if a user already has a Metal account and then uses
@@ -67,12 +66,16 @@ const ensureTeamForClerkOrg = async ({
     .then((rows) => rows[0] || undefined);
 
   if (!team) {
+    const { name: clerkOrgName } =
+      await clerkClient.organizations.getOrganization({
+        organizationId: clerkOrgId,
+      });
     await db.transaction(async (tx) => {
       const insertions = await tx
         .insert(teams)
         .values({
           clerkId: clerkOrgId,
-          name: teamName,
+          name: clerkOrgName,
           creatorId: userId,
         })
         .returning();
@@ -169,16 +172,14 @@ export default async function Page() {
     clerkId: clerkUser.id,
     userInsert,
   });
-  const teamName = `${user.firstName}'s Projects`;
   const userPersonalTeam = await findCreateUserTeam({
-    teamName,
+    teamName: `${user.firstName}'s Projects`,
     userId: user.id,
     userClerkId: clerkUser.id,
   });
   const { orgId } = auth();
   if (orgId) {
     await ensureTeamForClerkOrg({
-      teamName,
       userId: user.id,
       clerkOrgId: orgId,
     });
