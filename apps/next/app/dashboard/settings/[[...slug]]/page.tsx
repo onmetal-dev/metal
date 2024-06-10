@@ -16,6 +16,7 @@ const OrganizationProfilePage = () => (
         cardBox: "w-full grid-cols-8",
         navbar: "col-span-1",
         scrollBox: "col-span-7",
+        headerTitle: "hidden",
       },
     }}
   >
