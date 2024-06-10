@@ -57,6 +57,7 @@ export const Topbar = () => {
           hidePersonal
           organizationProfileUrl="/dashboard/settings"
           afterCreateOrganizationUrl="/dashboard"
+          afterSelectOrganizationUrl="/dashboard/clusters"
         />
       </div>
       <UserButton />
