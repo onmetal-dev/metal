@@ -17,6 +17,7 @@ const OrganizationProfilePage = () => (
         navbar: "col-span-1",
         scrollBox: "col-span-7",
         headerTitle: "hidden",
+        profileSection: "border-t-0 border-b",
       },
     }}
   >
