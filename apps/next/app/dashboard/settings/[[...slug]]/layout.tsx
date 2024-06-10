@@ -1,5 +1,5 @@
 import { FC } from "react";
-import styles from "./settings-page.module.css";
+import "./settings-page.module.css";
 
 type OrganizationProfileLayoutProps = {
   children: React.ReactNode;
@@ -7,6 +7,6 @@ type OrganizationProfileLayoutProps = {
 
 const OrganizationProfileLayout: FC<OrganizationProfileLayoutProps> = ({
   children,
-}) => <div className={styles.foo}>{children}</div>;
+}) => <div>{children}</div>;
 
 export default OrganizationProfileLayout;
