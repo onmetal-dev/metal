@@ -1,7 +1,7 @@
 import { db } from "@/app/server/db";
 import { Team, selectTeamSchema, teams } from "@/app/server/db/schema";
 import {
-  authenticateRequest,
+  authenticateUser,
   idSchema,
   responseSpecs,
   unauthorizedResponse,
@@ -41,7 +41,7 @@ export default function teamRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateRequest(c);
+      const user = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }
@@ -85,7 +85,7 @@ export default function teamRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateRequest(c);
+      const user = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }

@@ -1,46 +1,46 @@
+import { db } from "@/app/server/db";
 import {
   HetznerCluster,
-  hetznerClusters,
-  selectHetznerClusterWithNodeGroupsSchema,
-  HetznerClusterWithNodeGroups,
-  hetznerClusterSpec,
+  HetznerClusterInsert,
   HetznerClusterSpec,
-  HetznerProject,
-  hetznerProjects,
+  HetznerClusterWithNodeGroups,
+  HetznerInstanceTypeEnum,
   HetznerLocationEnum,
   HetznerNetworkZoneEnum,
-  HetznerClusterInsert,
   HetznerNodeGroupInsert,
-  HetznerInstanceTypeEnum,
+  HetznerProject,
+  hetznerClusterSpec,
+  hetznerClusters,
   hetznerNodeGroups,
+  hetznerProjects,
+  selectHetznerClusterWithNodeGroupsSchema,
 } from "@/app/server/db/schema";
-import { db } from "@/app/server/db";
-import { and, eq, inArray } from "drizzle-orm";
-import { type OpenAPIHono, createRoute } from "@hono/zod-openapi";
-import { z } from "zod";
-import { type Context } from "hono";
+import { queueNameForEnv } from "@/lib/constants";
+import { networkZoneForLocation } from "@/lib/hcloud-helpers";
 import { createTemporalClient } from "@/lib/temporal-client";
 import {
   DeleteHetznerCluster,
   ProvisionHetznerCluster,
 } from "@/temporal/src/workflows";
-import { ApplicationFailure, WorkflowFailedError } from "@temporalio/client";
-import { queueNameForEnv } from "@/lib/constants";
-import {
-  responseSpecs,
-  idSchema,
-  unauthorizedResponse,
-  userTeams,
-  authenticateRequest,
-} from "../../shared";
+import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import {
   adjectives,
   animals,
   colors,
   uniqueNamesGenerator,
 } from "@joaomoreno/unique-names-generator";
-import { networkZoneForLocation } from "@/lib/hcloud-helpers";
+import { ApplicationFailure, WorkflowFailedError } from "@temporalio/client";
+import { and, eq, inArray } from "drizzle-orm";
+import { type Context } from "hono";
 import uuidBase62 from "uuid-base62";
+import { z } from "zod";
+import {
+  authenticateUser,
+  idSchema,
+  responseSpecs,
+  unauthorizedResponse,
+  userTeams,
+} from "../../shared";
 
 const paramsClusterIdSchema = z.object({
   clusterId: idSchema.openapi({
@@ -75,7 +75,7 @@ export default function hetznerClustersRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateRequest(c);
+      const user = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }
@@ -126,7 +126,7 @@ export default function hetznerClustersRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateRequest(c);
+      const user = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }
@@ -171,7 +171,7 @@ export default function hetznerClustersRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateRequest(c);
+      const user = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }
@@ -301,7 +301,7 @@ export default function hetznerClustersRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateRequest(c);
+      const user = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }

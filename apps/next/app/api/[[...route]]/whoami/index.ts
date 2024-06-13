@@ -3,15 +3,11 @@ import {
   selectUserSchema,
   User,
 } from "@/app/server/db/schema";
-import { clerkClient } from "@clerk/nextjs";
-import { type OpenAPIHono, createRoute } from "@hono/zod-openapi";
-import { z } from "zod";
+import { clerkClient } from "@clerk/clerk-sdk-node";
+import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import { type Context } from "hono";
-import {
-  authenticateRequest,
-  unauthorizedResponse,
-  userTeams,
-} from "../shared";
+import { z } from "zod";
+import { authenticateUser, unauthorizedResponse, userTeams } from "../shared";
 
 const whoAmISchema = z
   .object({
@@ -52,13 +48,11 @@ export default function whoami(app: OpenAPIHono) {
     }),
     // @ts-ignore because hono is bad at matching the return of this function with the schema
     async (c: Context) => {
-      const authStatus = await clerkClient.authenticateRequest({
-        request: c.req.raw,
-      });
+      const authStatus = await clerkClient.authenticateRequest(c.req.raw);
       if (!authStatus.isSignedIn) {
         return c.json(unauthorizedResponse, 401);
       }
-      const user: User | undefined = await authenticateRequest(c);
+      const user: User | undefined = await authenticateUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }

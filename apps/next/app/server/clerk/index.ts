@@ -1,15 +1,17 @@
 import {
-  User as ClerkUser,
+  type AuthObject,
+  type SignedInAuthObject,
+} from "@clerk/backend/internal";
+import {
   Organization as ClerkOrganization,
-  AuthObject,
-  SignedInAuthObject,
-  clerkClient,
+  User as ClerkUser,
   auth,
+  clerkClient,
   currentUser,
 } from "@clerk/nextjs/server";
 
 export async function mustGetClerkSignedInAuth(): Promise<SignedInAuthObject> {
-  const clerkAuth: AuthObject = await auth();
+  const clerkAuth: AuthObject = auth();
   if (!clerkAuth.userId) {
     throw new Error("Clerk auth() returned null unexpectedly");
   }
@@ -31,11 +33,14 @@ export async function findCreateClerkOrganizationCreatedByUser({
   name: string;
   createdByClerkId: string;
 }): Promise<ClerkOrganization> {
-  const orgs = await clerkClient.users.getOrganizationMembershipList({
+  const { data: orgs } = await clerkClient.users.getOrganizationMembershipList({
     userId: createdByClerkId,
   });
   for (const org of orgs) {
-    if (org.organization.name === name) {
+    if (
+      org.organization.name === name &&
+      org.organization.createdBy === createdByClerkId
+    ) {
       return org.organization;
     }
   }

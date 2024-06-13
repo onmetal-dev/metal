@@ -11,12 +11,14 @@ import {
   users,
   usersToTeams,
 } from "@/app/server/db/schema";
-import { eq } from "drizzle-orm";
-import {
-  User as ClerkUser,
-  Organization as ClerkOrganization,
-} from "@clerk/nextjs/server";
 import { EnsureActiveOrgSetAndRedirect } from "@/components/EnsureActiveOrgSetAndRedirect";
+import {
+  auth,
+  clerkClient,
+  type Organization as ClerkOrganization,
+  type User as ClerkUser,
+} from "@clerk/nextjs/server";
+import { eq } from "drizzle-orm";
 
 async function findCreateUserWithClerkId({
   clerkId,
@@ -44,6 +46,54 @@ async function findCreateUserWithClerkId({
   }
   return newUser;
 }
+
+const ensureTeamForClerkOrg = async ({
+  clerkOrgId,
+  userId,
+}: {
+  clerkOrgId: string;
+  userId: string;
+}): Promise<void> => {
+  /* Fixes an issue where if a user already has a Metal account and then uses
+  Clerk's <OrganizationSwitcher /> to create a new org, the new Clerk org will
+  exist but won't have an associated Metal team. This function will create a
+  team for the  and then add the user to it.
+  */
+  let team = await db.query.teams
+    .findMany({
+      where: (team, { eq, and }) => and(eq(team.clerkId, clerkOrgId)),
+    })
+    .then((rows) => rows[0] || undefined);
+
+  if (!team) {
+    const { name: clerkOrgName } =
+      await clerkClient.organizations.getOrganization({
+        organizationId: clerkOrgId,
+      });
+    await db.transaction(async (tx) => {
+      const insertions = await tx
+        .insert(teams)
+        .values({
+          clerkId: clerkOrgId,
+          name: clerkOrgName,
+          creatorId: userId,
+        })
+        .returning();
+      team = insertions[0];
+      if (!team) {
+        tx.rollback();
+        throw new Error("User team not found despite just creating it");
+      }
+      await tx.insert(usersToTeams).values({
+        userId,
+        teamId: team.id,
+      });
+    });
+    if (!team) {
+      throw new Error("unexpeced error while ensuring team existence");
+    }
+  }
+};
 
 async function findCreateUserTeam({
   teamName,
@@ -127,6 +177,13 @@ export default async function Page() {
     userId: user.id,
     userClerkId: clerkUser.id,
   });
+  const { orgId } = auth();
+  if (orgId) {
+    await ensureTeamForClerkOrg({
+      userId: user.id,
+      clerkOrgId: orgId,
+    });
+  }
 
   // in the future we may not do this.. but in the beginning this is where the
   // onboarding happens (i.e. creating a cluster)

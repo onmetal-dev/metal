@@ -1,5 +1,5 @@
 import { NixpackPlan } from "@/types/deployment";
-import { clerkClient } from "@clerk/nextjs";
+import { clerkClient } from "@clerk/clerk-sdk-node";
 import chalk from "chalk";
 import { type NextRequest } from "next/server";
 import { exec as execCallbackBased, spawn } from "node:child_process";
@@ -207,7 +207,7 @@ async function* makeIterator(buildTag: string, fileName: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const authStatus = await clerkClient.authenticateRequest({ request });
+  const authStatus = await clerkClient.authenticateRequest(request);
   if (!authStatus.isSignedIn) {
     return new Response(JSON.stringify({}), {
       status: 401,

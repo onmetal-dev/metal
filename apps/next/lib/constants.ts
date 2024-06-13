@@ -22,3 +22,7 @@ export function queueNameForEnv(env: string) {
 }
 
 export const hetznerRedHex = "#D50C2D";
+
+// This matches the foreground color of the app's dark theme that's declared in this file:
+// apps/next/app/globals.css
+export const whiteishHex = "#F8FAFC";

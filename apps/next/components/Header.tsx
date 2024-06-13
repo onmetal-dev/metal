@@ -10,8 +10,7 @@ import { Container } from "@/components/Container";
 import { LogoWide } from "@/components/LogoWide";
 import { NavLink } from "@/components/NavLink";
 import { Menu, X } from "lucide-react";
-import { SignInButton } from "@clerk/nextjs";
-import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import { SignInButton, SignedIn, SignedOut } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import { UserButton } from "./UserButton";
 
@@ -35,7 +34,7 @@ function MobileNavIcon({ open }: { open: boolean }) {
       <Transition
         as={Fragment}
         show={open}
-        enter="transform transition duration-[400ms]"
+        enter="transform transition duration-400"
         enterFrom="opacity-0 rotate-[-120deg] scale-50"
         enterTo="opacity-100 rotate-0 scale-100"
         // leave immediately to make room for the other icon
@@ -48,7 +47,7 @@ function MobileNavIcon({ open }: { open: boolean }) {
       <Transition
         as={Fragment}
         show={!open}
-        enter="transform transition duration-[400ms]"
+        enter="transform transition duration-400"
         enterFrom="opacity-0 rotate-[-120deg] scale-50"
         enterTo="opacity-100 rotate-0 scale-100"
         // leave immediately to make room for the other icon

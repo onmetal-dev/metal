@@ -17,7 +17,7 @@ import {
   CreateHetznerProject,
   DeleteHetznerCluster,
 } from "@/temporal/src/workflows";
-import { auth } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 import { ServerActionState } from "@lib/action";
 import {
   ApplicationFailure,

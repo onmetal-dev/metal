@@ -53,7 +53,12 @@ export const Topbar = () => {
             /> */}
       </div>
       <div className="pt-2">
-        <OrganizationSwitcher hidePersonal={true} />
+        <OrganizationSwitcher
+          hidePersonal
+          organizationProfileUrl="/dashboard/settings"
+          afterCreateOrganizationUrl="/dashboard"
+          afterSelectOrganizationUrl="/dashboard/clusters"
+        />
       </div>
       <UserButton />
       {/* todo: I think I want to override the Clerk dropdown to make it feel less Clerk-y */}
