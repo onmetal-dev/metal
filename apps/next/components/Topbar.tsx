@@ -11,14 +11,13 @@ import {
 import { UserButton } from "@/components/UserButton";
 import { SidebarNavSm } from "@/components/SidebarNavSm";
 import React from "react";
-import { OrganizationSwitcher, useOrganizationList } from "@clerk/nextjs";
+import { OrganizationSwitcher } from "@clerk/nextjs";
 
 function capFirst(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 export const Topbar = () => {
-  const { setActive } = useOrganizationList();
   const segments = useSelectedLayoutSegments();
   // not sure why this doesn't include dashboard...the docs say it should?
   if (segments.length > 0 && segments[0] !== "dashboard") {
@@ -58,11 +57,7 @@ export const Topbar = () => {
           hidePersonal
           organizationProfileUrl="/dashboard/settings"
           afterCreateOrganizationUrl="/dashboard"
-          afterSelectOrganizationUrl={(org) => {
-            console.log("afterSelectOrganizationUrl org", org);
-            // setActive?.({ organization: org.id });
-            return "/dashboard/clusters";
-          }}
+          afterSelectOrganizationUrl="/dashboard/clusters"
         />
       </div>
       <UserButton />

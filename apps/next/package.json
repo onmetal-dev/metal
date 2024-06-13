@@ -55,7 +55,6 @@
     "@temporalio/worker": "^1.9.3",
     "@temporalio/workflow": "^1.9.3",
     "@tsconfig/node20": "^20.1.4",
-    "@uidotdev/usehooks": "^2.4.1",
     "@vercel/otel": "^1.8.1",
     "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.0",
@@ -86,7 +85,6 @@
     "zod-validation-error": "^3.3.0"
   },
   "devDependencies": {
-    "@clerk/types": "^4.6.0",
     "@types/bun": "^1.1.0",
     "@types/canvas-confetti": "^1.6.4",
     "@types/node": "^20",

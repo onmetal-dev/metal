@@ -25,7 +25,6 @@ import {
   WorkflowNotFoundError,
 } from "@temporalio/client";
 import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import uuidBase62 from "uuid-base62";
 
@@ -174,13 +173,7 @@ export async function fetchProjectAndClusters(): Promise<{
   project: HetznerProject | undefined;
   clusters: HetznerCluster[];
 }> {
-  const { orgId, orgSlug } = auth();
-  // console.log("org orgSlug", orgSlug);
-  // const cookieStore = cookies();
-  // const metalOrgId = cookieStore.get("metal_org_id")?.value;
-  // if (orgId && (!metalOrgId || orgId !== metalOrgId)) {
-  //   cookieStore.set("metal_org_id", orgId);
-  // }
+  const { orgId } = auth();
   if (!orgId) {
     throw new Error("No orgId found");
   }
@@ -202,12 +195,4 @@ export async function fetchProjectAndClusters(): Promise<{
     .from(hetznerClusters)
     .where(eq(hetznerClusters.teamId, team.id));
   return { project, clusters };
-}
-
-export async function fetchServerOrgAndSession(): Promise<{
-  orgId: string | null | undefined;
-  sessionId: string | null | undefined;
-}> {
-  const { orgId, sessionId } = auth();
-  return Promise.resolve({ orgId, sessionId });
 }
