@@ -1,5 +1,4 @@
 import { FC } from "react";
-import "./settings-page.module.css";
 
 type OrganizationProfileLayoutProps = {
   children: React.ReactNode;

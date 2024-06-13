@@ -100,3 +100,7 @@
     @apply bg-background text-foreground;
   }
 }
+
+.cl-navbar>div>div:not(.cl-navbarButtons) {
+  display: none;
+}
