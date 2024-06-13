@@ -7,6 +7,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import clsx from "clsx";
 import { dark } from "@clerk/themes";
 import { CommandItemsProvider, CommandMenu } from "@/components/CommandMenu";
+import { ClerkRefresher } from "@/components/ClerkRefresher";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -64,6 +65,7 @@ export default function RootLayout({
               defaultTheme="dark"
               disableTransitionOnChange
             >
+              <ClerkRefresher />
               {children}
             </ThemeProvider>
           </CommandItemsProvider>
