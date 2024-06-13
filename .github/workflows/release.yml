@@ -1,0 +1,80 @@
+name: Build and Release
+
+on:
+  push
+  # push:
+  #   tags:
+  #     - 'v*'
+  # push:
+  #   branches:
+  #     - main  # Change this to the branch you want to trigger the action
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/cli
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ">=20"
+
+      - name: Use Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install packages
+        run: bun install --frozen-lockfile
+
+      - name: Create Release file
+        run: echo ${{ github.sha }} > Release.txt
+
+      - name: Test Release file
+        run: cat Release.txt
+
+      - name: Build executables to release
+        run: |
+          bun build --compile --target=bun-linux-x64 --outfile onmetal-linux-x64 src/index.ts
+          bun build --compile --target=bun-linux-arm64 --outfile onmetal-linux-arm64 src/index.ts
+          bun build --compile --target=bun-macos-x64 --outfile onmetal-macos-x64 src/index.ts
+
+      - name: Package the executables
+        run: |
+          tar -czvf onmetal-linux-x64.tar.gz onmetal-linux-x64
+          tar -czvf onmetal-linux-arm64.tar.gz onmetal-linux-arm64
+          tar -czvf onmetal-macos-x64.tar.gz onmetal-macos-x64
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        # if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            onmetal-**.tar.gz
+            Release.txt
+            LICENSE
+
+      # - name: Create Release
+      #   id: create_release
+      #   uses: actions/create-release@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     tag_name: ${{ github.sha }}
+      #     release_name: Release ${{ github.sha }}
+      #     draft: false
+      #     prerelease: false
+
+      # - name: Upload Release Asset
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
+      #     asset_path: ./path/to/your/build/artifact.zip # Change to the path of your build artifact
+      #     asset_name: artifact.zip # Change to the name of your build artifact
+      #     asset_content_type: application/zip
