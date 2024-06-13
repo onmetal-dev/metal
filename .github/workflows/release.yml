@@ -46,13 +46,14 @@ jobs:
       - name: Package the executables
         run: |
           tar -czvf onmetal-linux-x64.tar.gz onmetal-linux-x64
-          tar -czvf onmetal-linux-arm64.tar.gz onmetal-linux-arm64
+          tar -czvf onmetal-linux-arm64.tar.gz onmetal-linux-arm6q4
           tar -czvf onmetal-macos-x64.tar.gz onmetal-macos-x64
 
       - name: Release
         uses: softprops/action-gh-release@v2
         # if: startsWith(github.ref, 'refs/tags/')
         with:
+          token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
           files: |
             onmetal-**.tar.gz
             Release.txt
