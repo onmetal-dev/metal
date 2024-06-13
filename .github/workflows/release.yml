@@ -43,6 +43,11 @@ jobs:
           bun build --compile --target=bun-linux-arm64 --outfile onmetal-linux-arm64 src/index.ts
           bun build --compile --target=bun-macos-x64 --outfile onmetal-macos-x64 src/index.ts
 
+      - name: List files and pwd
+        run: |
+          ls -l
+          pwd
+
       - name: Package the executables
         run: |
           tar -czvf onmetal-linux-x64.tar.gz onmetal-linux-x64
