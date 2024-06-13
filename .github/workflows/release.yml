@@ -51,7 +51,7 @@ jobs:
       - name: Package the executables
         run: |
           tar -czvf onmetal-linux-x64.tar.gz onmetal-linux-x64
-          tar -czvf onmetal-linux-arm64.tar.gz onmetal-linux-arm6q4
+          tar -czvf onmetal-linux-arm64.tar.gz onmetal-linux-arm64
           tar -czvf onmetal-macos-x64.tar.gz onmetal-macos-x64
 
       - name: Release
