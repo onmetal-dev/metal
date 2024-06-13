@@ -12,6 +12,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import stringify from "json-stable-stringify";
+import { createHash } from "node:crypto";
 import uuidBase62 from "uuid-base62";
 import { z } from "zod";
 import sqlSchemaForEnv from "./schemaForEnv";
@@ -334,40 +336,39 @@ export const hetznerNodeGroupRelations = relations(
   })
 );
 
-const portsSchema = z.array(
-  z.object({
-    name: z.string(),
-    port: z.number(),
-    proto: z.enum(["http", "tcp"]),
-  })
-);
+const portSchema = z.object({
+  name: z.string(),
+  port: z.number(),
+  proto: z.enum(["http"]),
+});
+export type Port = z.infer<typeof portSchema>;
+
+const portsSchema = z.array(portSchema);
 export type Ports = z.infer<typeof portsSchema>;
 
-const externalSchema = z.array(
-  z.object({
-    name: z.string(),
-    portName: z.string(),
-    port: z.number().refine((val) => val === 80 || val === 443),
-    proto: z.enum(["http", "https"]),
-  })
-);
+const externalPortSchema = z.object({
+  name: z.string(),
+  portName: z.string(),
+  port: z.number().refine((val) => val === 80 || val === 443),
+  proto: z.enum(["http", "https"]),
+});
+
+export type ExternalPort = z.infer<typeof externalPortSchema>;
+const externalSchema = z.array(externalPortSchema);
 export type External = z.infer<typeof externalSchema>;
 
-const envSchema = z.array(z.string());
-export type Env = z.infer<typeof envSchema>;
-
 const healthCheckSchema = z.object({
-  protocol: z.enum(["http", "tcp"]),
-  port: z.union([z.number(), z.string()]),
+  proto: z.enum(["http", "tcp"]),
+  portName: z.string(),
   path: z.string().optional(),
   httpHeaders: z
     .array(z.object({ name: z.string(), value: z.string() }))
     .optional(),
-  initialDelaySeconds: z.number(),
-  timeoutSeconds: z.number(),
-  periodSeconds: z.number(),
-  failureThreshold: z.number(),
-  successThreshold: z.number(),
+  initialDelaySeconds: z.number().optional(),
+  timeoutSeconds: z.number().optional(),
+  periodSeconds: z.number().optional(),
+  failureThreshold: z.number().optional(),
+  successThreshold: z.number().optional(),
 });
 export type HealthCheck = z.infer<typeof healthCheckSchema>;
 
@@ -390,15 +391,19 @@ export type Telemetry = z.infer<typeof telemetrySchema>;
 // - github: the team has connected their github account and at the end of a successful CI run publishes to metal with application version + build info + git metadata. We capture git metadata in source
 const sourceSchema = z.object({
   type: z.enum(["upload", "github"]),
-  upload: z.object({
-    hash: z.string().optional(), // the sha256 of the tar.gz
-    path: z.string().optional(), // where we stored it in our object storage
-  }),
-  github: z.object({
-    repository: z.string(), // org/repo
-    branch: z.string(),
-    commit: z.string(), // full commit sha
-  }),
+  upload: z
+    .object({
+      hash: z.string().optional(), // the sha256 of the tar.gz
+      path: z.string().optional(), // where we stored it in our object storage
+    })
+    .optional(),
+  github: z
+    .object({
+      repository: z.string(), // org/repo
+      branch: z.string(),
+      commit: z.string(), // full commit sha
+    })
+    .optional(),
 });
 export type Source = z.infer<typeof sourceSchema>;
 
@@ -410,47 +415,148 @@ const phaseSchema = z.object({
 // builderSchema describes what builder to use (in an application config) or what builder was used (in a build)
 const builderSchema = z.object({
   type: z.enum(["nixpacks"]), // todo: "dockerfile", "pack", "image"
-  nixpacks: z.object({
-    // a subset of what's supported here: https://nixpacks.com/docs/guides/configuring-builds
-    providers: z.array(z.string()).optional(),
-    buildImage: z.string().optional(),
-    phases: z
-      .object({
-        setup: z.object({
-          nixPkgs: z.array(z.string()).optional(),
-          nixLibs: z.array(z.string()).optional(),
-          aptPkgs: z.array(z.string()).optional(),
-        }),
-        build: z.object({
-          cmd: z.string().optional(),
-          dependsOn: z.array(z.string()).optional(),
-        }),
-        start: z.object({
-          cmd: z.string().optional(),
-        }),
-      })
-      .passthrough()
-      .refine(
-        (data) => {
-          // Ensure all additional user-defined phases follow the phase schema
-          return Object.entries(data).every(([key, value]) => {
-            if (["setup", "build", "start"].includes(key)) {
-              return true;
-            }
-            return phaseSchema.safeParse(value).success;
-          });
-        },
-        {
-          message: "All user-defined phases must follow the standard schema",
-        }
-      ),
-  }),
+  nixpacks: z
+    .object({
+      // a subset of what's supported here: https://nixpacks.com/docs/guides/configuring-builds
+      providers: z.array(z.string()).optional(),
+      buildImage: z.string().optional(),
+      phases: z
+        .object({
+          setup: z.object({
+            nixPkgs: z.array(z.string()).optional(),
+            nixLibs: z.array(z.string()).optional(),
+            aptPkgs: z.array(z.string()).optional(),
+          }),
+          build: z.object({
+            cmd: z.string().optional(),
+            dependsOn: z.array(z.string()).optional(),
+          }),
+          start: z.object({
+            cmd: z.string().optional(),
+          }),
+        })
+        .passthrough()
+        .refine(
+          (data) => {
+            // Ensure all additional user-defined phases follow the phase schema
+            return Object.entries(data).every(([key, value]) => {
+              if (["setup", "build", "start"].includes(key)) {
+                return true;
+              }
+              return phaseSchema.safeParse(value).success;
+            });
+          },
+          {
+            message: "All user-defined phases must follow the standard schema",
+          }
+        )
+        .optional(),
+    })
+    .optional(),
 });
 export type Builder = z.infer<typeof builderSchema>;
 
-const resourcesSchema = z.object({
-  memory: z.number(),
-  cpu: z.number(),
+// mustParseCpu returns the number of CPUs in a string CPU request.
+// The request may be in millicpu in which case it is converted. E.g. 100m returns 0.1
+export function mustParseCpu(input: string): number {
+  const match = input.match(/^(?<number>\d*\.?\d+)(?<unit>m)?$/);
+  if (!match || !match.groups?.number) {
+    throw new Error(
+      `${input} is not a valid CPU request. Format must be a number or a number followed by 'm' (millicpu).`
+    );
+  }
+  const num = mustParseFloat(match.groups.number);
+  if (!match.groups.unit) {
+    if (!Number.isInteger(num * 1000)) {
+      throw new Error(
+        `${input} is not a valid CPU request. Maximum precision is 0.001.`
+      );
+    }
+    return num;
+  }
+  if (!Number.isInteger(num)) {
+    throw new Error(
+      `${input} is not a valid CPU request. Millicpu requests must be integers.`
+    );
+  }
+  return num / 1000;
+}
+
+const memoryMultipliers = {
+  k: 1000,
+  M: 1000 ** 2,
+  G: 1000 ** 3,
+  T: 1000 ** 4,
+  P: 1000 ** 5,
+  E: 1000 ** 6,
+  Ki: 1024,
+  Mi: 1024 ** 2,
+  Gi: 1024 ** 3,
+  Ti: 1024 ** 4,
+  Pi: 1024 ** 5,
+  Ei: 1024 ** 6,
+};
+
+function mustParseFloat(input: string): number {
+  try {
+    const num: number = parseFloat(input);
+    return num;
+  } catch (e) {
+    throw new Error(`${input} is not a number`);
+  }
+}
+
+export function mustParseMemory(input: string): number {
+  const match = input.match(
+    /^(?<number>[0-9\.]+)(?<unit>k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$/
+  );
+  if (!match || !match.groups?.number) {
+    throw new Error(
+      `${input} is not a valid memory request. Format must be a number of bytes or a number followed by one of k, M, G, T, P, E, Ki, Mi, Gi, Ti, Pi, or Ei.`
+    );
+  }
+  const num = mustParseFloat(match.groups.number);
+  if (!match.groups?.unit) {
+    if (!Number.isInteger(num)) {
+      throw new Error(
+        `${input} is not a valid memory request. If not specifying a unit, memory requests are interpreted as bytes and must be integers.`
+      );
+    }
+    return num;
+  }
+  const unit: string = match.groups.unit as keyof typeof memoryMultipliers;
+  if (!(unit in memoryMultipliers)) {
+    throw new Error(
+      `${input} is not a valid memory request. Unit ${unit} must be k, M, G, T, P, E, Ki, Mi, Gi, Ti, Pi, or Ei.`
+    );
+  }
+  const multiplier = memoryMultipliers[unit as keyof typeof memoryMultipliers];
+  return num * multiplier;
+}
+
+export const resourcesSchema = z.object({
+  memory: z.union([z.string(), z.number()]).superRefine((val, ctx) => {
+    try {
+      mustParseMemory(val.toString());
+    } catch (e) {
+      const error = e as Error;
+      return ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: error.message,
+      });
+    }
+  }),
+  cpu: z.union([z.string(), z.number()]).superRefine((val, ctx) => {
+    try {
+      mustParseCpu(val.toString());
+    } catch (e) {
+      const error = e as Error;
+      return ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: error.message,
+      });
+    }
+  }),
 });
 export type Resources = z.infer<typeof resourcesSchema>;
 
@@ -462,8 +568,23 @@ export const applications = metalSchema.table("applications", {
   creatorId: varchar("creator_id", { length: 22 })
     .references(() => users.id)
     .notNull(), // could be null if we can't track down who initiated the deployment
-  name: text("name").notNull(), // todo: constraint sql`name ~ '^[a-z0-9-]+$'` (when drizzle supports check constraints)
+  name: text("name").notNull(), // todo: constraint sql`name ~ '^[a-zA-Z0-9_-]+$'` (when drizzle supports check constraints)
 });
+
+export const insertApplicationSchema = createInsertSchema(applications);
+export type ApplicationInsert = z.infer<typeof insertApplicationSchema>;
+export const selectApplicationSchema = createSelectSchema(applications);
+export type Application = z.infer<typeof selectApplicationSchema>;
+export const applicationSpec = insertApplicationSchema
+  .omit({
+    createdAt: true,
+    updatedAt: true,
+  })
+  .refine((data) => /^[a-zA-Z0-9_-]+$/.test(data.name), {
+    message: "Name must match the regex ^[a-zA-Z0-9_-]+$",
+    path: ["name"],
+  });
+export type ApplicationSpec = z.infer<typeof applicationSpec>;
 
 export const applicationRelations = relations(
   applications,
@@ -480,21 +601,6 @@ export const applicationRelations = relations(
   })
 );
 
-export const insertApplicationSchema = createInsertSchema(applications);
-export type ApplicationInsert = z.infer<typeof insertApplicationSchema>;
-export const selectApplicationSchema = createSelectSchema(applications);
-export type Application = z.infer<typeof selectApplicationSchema>;
-export const applicationSpec = insertApplicationSchema
-  .omit({
-    createdAt: true,
-    updatedAt: true,
-  })
-  .refine((data) => /^[a-z0-9-_]+$/.test(data.name), {
-    message: "Name must match the regex ^[a-z0-9-_]+$",
-    path: ["name"],
-  });
-export type ApplicationSpec = z.infer<typeof applicationSpec>;
-
 const customJsonb = <TData>(name: string) =>
   customType<{ data: TData; driverData: string }>({
     dataType() {
@@ -502,6 +608,9 @@ const customJsonb = <TData>(name: string) =>
     },
     toDriver(value: TData): string {
       return JSON.stringify(value);
+    },
+    fromDriver(value: string): TData {
+      return JSON.parse(value);
     },
   })(name);
 
@@ -519,7 +628,6 @@ export const applicationConfigs = metalSchema.table(
     builder: customJsonb<Builder>("builder").notNull(),
     ports: customJsonb<Ports>("ports").notNull(),
     external: customJsonb<External>("external").notNull(),
-    env: customJsonb<Env>("env").notNull(),
     healthCheck: customJsonb<HealthCheck>("health_check").notNull(),
     dependencies: customJsonb<Dependencies>("dependencies").notNull(),
     databases: customJsonb<Databases>("databases").notNull(),
@@ -544,15 +652,45 @@ export const applicationConfigs = metalSchema.table(
     };
   }
 );
-
 export const insertApplicationConfigSchema =
   createInsertSchema(applicationConfigs);
 export type ApplicationConfigInsert = z.infer<
   typeof insertApplicationConfigSchema
 >;
-export const selectApplicationConfigSchema =
-  createSelectSchema(applicationConfigs);
+export const selectApplicationConfigSchema = createSelectSchema(
+  applicationConfigs
+).extend({
+  // without the below drizzle makes these `any`. TODO: file issue
+  source: sourceSchema,
+  builder: builderSchema,
+  ports: portsSchema,
+  external: externalSchema,
+  healthCheck: healthCheckSchema,
+  dependencies: dependenciesSchema,
+  databases: databasesSchema,
+  resources: resourcesSchema,
+});
 export type ApplicationConfig = z.infer<typeof selectApplicationConfigSchema>;
+
+export const applicationConfigVersionDataSchema =
+  selectApplicationConfigSchema.omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+    version: true,
+  });
+export type ApplicationConfigVersionData = z.infer<
+  typeof applicationConfigVersionDataSchema
+>;
+
+// applicationVersion is a unique identifier for the current configuration of an application
+export function applicationVersion(
+  appConfigVersionData: ApplicationConfigVersionData
+): string {
+  return createHash("md5")
+    .update(stringify(appConfigVersionData))
+    .digest("hex");
+}
 
 export const applicationConfigRelations = relations(
   applicationConfigs,
@@ -593,9 +731,11 @@ const buildArtifactSchema = z.object({
         ),
       tag: z
         .string()
+        .optional()
         .describe("The tag of the image. If not specified, latest is assumed."),
       digest: z
         .string()
+        .optional()
         .describe(
           "Instead of a tag you can use a digest. E.g. sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9"
         ),
@@ -623,8 +763,13 @@ export const builds = metalSchema.table("builds", {
     .references(() => applicationConfigs.id, { onDelete: "cascade" }),
   status: buildStatusEnum("status").notNull(),
   logs: text("logs").notNull(),
-  artifact: customJsonb<BuildArtifact>("artifact").notNull(),
+  artifacts: customJsonb<BuildArtifact[]>("artifacts").notNull(),
 });
+
+export const insertBuildSchema = createInsertSchema(builds);
+export type BuildInsert = z.infer<typeof insertBuildSchema>;
+export const selectBuildSchema = createSelectSchema(builds);
+export type Build = z.infer<typeof selectBuildSchema>;
 
 export const buildRelations = relations(builds, ({ one }) => ({
   team: one(teams, {
@@ -646,8 +791,23 @@ export const environments = metalSchema.table("environments", {
   teamId: varchar("team_id", { length: 22 })
     .notNull()
     .references(() => teams.id, { onDelete: "cascade" }),
-  name: text("name").notNull(), // todo: constraint sql`name ~ '^[a-z0-9-]+$'` (when drizzle supports check constraints)
+  name: text("name").notNull(), // todo: constraint sql`name ~ '^[a-zA-Z0-9_-]+$'` (when drizzle supports check constraints)
 });
+
+export const insertEnvironmentSchema = createInsertSchema(environments);
+export type EnvironmentInsert = z.infer<typeof insertEnvironmentSchema>;
+export const selectEnvironmentSchema = createSelectSchema(environments);
+export type Environment = z.infer<typeof selectEnvironmentSchema>;
+export const environmentSpec = insertEnvironmentSchema
+  .omit({
+    createdAt: true,
+    updatedAt: true,
+  })
+  .refine((data) => /^[a-zA-Z0-9_-]+$/.test(data.name), {
+    message: "Name must match the regex ^[a-zA-Z0-9_-]+$",
+    path: ["name"],
+  });
+export type EnvironmentSpec = z.infer<typeof environmentSpec>;
 
 export const environmentRelations = relations(environments, ({ one }) => ({
   team: one(teams, {
@@ -742,9 +902,11 @@ export const deployments = metalSchema.table("deployments", {
   teamId: varchar("team_id", { length: 22 })
     .notNull()
     .references(() => teams.id, { onDelete: "cascade" }),
-  creatorId: varchar("creator_id", { length: 22 }).references(() => users.id, {
-    onDelete: "cascade",
-  }), // could be null if we can't track down who initiated the deployment
+  creatorId: varchar("creator_id", { length: 22 })
+    .references(() => users.id, {
+      onDelete: "cascade",
+    })
+    .notNull(),
   applicationId: varchar("application_id", { length: 22 })
     .notNull()
     .references(() => applications.id, { onDelete: "cascade" }),
@@ -761,13 +923,18 @@ export const deployments = metalSchema.table("deployments", {
   type: deploymentTypeEnum("type").notNull(),
   rolloutStatus: deploymentStatusEnum("rollout_status").notNull(),
   // rolloutStrategy: // within the cluster, the rollout strategy. todo, all-at-once for now
-  resources: customJsonb<Resources>("resources").notNull(),
+  //  resources: customJsonb<Resources>("resources").notNull(), // redundant with application config
   referenceDeploymentId: varchar("reference_deployment_id", { length: 22 }),
   count: integer("count"), // only set for scale deployments
   // clusterSelector: // todo: clusters you want to deploy into
   // clusterRolloutStrategy: // todo: how to rollout to clusters
   // clusterRolloutStatus: // todo: status of the rollout per cluster
 });
+
+export const insertDeploymentSchema = createInsertSchema(deployments);
+export type DeploymentInsert = z.infer<typeof insertDeploymentSchema>;
+export const selectDeploymentSchema = createSelectSchema(deployments);
+export type Deployment = z.infer<typeof selectDeploymentSchema>;
 
 export const deploymentRelations = relations(deployments, ({ one }) => ({
   team: one(teams, {

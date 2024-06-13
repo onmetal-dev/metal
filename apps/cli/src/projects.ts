@@ -1,17 +1,11 @@
 import { Command } from "commander";
 
-import { type Config } from "./types";
+import { NotFoundError } from "@onmetal/node";
 import chalk from "chalk";
-import Metal, { NotFoundError } from "@onmetal/node";
 import uuidBase62 from "uuid-base62";
+import { log, mustMetalClient, type Config } from "./shared";
 
-const log = console.log;
-
-export default function projects(
-  program: Command,
-  config: Config,
-  baseURL: string
-) {
+export default function projects(program: Command, config: Config) {
   program.description("Manage Hetzner projects connected to your team");
 
   program
@@ -19,11 +13,7 @@ export default function projects(
     .description("Get project details")
     .argument("<projectId>", "Project ID")
     .action(async (projectId) => {
-      if (!config.whoami) {
-        log(`Not logged in. Login with ${chalk.red("metal login")}`);
-        return;
-      }
-      const metal = new Metal({ baseURL, metalAPIKey: config.whoami.token });
+      const metal = mustMetalClient(config);
       try {
         const project = await metal.hetznerProjects.retrieve(projectId);
         log(project);
@@ -39,11 +29,7 @@ export default function projects(
     .command("list")
     .description("List Hetzner projects connected to your teams")
     .action(async () => {
-      if (!config.whoami) {
-        log(`Not logged in. Login with ${chalk.red("metal login")}`);
-        return;
-      }
-      const metal = new Metal({ baseURL, metalAPIKey: config.whoami.token });
+      const metal = mustMetalClient(config);
       const projects = await metal.hetznerProjects.list();
       log(projects);
     });
@@ -55,8 +41,9 @@ export default function projects(
     .requiredOption("-n, --hetznerName <hetznerName>", "Hetzner project name")
     .requiredOption("-a, --apiToken <apiToken>", "Hetzner API token")
     .action(async (options) => {
-      if (!config.whoami) {
-        log(`Not logged in. Login with ${chalk.red("metal login")}`);
+      const metal = mustMetalClient(config);
+      if (!config.whoami?.teams || !config.whoami.user?.id) {
+        log(`Unknown login state, please logout and login again`);
         return;
       }
       if (config.whoami.teams.length != 1) {
@@ -68,7 +55,6 @@ export default function projects(
       const id = options.id || uuidBase62.v4();
       const teamId = options.teamId || config.whoami.teams[0].id;
       const { hetznerName, apiToken } = options;
-      const metal = new Metal({ baseURL, metalAPIKey: config.whoami.token });
       const project = await metal.hetznerProjects.create(id, {
         id,
         hetznerName,
@@ -83,11 +69,7 @@ export default function projects(
     .description("Delete project")
     .argument("<projectId>", "Project ID")
     .action(async (projectId) => {
-      if (!config.whoami) {
-        log(`Not logged in. Login with ${chalk.red("metal login")}`);
-        return;
-      }
-      const metal = new Metal({ baseURL, metalAPIKey: config.whoami.token });
+      const metal = mustMetalClient(config);
       await metal.hetznerProjects.delete(projectId);
       log(chalk.green(`Project ${projectId} deleted successfully`));
     });

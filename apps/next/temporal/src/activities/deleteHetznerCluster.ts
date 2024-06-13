@@ -1,11 +1,12 @@
 import { db } from "@db/index";
 import { HetznerCluster, Team, hetznerClusters, teams } from "@db/schema";
 import { serviceName } from "@lib/constants";
+import { tracedExec } from "@lib/tracedExec";
 import { trace } from "@opentelemetry/api";
 import { eq } from "drizzle-orm";
 import fs from "fs";
 import tmp from "tmp";
-import { mgmtClusterKubeconfigFile, tracedExec } from "./shared";
+import { mgmtClusterKubeconfigFile } from "./shared";
 
 export async function deleteHetznerCluster({
   clusterId,

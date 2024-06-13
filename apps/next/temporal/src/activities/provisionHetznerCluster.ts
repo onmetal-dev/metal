@@ -10,6 +10,8 @@ import {
   teams,
 } from "@db/schema";
 import { serviceName } from "@lib/constants";
+import { findOrCreateNamespace } from "@lib/k8s";
+import { tracedExec } from "@lib/tracedExec";
 import { trace } from "@opentelemetry/api";
 import { eq } from "drizzle-orm";
 import fs from "fs";
@@ -17,12 +19,10 @@ import path from "path";
 import tmp from "tmp";
 import * as ub62 from "uuid-base62";
 import {
-  findOrCreateNamespace,
   findOrCreateSecret,
   generateAwsAccessKeyId,
   generateAwsSecretAccessKey,
   mgmtClusterKubeconfigFile,
-  tracedExec,
 } from "./shared";
 
 export async function provisionHetznerCluster({

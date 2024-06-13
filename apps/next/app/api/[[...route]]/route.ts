@@ -3,10 +3,13 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { handle } from "hono/vercel";
 import applicationsRoutes from "./applications";
+import environmentsRoutes from "./environments";
 import hetznerClustersRoutes from "./hetzner/clusters";
 import hetznerProjectsRoutes from "./hetzner/projects";
+import { idSchema } from "./shared";
 import teamRoutes from "./teams";
 import { otelTracer } from "./tracing";
+import upRoutes from "./up";
 import whoami from "./whoami";
 export const runtime = "nodejs";
 
@@ -41,6 +44,8 @@ hetznerProjectsRoutes(app);
 hetznerClustersRoutes(app);
 applicationsRoutes(app);
 teamRoutes(app);
+environmentsRoutes(app);
+upRoutes(app);
 
 const securitySchemeKey = "bearerAuth";
 app.openAPIRegistry.registerComponent("securitySchemes", securitySchemeKey, {
@@ -49,6 +54,7 @@ app.openAPIRegistry.registerComponent("securitySchemes", securitySchemeKey, {
   bearerFormat: "JWT",
   description: "Bearer token",
 });
+app.openAPIRegistry.register("IDSchema", idSchema);
 
 // The OpenAPI documentation will be available at /doc
 app.doc("/doc", {

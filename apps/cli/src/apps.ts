@@ -1,33 +1,55 @@
-import { Command } from "commander";
-
-import Metal from "@onmetal/node";
 import type { Application } from "@onmetal/node/resources/applications.mjs";
 import type { Team } from "@onmetal/node/resources/teams.mjs";
 import chalk from "chalk";
-import inquirer from "inquirer";
+import { Command } from "commander";
+import { table } from "table";
 import uuidBase62 from "uuid-base62";
-import { type Config } from "./types";
+import { promptForApp, promptForTeam } from "./prompts";
+import {
+  log,
+  logOutput,
+  mustMetalClient,
+  outputOption,
+  type Config,
+} from "./shared";
 
-const log = console.log;
-
-export default function apps(
-  program: Command,
-  config: Config,
-  baseURL: string
-) {
+export default function apps(program: Command, config: Config) {
   program.description("Manage applications");
 
   program
     .command("list")
     .description("List applications")
-    .action(async () => {
-      if (!config.whoami) {
-        log(`Not logged in. Login with ${chalk.red("metal login")}`);
-        return;
-      }
-      const metal = new Metal({ baseURL, metalAPIKey: config.whoami.token });
+    .addOption(outputOption())
+    .action(async (options) => {
+      const metal = mustMetalClient(config);
       const applications = await metal.applications.list();
-      log(JSON.stringify(applications, null, 2));
+      // populate the team object for each application, minimizing the number of requests
+      const teamCache = new Map<string, Team>();
+      type ApplicationWithTeam = Application & { team: Team };
+      const applicationsWithTeam: ApplicationWithTeam[] = await Promise.all(
+        applications.map(async (app): Promise<ApplicationWithTeam> => {
+          if (!teamCache.has(app.teamId)) {
+            const team = await metal.teams.retrieve(app.teamId);
+            if (!team) {
+              throw new Error(`Team ${app.teamId} not found`);
+            }
+            teamCache.set(app.teamId, team!);
+          }
+          return { ...app, team: teamCache.get(app.teamId)! };
+        })
+      );
+      logOutput({
+        data: applicationsWithTeam,
+        format: options.output,
+        humanReadableString: table([
+          ["ID", "Name", "Team"],
+          ...applicationsWithTeam.map((app) => [
+            app.id,
+            app.name,
+            app.team.name,
+          ]),
+        ]),
+      });
     });
 
   program
@@ -39,15 +61,11 @@ export default function apps(
       "Team ID (optional). Will prompt if not specified."
     )
     .action(async (name, options) => {
-      if (!config.whoami) {
-        log(`Not logged in. Login with ${chalk.red("metal login")}`);
+      const metal = mustMetalClient(config);
+      if (!config.whoami?.user.id) {
+        log(`Unknown login state, please logout and login again`);
         return;
       }
-      const metal = new Metal({
-        baseURL,
-        metalAPIKey: config.whoami.token,
-      });
-
       const team =
         (options.teamId && (await metal.teams.retrieve(options.teamId))) ||
         (await promptForTeam(metal));
@@ -77,17 +95,20 @@ export default function apps(
       "Application to link to (optional). Will prompt if not specified."
     )
     .action(async (directory, options) => {
-      if (!config.whoami) {
-        log(`Not logged in. Login with ${chalk.red("metal login")}`);
+      const metal = mustMetalClient(config);
+      if (!config.whoami?.user.id) {
+        log(`Unknown login state, please logout and login again`);
         return;
       }
-      const metal = new Metal({ baseURL, metalAPIKey: config.whoami.token });
       const team =
         (options.teamId && (await metal.teams.retrieve(options.teamId))) ||
         (await promptForTeam(metal));
       const app =
         (options.appId && (await metal.applications.retrieve(options.appId))) ||
-        (await promptForApp(metal, team));
+        (await promptForApp(metal, {
+          teamId: team.id,
+          userId: config.whoami.user.id,
+        }));
       directory = directory || process.cwd();
       config.appLinks = config.appLinks || {};
       config.appLinks[directory] = {
@@ -125,55 +146,4 @@ export default function apps(
       );
       delete config.appLinks[directory];
     });
-}
-
-async function promptForTeam(metal: Metal): Promise<Team> {
-  const teams = await metal.teams.list();
-  if (teams.length === 0) {
-    log(chalk.red("You are not a member of any teams!"));
-    process.exit(1);
-  }
-  const answers = await inquirer.prompt({
-    type: "list",
-    name: "team",
-    message: "Please select a team",
-    choices: teams.map((team) => team.name),
-  });
-  if (!answers || !answers.team) {
-    log("Exiting");
-    process.exit(1);
-  }
-  const team = teams.find((team) => team.name === answers.team);
-  if (!team) {
-    log("Exiting");
-    process.exit(1);
-  }
-  return team;
-}
-
-async function promptForApp(metal: Metal, team: Team): Promise<Application> {
-  const apps = (await metal.applications.list()).filter(
-    (app) => app.teamId === team.id
-  );
-  if (apps.length === 0) {
-    log(chalk.red(`No apps found for team '${team.name}'`));
-    log(chalk.red("Create an app with `metal apps create`"));
-    process.exit(1);
-  }
-  const answers = await inquirer.prompt({
-    type: "list",
-    name: "app",
-    message: "Please select an app",
-    choices: apps.map((app) => app.name),
-  });
-  if (!answers || !answers.app) {
-    log("Exiting");
-    process.exit(1);
-  }
-  const app = apps.find((app) => app.name === answers.app);
-  if (!app) {
-    log("Exiting");
-    process.exit(1);
-  }
-  return app;
 }
