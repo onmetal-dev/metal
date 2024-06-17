@@ -1,12 +1,6 @@
 import { db } from "@/app/server/db";
 import { Team, selectTeamSchema, teams } from "@/app/server/db/schema";
-import {
-  authenticateUser,
-  idSchema,
-  responseSpecs,
-  unauthorizedResponse,
-  userTeams,
-} from "@api/shared";
+import { getUser, idSchema, responseSpecs, userTeams } from "@api/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import { and, eq, inArray } from "drizzle-orm";
 import { type Context } from "hono";
@@ -41,11 +35,7 @@ export default function teamRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
-
+      const user = getUser(c);
       const uTeams = await userTeams(user.id);
       const { teamId } = (c.req.valid as (type: string) => ParamsTeamId)(
         "param"
@@ -85,10 +75,7 @@ export default function teamRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
+      const user = getUser(c);
       const teams = await userTeams(user.id);
       return c.json(teams);
     }

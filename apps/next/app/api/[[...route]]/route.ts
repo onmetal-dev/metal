@@ -1,4 +1,5 @@
 import { serviceName } from "@/lib/constants";
+import { clerkMiddleware } from "@hono/clerk-auth";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { handle } from "hono/vercel";
@@ -6,7 +7,7 @@ import applicationsRoutes from "./applications";
 import environmentsRoutes from "./environments";
 import hetznerClustersRoutes from "./hetzner/clusters";
 import hetznerProjectsRoutes from "./hetzner/projects";
-import { idSchema } from "./shared";
+import { idSchema, userMiddleware } from "./shared";
 import teamRoutes from "./teams";
 import { otelTracer } from "./tracing";
 import upRoutes from "./up";
@@ -17,6 +18,9 @@ export const runtime = "nodejs";
 // much, much more straightforward for getting a basic openapi setup going
 const app = new OpenAPIHono().basePath("/api");
 app.use("*", otelTracer(serviceName));
+
+app.use("*", clerkMiddleware());
+app.use("*", userMiddleware);
 
 // implement onError so that we pass back meaningful 500 responses
 function getErrorMessage(error: unknown): string {

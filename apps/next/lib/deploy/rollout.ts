@@ -14,11 +14,11 @@ import * as k8sGateway from "./gen/gateway.networking.k8s.io";
 
 type schemas = components["schemas"];
 export type Rollout = schemas["Rollout"];
-type RolloutSpecTemplate = schemas["Rollout"]["spec"]["template"];
 
 export interface ArgoDeploymentOptions {
   app: Application;
   appConfig: ApplicationConfig;
+  labels: Record<string, string>;
   buildArtifacts: BuildArtifact[];
   clusterName: string;
 }
@@ -27,9 +27,15 @@ export class ArgoRollout extends Chart {
   constructor(
     scope: Construct,
     id: string,
-    { app, appConfig, buildArtifacts, clusterName }: ArgoDeploymentOptions
+    {
+      app,
+      appConfig,
+      buildArtifacts,
+      clusterName,
+      labels,
+    }: ArgoDeploymentOptions
   ) {
-    const labels = { app: app.name };
+    labels = { ...labels, app: app.name };
     const namespace = app.name;
     super(scope, id, { labels, namespace });
 

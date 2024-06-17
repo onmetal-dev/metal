@@ -409,7 +409,15 @@ export type Source = z.infer<typeof sourceSchema>;
 
 const phaseSchema = z.object({
   cmd: z.string().optional(),
+  nixPkgs: z.array(z.string()).optional(),
+  nixLibs: z.array(z.string()).optional(),
+  nixOverlays: z.array(z.string()).optional(),
+  nixpkgsArchive: z.string().optional(),
+  aptPkgs: z.array(z.string()).optional(),
   dependsOn: z.array(z.string()).optional(),
+  cacheDirectories: z.array(z.string()).optional(),
+  onlyIncludeFiles: z.array(z.string()).optional(),
+  paths: z.array(z.string()).optional(),
 });
 
 // builderSchema describes what builder to use (in an application config) or what builder was used (in a build)
@@ -417,40 +425,10 @@ const builderSchema = z.object({
   type: z.enum(["nixpacks"]), // todo: "dockerfile", "pack", "image"
   nixpacks: z
     .object({
-      // a subset of what's supported here: https://nixpacks.com/docs/guides/configuring-builds
+      // see: https://nixpacks.com/docs/guides/configuring-builds
       providers: z.array(z.string()).optional(),
       buildImage: z.string().optional(),
-      phases: z
-        .object({
-          setup: z.object({
-            nixPkgs: z.array(z.string()).optional(),
-            nixLibs: z.array(z.string()).optional(),
-            aptPkgs: z.array(z.string()).optional(),
-          }),
-          build: z.object({
-            cmd: z.string().optional(),
-            dependsOn: z.array(z.string()).optional(),
-          }),
-          start: z.object({
-            cmd: z.string().optional(),
-          }),
-        })
-        .passthrough()
-        .refine(
-          (data) => {
-            // Ensure all additional user-defined phases follow the phase schema
-            return Object.entries(data).every(([key, value]) => {
-              if (["setup", "build", "start"].includes(key)) {
-                return true;
-              }
-              return phaseSchema.safeParse(value).success;
-            });
-          },
-          {
-            message: "All user-defined phases must follow the standard schema",
-          }
-        )
-        .optional(),
+      phases: z.record(z.string(), phaseSchema).optional(),
     })
     .optional(),
 });

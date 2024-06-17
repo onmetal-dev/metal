@@ -10,18 +10,18 @@ import { queueNameForEnv } from "@/lib/constants";
 import { createTemporalClient } from "@/lib/temporal-client";
 import { CreateHetznerProject } from "@/temporal/src/workflows";
 import { DeleteHetznerProject } from "@/temporal/src/workflows/deleteHetznerProject";
+import {
+  getUser,
+  idSchema,
+  responseSpecs,
+  unauthorizedResponse,
+  userTeams,
+} from "@api/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import { ApplicationFailure, WorkflowFailedError } from "@temporalio/client";
 import { and, eq, inArray } from "drizzle-orm";
 import { type Context } from "hono";
 import { z } from "zod";
-import {
-  authenticateUser,
-  idSchema,
-  responseSpecs,
-  unauthorizedResponse,
-  userTeams,
-} from "../../shared";
 
 const paramsProjectIdSchema = z.object({
   projectId: idSchema.openapi({
@@ -57,7 +57,7 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
     }),
     // @ts-ignore since hono can't figure this out
     async (c: Context) => {
-      const user = await authenticateUser(c);
+      const user = getUser(c);
       if (!user) {
         return c.json(unauthorizedResponse, 401);
       }
@@ -104,10 +104,7 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
     }),
     // @ts-ignore since hono can't figure this out
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
+      const user = getUser(c);
       const teams = await userTeams(user.id);
       return c.json(
         await db.query.hetznerProjects.findMany({
@@ -147,10 +144,7 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
     }),
     // @ts-ignore since hono can't figure this out
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
+      const user = getUser(c);
       const spec: HetznerProjectSpec = (
         c.req.valid as (type: string) => HetznerProjectSpec
       )("json");
@@ -239,11 +233,7 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
     }),
     // @ts-ignore since hono can't figure this out
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
-
+      const user = getUser(c);
       const { projectId } = (c.req.valid as (type: string) => ParamsProjectId)(
         "param"
       );

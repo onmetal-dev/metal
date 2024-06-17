@@ -26,14 +26,9 @@ import {
   deployments,
 } from "@/app/server/db/schema";
 import * as deploy from "@/lib/deploy";
+import { parseSsOutput } from "@/lib/ss";
 import { tracedExec } from "@/lib/tracedExec";
-import {
-  authenticateUser,
-  idSchema,
-  responseSpecs,
-  unauthorizedResponse,
-  userTeams,
-} from "@api/shared";
+import { getUser, idSchema, responseSpecs, userTeams } from "@api/shared";
 import { createRoute, z, type OpenAPIHono } from "@hono/zod-openapi";
 import { App } from "cdk8s";
 import chalk from "chalk";
@@ -101,10 +96,7 @@ export default function upRoutes(app: OpenAPIHono) {
     }),
     // @ts-ignore
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
+      const user = getUser(c);
       const body = (await c.req.parseBody()) as BodyUp;
       const archive = body.archive;
       const teamId = body.teamId;
@@ -197,6 +189,7 @@ export default function upRoutes(app: OpenAPIHono) {
 
         stream.writeln(chalk.green("Generating Dockerfile with nixpacks..."));
         await nixpacksBuild({
+          appConfig,
           appPath: tmpDirForExtraction.name,
           imageName: app.name,
           destination: tmpDirForExtraction.name,
@@ -259,13 +252,18 @@ export default function upRoutes(app: OpenAPIHono) {
           type: "deploy",
           rolloutStatus: "deploying",
         };
-        // @ts-ignore
-        const deployment: Deployment = await db
+        await db
           .insert(deployments)
           // @ts-ignore
-          .values(deploymentInsert)
-          .returning();
-
+          .values(deploymentInsert);
+        // for whatever reason the .returning() version of insert returns a deployment object with an undefined deployment.id, so run a query
+        const deployment: Deployment | undefined =
+          await db.query.deployments.findFirst({
+            where: (d, { eq }) => eq(d.id, deploymentId),
+          });
+        if (!deployment) {
+          throw new Error("Deployment not found");
+        }
         await performDeployment({
           app,
           appConfig,
@@ -304,6 +302,10 @@ async function performDeployment({
   clusters,
   stream,
 }: PerformDeploymentOptions) {
+  if (clusters.length === 0) {
+    throw new Error("performDeployment must have a list of clusters");
+  }
+
   // all external ports must have a corresponding referent in appConfig.ports
   for (const ep of appConfig.external) {
     if (!appConfig.ports.find((p: Port) => p.name === ep.portName)) {
@@ -359,6 +361,7 @@ async function performDeployment({
     const argoDeployment = new deploy.ArgoRollout(cdkApp, app.name, {
       app,
       appConfig,
+      labels: { app: app.name, deploymentId: deployment.id },
       buildArtifacts: build.artifacts,
       clusterName: cluster.name,
     });
@@ -372,14 +375,103 @@ async function performDeployment({
 
     stream.writeln(
       chalk.green(
-        `deployment in progress! App running at https://${app.name}.${cluster.name}.up.onmetal.dev`
+        `deployment in progress! Once app is up, visit https://${app.name}.${cluster.name}.up.onmetal.dev`
       )
     );
 
     db.update(deployments)
       .set({ rolloutStatus: "deploying" })
       .where(eq(deployments.id, deployment.id));
-    rimraf.sync(tmpDirForRollout.name);
+    //rimraf.sync(tmpDirForRollout.name);
+  }
+
+  // in the first cluster, perform a port check
+  try {
+    await portCheck({
+      cluster: clusters[0]!,
+      namespace: app.name,
+      deployment,
+      appConfig,
+    });
+  } catch (e) {
+    if (e instanceof PortCheckError) {
+      stream.writeln(chalk.red(`Port check failed: ${e.message}`));
+      stream.writeln(
+        chalk.red(`Expected ports: ${e.details.expectedPorts.join(", ")}`)
+      );
+      stream.writeln(
+        chalk.red(`Detected ports: ${e.details.detectedPorts.join(", ")}`)
+      );
+      stream.writeln(
+        "Possible reason: if the app does not have a config file, then we assume that the app respects a PORT environment variable that we inject, which is by default port 80"
+      );
+    } else {
+      throw e; // rethrow if it's not a PortCheckError
+    }
+  }
+}
+
+interface PortCheckOptions {
+  cluster: HetznerCluster;
+  deployment: Deployment;
+  namespace: string;
+  appConfig: ApplicationConfig;
+}
+
+class PortCheckError extends Error {
+  constructor(
+    message: string,
+    public details: { expectedPorts: number[]; detectedPorts: number[] }
+  ) {
+    super(message);
+    this.name = "PortCheckError";
+  }
+}
+
+// portCheck makes sure that the app is up and listening on the correct ports
+async function portCheck({
+  cluster,
+  deployment,
+  namespace,
+  appConfig,
+}: PortCheckOptions): Promise<void> {
+  if (!cluster.kubeconfig) {
+    throw new Error(`Cluster ${cluster.name} has no kubeconfig`);
+  }
+  const tmpFileForPortCheck = tmp.fileSync();
+  writeFileSync(`${tmpFileForPortCheck.name}`, cluster.kubeconfig!, "utf8");
+  let { stdout: podName } = await tracedExec({
+    spanName: "get-pod-name",
+    command: `kubectl --kubeconfig ${tmpFileForPortCheck.name} get pods -n ${namespace} -l deploymentId=${deployment.id} -o name | head -n1 | sed 's/pod\\///'`,
+  });
+  podName = podName.trim();
+  if (podName === "") {
+    throw new Error(
+      `No pod found in namespace ${namespace} with label deploymentId=${deployment.id}`
+    );
+  }
+  await tracedExec({
+    spanName: "wait-for-pod-to-be-running",
+    command: `kubectl --kubeconfig ${tmpFileForPortCheck.name} wait --for=condition=ready pod -n ${namespace} ${podName}`,
+  });
+  const { stdout: ssOutput } = await tracedExec({
+    spanName: "get-ss-output",
+    command: `kubectl --kubeconfig ${tmpFileForPortCheck.name} exec -n ${namespace} ${podName} -- ss -tulpn`,
+  });
+  tmpFileForPortCheck.removeCallback();
+  const expectedPorts: number[] = appConfig.ports.map((p) => p.port);
+  const detectedPorts: number[] = parseSsOutput(ssOutput).map(
+    (c) => c.localPort
+  );
+  const detectedPortsSet: Set<number> = new Set(detectedPorts);
+  const missingPortsSet: Set<number> = new Set(
+    expectedPorts.filter((port) => !detectedPortsSet.has(port))
+  );
+  if (missingPortsSet.size > 0) {
+    throw new PortCheckError("Expected ports do not match detected ports", {
+      expectedPorts,
+      detectedPorts,
+    });
   }
 }
 
@@ -437,6 +529,20 @@ async function findCreateApplicationConfig({
     } as Source,
     builder: {
       type: "nixpacks" /* nixpacks: {} <- todo: if user specifies these in custom config */,
+      nixpacks: {
+        phases: {
+          setup: {
+            nixPkgs: ["...", "iproute2"],
+            nixLibs: ["..."],
+            nixOverlays: ["..."],
+            aptPkgs: ["..."],
+            dependsOn: ["..."],
+            cacheDirectories: ["..."],
+            onlyIncludeFiles: ["..."],
+            paths: ["..."],
+          },
+        },
+      },
     } as Builder,
     ports: [{ name: "http", proto: "http", port: 80 }] as Ports,
     external: [
@@ -607,21 +713,31 @@ async function relayData(stream: StreamingApi, data: Buffer) {
 }
 
 interface NixpacksBuildOptions {
+  appConfig: ApplicationConfig;
   appPath: string;
   imageName: string;
   destination: string;
   stream: StreamingApi;
 }
 async function nixpacksBuild({
+  appConfig,
   appPath,
   imageName,
   destination,
   stream,
 }: NixpacksBuildOptions) {
+  const nixpacksConfig = tmp.fileSync({ postfix: ".json" });
+  writeFileSync(
+    nixpacksConfig.name,
+    JSON.stringify(appConfig.builder.nixpacks, null, 2),
+    "utf8"
+  );
   return new Promise<void>((resolve, reject) => {
     const proc = spawn("nixpacks", [
       "build",
       appPath,
+      "--config",
+      nixpacksConfig.name,
       "--name",
       imageName,
       "--out",

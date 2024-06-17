@@ -7,13 +7,7 @@ import {
   applications,
   selectApplicationSchema,
 } from "@/app/server/db/schema";
-import {
-  authenticateUser,
-  idSchema,
-  responseSpecs,
-  unauthorizedResponse,
-  userTeams,
-} from "@api/shared";
+import { getUser, idSchema, responseSpecs, userTeams } from "@api/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import { and, eq, inArray } from "drizzle-orm";
 import { type Context } from "hono";
@@ -51,11 +45,7 @@ export default function applicationsRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
-
+      const user = getUser(c);
       const teams = await userTeams(user.id);
       const { applicationId } = (
         c.req.valid as (type: string) => ParamsApplicationId
@@ -101,10 +91,7 @@ export default function applicationsRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
+      const user = getUser(c);
       const teams = await userTeams(user.id);
       return c.json(
         await db.query.applications.findMany({
@@ -143,10 +130,7 @@ export default function applicationsRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
+      const user = getUser(c);
       const spec: ApplicationSpec = (
         c.req.valid as (type: string) => ApplicationSpec
       )("json");
@@ -226,11 +210,7 @@ export default function applicationsRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
-
+      const user = getUser(c);
       const { applicationId } = (
         c.req.valid as (type: string) => ParamsApplicationId
       )("param");

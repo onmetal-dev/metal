@@ -7,13 +7,7 @@ import {
   environments,
   selectEnvironmentSchema,
 } from "@/app/server/db/schema";
-import {
-  authenticateUser,
-  idSchema,
-  responseSpecs,
-  unauthorizedResponse,
-  userTeams,
-} from "@api/shared";
+import { getUser, idSchema, responseSpecs, userTeams } from "@api/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import { and, eq, inArray } from "drizzle-orm";
 import { type Context } from "hono";
@@ -62,11 +56,7 @@ export default function environmentRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
-
+      const user = await getUser(c);
       const uTeams = await userTeams(user.id);
       const { environmentId } = (
         c.req.valid as (type: string) => ParamsEnvironmentId
@@ -112,10 +102,7 @@ export default function environmentRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
+      const user = getUser(c);
       const uTeams = await userTeams(user.id);
       let where = [
         inArray(
@@ -162,10 +149,7 @@ export default function environmentRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
+      const user = getUser(c);
       const spec: EnvironmentSpec = (
         c.req.valid as (type: string) => EnvironmentSpec
       )("json");
