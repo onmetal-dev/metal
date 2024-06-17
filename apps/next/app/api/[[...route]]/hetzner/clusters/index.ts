@@ -22,6 +22,7 @@ import {
   DeleteHetznerCluster,
   ProvisionHetznerCluster,
 } from "@/temporal/src/workflows";
+import { getUser, idSchema, responseSpecs, userTeams } from "@api/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import {
   adjectives,
@@ -34,13 +35,6 @@ import { and, eq, inArray } from "drizzle-orm";
 import { type Context } from "hono";
 import uuidBase62 from "uuid-base62";
 import { z } from "zod";
-import {
-  authenticateUser,
-  idSchema,
-  responseSpecs,
-  unauthorizedResponse,
-  userTeams,
-} from "../../shared";
 
 const paramsClusterIdSchema = z.object({
   clusterId: idSchema.openapi({
@@ -75,11 +69,7 @@ export default function hetznerClustersRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
-
+      const user = getUser(c);
       const teams = await userTeams(user.id);
       const { clusterId } = (c.req.valid as (type: string) => ParamsClusterId)(
         "param"
@@ -126,10 +116,7 @@ export default function hetznerClustersRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
+      const user = getUser(c);
       const teams = await userTeams(user.id);
       return c.json(
         await db.query.hetznerClusters.findMany({
@@ -171,10 +158,7 @@ export default function hetznerClustersRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
+      const user = getUser(c);
       const spec: HetznerClusterSpec = (
         c.req.valid as (type: string) => HetznerClusterSpec
       )("json");
@@ -301,11 +285,7 @@ export default function hetznerClustersRoutes(app: OpenAPIHono) {
       },
     }),
     async (c: Context) => {
-      const user = await authenticateUser(c);
-      if (!user) {
-        return c.json(unauthorizedResponse, 401);
-      }
-
+      const user = getUser(c);
       const { clusterId } = (c.req.valid as (type: string) => ParamsClusterId)(
         "param"
       );

@@ -1,23 +1,47 @@
 import { db } from "@/app/server/db";
 import { Team, User, teams, users, usersToTeams } from "@/app/server/db/schema";
-import { decodeJwt } from "@clerk/backend/jwt";
-import { clerkClient } from "@clerk/clerk-sdk-node";
+import { ClerkClient } from "@clerk/clerk-sdk-node";
 import { eq } from "drizzle-orm";
-import { Context } from "hono";
+import { Context, MiddlewareHandler, Next } from "hono";
+import { HTTPException } from "hono/http-exception";
 import z from "zod";
 
-export async function authenticateUser(c: Context): Promise<User | undefined> {
-  const authStatus = await clerkClient.authenticateRequest(c.req.raw);
-  if (!authStatus.isSignedIn) {
-    return undefined;
-  }
-  const { payload: token } = decodeJwt(authStatus.token);
-  const clerkUserId = token.sub;
-  const user: User | undefined = await db.query.users.findFirst({
-    where: eq(users.clerkId, clerkUserId),
-  });
-  return user;
+export function getUser(c: Context): User {
+  return c.get("metalUser");
 }
+
+type ClerkAuth = ReturnType<
+  Awaited<ReturnType<ClerkClient["authenticateRequest"]>>["toAuth"]
+>;
+
+export const unauthorizedResponse = {
+  error: { name: "unauthorized", message: "unauthorized" },
+};
+
+const unauthorizedRes = new Response(JSON.stringify(unauthorizedResponse), {
+  status: 401,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+export const userMiddleware: MiddlewareHandler = async (
+  c: Context,
+  next: Next
+) => {
+  const clerkAuth = c.get("clerkAuth") as ClerkAuth;
+  if (!clerkAuth?.userId) {
+    throw new HTTPException(401, { res: unauthorizedRes });
+  }
+  const user: User | undefined = await db.query.users.findFirst({
+    where: eq(users.clerkId, clerkAuth.userId),
+  });
+  if (!user) {
+    throw new HTTPException(401, { res: unauthorizedRes });
+  }
+  c.set("metalUser", user);
+  await next();
+};
 
 export async function userTeams(userId: string): Promise<Team[]> {
   return await db
@@ -50,10 +74,6 @@ export const errorResponseSchema = z.object({
     issues: z.array(z.record(z.string(), z.any())),
   }),
 });
-
-export const unauthorizedResponse = {
-  error: { name: "unauthorized", message: "unauthorized" },
-};
 
 export const responseSpecs = {
   400: {

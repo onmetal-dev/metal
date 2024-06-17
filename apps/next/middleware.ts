@@ -1,19 +1,12 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// For more info, see:
-// https://clerk.com/docs/upgrade-guides/core-2/nextjs#migrating-to-clerk-middleware
-const isPublicRoute = createRouteMatcher([
-  // Allow signed out users to access these routes:
-  "/",
-  "/register",
-  "/login(.*)",
-  "/login-to-cli",
-  "/api/doc",
-  "/__nextjs_original-stack-frame",
-]);
+const isDashboardRoute = createRouteMatcher(["/dashboard(.*)"]);
 
+// See https://clerk.com/docs/references/nextjs/clerk-middleware
+// note: we do not protect API routes since we do that in the API logic itself
+// protecting it via Clerk would result in redirects to the login page on 401 responses
 export default clerkMiddleware((auth, request) => {
-  if (!isPublicRoute(request)) {
+  if (isDashboardRoute(request)) {
     auth().protect();
   }
 });
@@ -22,7 +15,8 @@ export const config = {
   matcher: [
     // Exclude files with a "." followed by an extension, which are typically static files.
     // Exclude files in the _next directory, which are Next.js internals.
-    "/((?!.+\\.[\\w]+$|_next).*)",
+    "/((?!.*\\..*|_next).*)",
+    "/",
     // Re-include any files in the api or trpc folders that might have an extension
     "/(api|trpc)(.*)",
   ],
