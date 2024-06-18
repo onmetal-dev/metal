@@ -32,7 +32,9 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Create Release file
-        run: echo ${{ github.sha }} > Release.txt
+        run: |
+          echo "v${{ github.ref_name }}" > Release.txt
+          echo ${{ github.sha }} >> Release.txt
 
       - name: Test Release file
         run: cat Release.txt
@@ -48,11 +50,16 @@ jobs:
           ls -l
           pwd
 
-      - name: Package the executables
+      - name: Compress the executables
         run: |
           tar -czvf onmetal-linux-x64.tar.gz onmetal-linux-x64
           tar -czvf onmetal-linux-arm64.tar.gz onmetal-linux-arm64
           tar -czvf onmetal-macos-x64.tar.gz onmetal-macos-x64
+
+      - name: Save binaries' hashes
+        run: |
+          echo "Hashes of binaries:" >> Release.txt
+          sha256sum onmetal-*.tar.gz >> Release.txt
 
       - name: Release
         uses: softprops/action-gh-release@v2
