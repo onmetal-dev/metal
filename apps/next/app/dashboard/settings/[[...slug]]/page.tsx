@@ -12,8 +12,8 @@ const OrganizationProfilePage = () => (
       // The styles are used to make the settings box full-page-width. Comment them out and
       // see how the settings box only fills about 70% of the screen.
       elements: {
-        rootBox: "w-full border border-slate-300 dark:border-slate-700",
-        cardBox: "w-full grid-cols-8",
+        rootBox: "w-full",
+        cardBox: "w-full grid-cols-8 rounded-sm shadow-none",
         navbar: "col-span-1",
         scrollBox: "col-span-7",
         headerTitle: "hidden",

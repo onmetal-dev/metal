@@ -49,13 +49,13 @@ export default function RootLayout({
       <html
         lang="en"
         className={clsx(
-          "h-screen scroll-smooth bg-background antialiased",
+          "scroll-smooth antialiased",
           inter.variable,
           lexend.variable
         )}
         suppressHydrationWarning
       >
-        <body className="h-full flex flex-col">
+        <body className="min-h-screen">
           <CommandItemsProvider>
             <CommandMenu />
             <ThemeProvider
