@@ -17,7 +17,7 @@ import { forwardRef, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useCommandItems } from "@/components/CommandMenu";
 import { useRouter } from "next/navigation";
-import { deleteHetznerCluster } from "./actions";
+import { deleteHetznerCluster, fetchProjectAndClusters } from "./actions";
 import { useFormState, useFormStatus } from "react-dom";
 import { serverActionInitialState } from "@lib/action";
 import { useToast } from "@/components/ui/use-toast";
@@ -36,7 +36,20 @@ interface ClustersProps {
   clusters: HetznerCluster[];
 }
 
-export function Clusters({ clusters }: ClustersProps) {
+export function Clusters({ clusters: initialClusters }: ClustersProps) {
+  const [clusters, setClusters] = useState<HetznerCluster[]>(initialClusters);
+
+  // poll cluster data every 5s--mainly to get cluster statuses updated
+  useEffect(() => {
+    async function fetchData() {
+      const { clusters } = await fetchProjectAndClusters();
+      setClusters(clusters);
+    }
+    fetchData();
+    const interval = setInterval(fetchData, 5000); // Poll every 5000 milliseconds (5 seconds)
+    return () => clearInterval(interval); // Cleanup interval on component unmount
+  }, []);
+
   const [focusedClusterIdx, setFocusedClusterIdx] = useState<number>(0);
   const [focusMode, setFocusMode] = useState<"mouse" | "keyboard">("mouse");
   const tableBodyRef = useRef<HTMLDivElement>(null);
