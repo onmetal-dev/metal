@@ -1,10 +1,9 @@
 name: Build and Release
 
 on:
-  push
-  # push:
-  #   tags:
-  #     - 'v*'
+  push:
+    tags:
+      - "v*"
   # push:
   #   branches:
   #     - main  # Change this to the branch you want to trigger the action
@@ -66,3 +65,23 @@ jobs:
             ./apps/cli/metal-*.tar.gz
             ./apps/cli/Release.txt
             LICENSE
+
+      - name: Create PR in Homebrew Tap
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          git config user.name release-gha
+          git config user.email release-gha@onmetal.dev
+
+          cd ./apps/cli
+
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
+          git add Formula/*.rb Casks/*.rb
+
+          git commit -m "Bump ${{ github.event.client_payload.name }} to ${{ github.event.client_payload.version }}"
+
+          # Ensure we have any changes that might have been merged before we push. This narrows the window in which a 
+          # race from multiple changes happening at once can occur. Conflicts/Races could still occur though unlikley.
+          git pull --rebase
+
+          git push
