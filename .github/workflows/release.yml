@@ -41,11 +41,11 @@ jobs:
 
       - name: Build executables to release
         run: |
-          bun build --compile --target=bun-darwin-x64 --outfile onmetal-darwin-x64 src/index.ts
-          bun build --compile --target=bun-darwin-arm64 --outfile onmetal-darwin-arm64 src/index.ts
-          bun build --compile --target=bun-linux-arm64 --outfile onmetal-linux-arm64 src/index.ts
-          bun build --compile --target=bun-linux-x64 --outfile onmetal-linux-x64 src/index.ts
-          bun build --compile --target=bun-windows-x64 --outfile onmetal-windows-x64 src/index.ts
+          bun build --compile --target=bun-darwin-x64 --outfile metal-darwin-x64 src/index.ts
+          bun build --compile --target=bun-darwin-arm64 --outfile metal-darwin-arm64 src/index.ts
+          bun build --compile --target=bun-linux-arm64 --outfile metal-linux-arm64 src/index.ts
+          bun build --compile --target=bun-linux-x64 --outfile metal-linux-x64 src/index.ts
+          bun build --compile --target=bun-windows-x64 --outfile metal-windows-x64 src/index.ts
 
       - name: List files and pwd
         run: |
@@ -54,22 +54,22 @@ jobs:
 
       - name: Compress the executables
         run: |
-          tar -czvf onmetal-${{ github.ref_name }}-darwin-arm64.tar.gz onmetal-darwin-arm64
-          tar -czvf onmetal-${{ github.ref_name }}-darwin-x64.tar.gz onmetal-darwin-x64
-          tar -czvf onmetal-${{ github.ref_name }}-linux-arm64.tar.gz onmetal-linux-arm64
-          tar -czvf onmetal-${{ github.ref_name }}-linux-x64.tar.gz onmetal-linux-x64
-          tar -czvf onmetal-${{ github.ref_name }}-windows-x64.tar.gz onmetal-windows-x64
+          tar -czvf metal-${{ github.ref_name }}-darwin-arm64.tar.gz metal-darwin-arm64
+          tar -czvf metal-${{ github.ref_name }}-darwin-x64.tar.gz metal-darwin-x64
+          tar -czvf metal-${{ github.ref_name }}-linux-arm64.tar.gz metal-linux-arm64
+          tar -czvf metal-${{ github.ref_name }}-linux-x64.tar.gz metal-linux-x64
+          tar -czvf metal-${{ github.ref_name }}-windows-x64.tar.gz metal-windows-x64
 
       - name: Save binaries' hashes
         run: |
           echo "Hashes of binaries:" >> Release.txt
-          sha256sum onmetal-*.tar.gz >> Release.txt
+          sha256sum metal-*.tar.gz >> Release.txt
 
       - name: Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            ./apps/cli/onmetal-*.tar.gz
+            ./apps/cli/metal-*.tar.gz
             ./apps/cli/Release.txt
             LICENSE
