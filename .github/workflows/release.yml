@@ -69,9 +69,6 @@ jobs:
   update-homebrew-formulae:
     needs: build-release
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./apps/cli
 
     steps:
       - name: List dir contents
