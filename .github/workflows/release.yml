@@ -36,9 +36,6 @@ jobs:
           echo "Version: ${{ github.ref_name }}" > Release.txt
           echo "Commit: ${{ github.sha }}" >> Release.txt
 
-      - name: Test Release file
-        run: cat Release.txt
-
       - name: Build executables to release
         run: |
           bun build --compile --target=bun-darwin-x64 --outfile metal-${{ github.ref_name }}-darwin-x64 src/index.ts
@@ -47,11 +44,6 @@ jobs:
           bun build --compile --target=bun-linux-x64 --outfile metal-${{ github.ref_name }}-linux-x64 src/index.ts
           # NB: the output file name here ends with ".exe"
           bun build --compile --target=bun-windows-x64 --outfile metal-${{ github.ref_name }}-windows-x64.exe src/index.ts
-
-      - name: List files and pwd
-        run: |
-          ls -l
-          pwd
 
       - name: Compress the executables
         run: |
