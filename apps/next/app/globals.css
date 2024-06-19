@@ -101,6 +101,6 @@
   }
 }
 
-.cl-navbar>div>div:not(.cl-navbarButtons) {
+.cl-navbar > div > div:not(.cl-navbarButtons) {
   display: none;
 }
