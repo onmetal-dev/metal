@@ -41,9 +41,11 @@ jobs:
 
       - name: Build executables to release
         run: |
-          bun build --compile --target=bun-linux-x64 --outfile onmetal-linux-x64 src/index.ts
+          bun build --compile --target=bun-darwin-x64 --outfile onmetal-darwin-x64 src/index.ts
+          bun build --compile --target=bun-darwin-arm64 --outfile onmetal-darwin-arm64 src/index.ts
           bun build --compile --target=bun-linux-arm64 --outfile onmetal-linux-arm64 src/index.ts
-          bun build --compile --target=bun-macos-x64 --outfile onmetal-macos-x64 src/index.ts
+          bun build --compile --target=bun-linux-x64 --outfile onmetal-linux-x64 src/index.ts
+          bun build --compile --target=bun-windows-x64 --outfile onmetal-windows-x64 src/index.ts
 
       - name: List files and pwd
         run: |
@@ -52,9 +54,11 @@ jobs:
 
       - name: Compress the executables
         run: |
-          tar -czvf onmetal-linux-x64.tar.gz onmetal-linux-x64
-          tar -czvf onmetal-linux-arm64.tar.gz onmetal-linux-arm64
-          tar -czvf onmetal-macos-x64.tar.gz onmetal-macos-x64
+          tar -czvf onmetal-${{ github.ref_name }}-darwin-arm64.tar.gz onmetal-darwin-arm64
+          tar -czvf onmetal-${{ github.ref_name }}-darwin-x64.tar.gz onmetal-darwin-x64
+          tar -czvf onmetal-${{ github.ref_name }}-linux-arm64.tar.gz onmetal-linux-arm64
+          tar -czvf onmetal-${{ github.ref_name }}-linux-x64.tar.gz onmetal-linux-x64
+          tar -czvf onmetal-${{ github.ref_name }}-windows-x64.tar.gz onmetal-windows-x64
 
       - name: Save binaries' hashes
         run: |
