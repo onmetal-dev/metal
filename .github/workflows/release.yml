@@ -34,7 +34,7 @@ jobs:
       - name: Create Release file
         run: |
           echo "Version: ${{ github.ref_name }}" > Release.txt
-          echo "Commit: ${{ github.sha }}"" >> Release.txt
+          echo "Commit: ${{ github.sha }}" >> Release.txt
 
       - name: Test Release file
         run: cat Release.txt
