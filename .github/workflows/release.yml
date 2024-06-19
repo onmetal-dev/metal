@@ -45,7 +45,8 @@ jobs:
           bun build --compile --target=bun-darwin-arm64 --outfile metal-${{ github.ref_name }}-darwin-arm64 src/index.ts
           bun build --compile --target=bun-linux-arm64 --outfile metal-${{ github.ref_name }}-linux-arm64 src/index.ts
           bun build --compile --target=bun-linux-x64 --outfile metal-${{ github.ref_name }}-linux-x64 src/index.ts
-          bun build --compile --target=bun-windows-x64 --outfile metal-${{ github.ref_name }}-windows-x64 src/index.ts
+          # NB: the output file name here ends with ".exe"
+          bun build --compile --target=bun-windows-x64 --outfile metal-${{ github.ref_name }}-windows-x64.exe src/index.ts
 
       - name: List files and pwd
         run: |
@@ -58,7 +59,7 @@ jobs:
           tar -czvf metal-${{ github.ref_name }}-darwin-x64.tar.gz metal-${{ github.ref_name }}-darwin-x64
           tar -czvf metal-${{ github.ref_name }}-linux-arm64.tar.gz metal-${{ github.ref_name }}-linux-arm64
           tar -czvf metal-${{ github.ref_name }}-linux-x64.tar.gz metal-${{ github.ref_name }}-linux-x64
-          tar -czvf metal-${{ github.ref_name }}-windows-x64.tar.gz metal-${{ github.ref_name }}-windows-x64
+          tar -czvf metal-${{ github.ref_name }}-windows-x64.tar.gz metal-${{ github.ref_name }}-windows-x64.exe
 
       - name: Save binaries' hashes
         run: |
