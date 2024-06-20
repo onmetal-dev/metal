@@ -85,7 +85,7 @@ jobs:
         run: |
           git pull --tags origin ${{ github.ref_name }}
           # NB: this strips out the leading 'v' in the version
-          echo "PREVIOUS_VERSION=$(git tag -l --sort=-version:refname | sed -n 2p | sed 's/^v//)" >> $GITHUB_OUTPUT
+          echo "PREVIOUS_VERSION=$(git tag -l --sort=-version:refname | sed -n 2p | sed 's/^v//')" >> $GITHUB_OUTPUT
 
   update-homebrew-tap:
     runs-on: ubuntu-latest
