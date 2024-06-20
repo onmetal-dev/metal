@@ -71,16 +71,18 @@ jobs:
           path: homebrew-tap
 
       - name: List dir contents
-        working-directory: $GITHUB_WORKSPACE/homebrew-tap
+        working-directory: homebrew-tap
         run: |
           ls -l
           pwd
 
       - name: Demote the old version
+        working-directory: homebrew-tap
         run: |
           mv cli.rb cli@${{ steps.previous-cli-version.outputs.PREVIOUS_VERSION }}.rb
 
       - name: Generate Homebrew formula for Metal CLI
+        working-directory: homebrew-tap
         id: generate-cli-formula
         run: |
           echo <<- EOF > cli.rb
@@ -143,8 +145,15 @@ jobs:
           cat cli.rb| sed 's/  \{10\}/ /g' > cli.rb
           cat cli.rb
 
+      - name: List dir contents
+        working-directory: homebrew-tap
+        run: |
+          ls -l
+          pwd
+
       # Clone old repo, cd into it, move old cli.rb to cli@$PREVIOUS_VERSION.rb, write new formula to cli.rb, commit the changes and push to main/create a pull request
       - name: Update Homebrew tap
+        working-directory: homebrew-tap
         run: |
           git config user.name release-gha
           git config user.email release-gha@onmetal.dev
