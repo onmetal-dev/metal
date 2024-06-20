@@ -163,10 +163,6 @@ jobs:
             end
           EOF
 
-          cat cli.rb
-          # "10" because this line is indented by 10 spaces
-          cat cli.rb | sed 's/  \{10\}/ /g' > cli.rb
-
       - name: Update Homebrew tap
         run: |
           git config user.name release-gha
