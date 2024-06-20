@@ -14,6 +14,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: main-repo
+          fetch-tags: true
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -67,7 +68,6 @@ jobs:
           repository: onmetal-dev/homebrew-tap
           ref: main
           fetch-depth: 2
-          fetch-tags: true
           path: homebrew-tap
 
       - name: List dir contents
@@ -158,16 +158,9 @@ jobs:
           git config user.name release-gha
           git config user.email release-gha@onmetal.dev
 
-          # cd ~
-          # git clone git@github.com:onmetal-dev/homebrew-tap.git
-          # cd homebrew-tap
-          # git checkout main
-
-          # Store last version in a var
-          # PREVIOUS_VERSION=$(git tag -l --sort=-version:refname | head -n1)
-
           git add cli*.rb
 
+          git remote set-url --push origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/onmetal-dev/homebrew-tap/
           git commit -m "Bump CLI from ${{ steps.previous-cli-version.outputs.PREVIOUS_VERSION }} to ${{ github.ref_name }}"
 
           git pull --rebase
