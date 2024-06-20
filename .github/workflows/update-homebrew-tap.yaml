@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./main-repoapps/cli
+        working-directory: ./main-repo/apps/cli
 
     steps:
       - name: Check out the repository
@@ -71,7 +71,7 @@ jobs:
           path: homebrew-tap
 
       - name: List dir contents
-        working-directory: homebrew-tap
+        working-directory: $GITHUB_WORKSPACE/homebrew-tap
         run: |
           ls -l
           pwd
