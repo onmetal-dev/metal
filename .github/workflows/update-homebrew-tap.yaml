@@ -155,7 +155,7 @@ jobs:
 
           git add cli*.rb
 
-          git commit -m "Bump CLI from ${{ PREVIOUS_VERSION }} to ${{ github.ref_name }}"
+          git commit -m "Bump CLI from ${{ steps.previous-cli-version.outputs.PREVIOUS_VERSION }} to ${{ github.ref_name }}"
 
           git pull --rebase
 
