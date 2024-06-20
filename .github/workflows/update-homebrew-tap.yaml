@@ -60,9 +60,8 @@ jobs:
       - name: Get previous CLI version
         id: previous-cli-version
         run: |
-          git pull
+          git pull ${{ github.ref_name }}
           echo "PREVIOUS_VERSION=$(git tag -l --sort=-version:refname | head -n 1)" >> $GITHUB_OUTPUT
-          git checkout -
 
       - name: Check out the repository
         uses: actions/checkout@v4
