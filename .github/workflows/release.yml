@@ -84,7 +84,8 @@ jobs:
         id: previous-cli-version
         run: |
           git pull --tags origin ${{ github.ref_name }}
-          echo "PREVIOUS_VERSION=$(git tag -l --sort=-version:refname | sed -n 2p)" >> $GITHUB_OUTPUT
+          # NB: this strips out the leading 'v' in the version
+          echo "PREVIOUS_VERSION=$(git tag -l --sort=-version:refname | sed -n 2p | sed 's/^v//)" >> $GITHUB_OUTPUT
 
   update-homebrew-tap:
     runs-on: ubuntu-latest
@@ -173,7 +174,7 @@ jobs:
 
           git add cli*.rb
 
-          git commit -m "Bump CLI from ${{ needs.build-release.outputs.PREVIOUS_VERSION }} to ${{ github.ref_name }}"
+          git commit -m "Bump CLI from v${{ needs.build-release.outputs.PREVIOUS_VERSION }} to ${{ github.ref_name }}"
 
           git pull --rebase
 
