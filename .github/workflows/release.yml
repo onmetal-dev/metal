@@ -84,7 +84,7 @@ jobs:
         id: previous-cli-version
         run: |
           git pull --tags origin ${{ github.ref_name }}
-          echo "PREVIOUS_VERSION=$(git tag -l --sort=-version:refname | head -n 1)" >> $GITHUB_OUTPUT
+          echo "PREVIOUS_VERSION=$(git tag -l --sort=-version:refname | sed -n 2p)" >> $GITHUB_OUTPUT
 
   update-homebrew-tap:
     runs-on: ubuntu-latest
