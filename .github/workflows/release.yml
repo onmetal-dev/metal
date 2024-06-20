@@ -164,11 +164,8 @@ jobs:
           EOF
 
           cat cli.rb
-          echo "UPDATED_CLI_FORMULA: $UPDATED_CLI_FORMULA"
-          echo $UPDATED_CLI_FORMULA > cli.rb
           # "10" because this line is indented by 10 spaces
           cat cli.rb | sed 's/  \{10\}/ /g' > cli.rb
-          cat cli.rb
 
       - name: Update Homebrew tap
         run: |
