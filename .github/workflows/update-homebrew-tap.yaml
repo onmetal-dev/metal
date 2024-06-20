@@ -60,7 +60,7 @@ jobs:
       - name: Get previous CLI version
         id: previous-cli-version
         run: |
-          git pull ${{ github.ref_name }}
+          git pull --tags origin ${{ github.ref_name }}
           echo "PREVIOUS_VERSION=$(git tag -l --sort=-version:refname | head -n 1)" >> $GITHUB_OUTPUT
 
       - name: Check out the repository
