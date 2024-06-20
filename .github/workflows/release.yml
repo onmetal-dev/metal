@@ -89,6 +89,8 @@ jobs:
   update-homebrew-tap:
     runs-on: ubuntu-latest
     needs: build-release
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout onmetal-dev/homebrew-tap
