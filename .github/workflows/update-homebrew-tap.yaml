@@ -160,7 +160,7 @@ jobs:
 
           git add cli*.rb
 
-          git remote set-url --push origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/onmetal-dev/homebrew-tap/
+          git remote set-url --push origin https://x-access-token:${{ secrets.GH_TOKEN_FOR_HOMEBREW_TAP }}@github.com/onmetal-dev/homebrew-tap/
           git commit -m "Bump CLI from ${{ steps.previous-cli-version.outputs.PREVIOUS_VERSION }} to ${{ github.ref_name }}"
 
           git pull --rebase
