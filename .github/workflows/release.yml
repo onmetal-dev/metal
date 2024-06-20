@@ -89,9 +89,6 @@ jobs:
   update-homebrew-tap:
     runs-on: ubuntu-latest
     needs: build-release
-    # defaults:
-    #   run:
-    #     working-directory: ./homebrew-tap
 
     steps:
       - name: Checkout onmetal-dev/homebrew-tap
@@ -100,7 +97,6 @@ jobs:
           repository: onmetal-dev/homebrew-tap
           ref: main
           fetch-depth: 2
-          # path: homebrew-tap
 
       - name: Demote the old CLI version
         run: |
@@ -176,7 +172,7 @@ jobs:
 
           git add cli*.rb
 
-          git remote set-url --push origin https://x-access-token:${{ secrets.GH_TOKEN_FOR_HOMEBREW_TAP }}@github.com/onmetal-dev/homebrew-tap/
+          git remote set-url --push origin https://folushooladipo:${{ secrets.GH_TOKEN_FOR_HOMEBREW_TAP }}@github.com/onmetal-dev/homebrew-tap/
           git commit -m "Bump CLI from ${{ needs.build-release.outputs.PREVIOUS_VERSION }} to ${{ github.ref_name }}"
 
           git pull --rebase
