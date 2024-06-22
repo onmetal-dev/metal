@@ -1,0 +1,11 @@
+{
+  "name": "@metal/hcloud",
+  "version": "0.0.1",
+  "module": "index.d.ts",
+  "type": "module",
+  "scripts": {
+    "gen": "bun gen.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
