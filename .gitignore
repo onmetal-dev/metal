@@ -5,3 +5,7 @@ id_ed25519*
 *.tgz
 *.gz
 **/temp/*
+
+.archive/node_modules/
+.archive/
+node_modules/

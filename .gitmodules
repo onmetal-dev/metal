@@ -1,9 +1,3 @@
-[submodule "cluster-api-hivelocity/cluster-api-provider-hivelocity"]
-	path = cluster-api-hivelocity/cluster-api-provider-hivelocity
-	url = git@github.com:hivelocity/cluster-api-provider-hivelocity.git
 [submodule "apps/next/hack/opentelemetry-collector-dev-setup"]
 	path = apps/next/hack/opentelemetry-collector-dev-setup
 	url = git@github.com:vercel/opentelemetry-collector-dev-setup
-[submodule "cluster-api-hetzner/cluster-api-provider-hetzner"]
-	path = cluster-api-hetzner/cluster-api-provider-hetzner
-	url = git@github.com:syself/cluster-api-provider-hetzner

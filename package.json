@@ -1,0 +1,12 @@
+{
+  "name": "metal",
+  "private": "true",
+  "type": "module",
+  "workspaces": [
+    "packages/ops",
+    "packages/hcloud"
+  ],
+  "scripts": {
+    "clean": "rm -rf node_modules packages/ops/node_modules packages/hcloud/node_modules bun.lockb packages/ops/bun.lockb packages/hcloud/bun.lockb"
+  }
+}

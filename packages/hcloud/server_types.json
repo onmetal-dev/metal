@@ -1,0 +1,1280 @@
+{
+  "server_types": [
+    {
+      "id": 1,
+      "name": "cx11",
+      "description": "CX11",
+      "cores": 1,
+      "memory": 2,
+      "disk": 20,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0052000000",
+            "gross": "0.0052000000000000"
+          },
+          "price_monthly": {
+            "net": "3.2900000000",
+            "gross": "3.2900000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0052000000",
+            "gross": "0.0052000000000000"
+          },
+          "price_monthly": {
+            "net": "3.2900000000",
+            "gross": "3.2900000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0052000000",
+            "gross": "0.0052000000000000"
+          },
+          "price_monthly": {
+            "net": "3.2900000000",
+            "gross": "3.2900000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 3,
+      "name": "cx21",
+      "description": "CX21",
+      "cores": 2,
+      "memory": 4,
+      "disk": 40,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0079000000",
+            "gross": "0.0079000000000000"
+          },
+          "price_monthly": {
+            "net": "4.8500000000",
+            "gross": "4.8500000000000000"
+          }
+        },
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0079000000",
+            "gross": "0.0079000000000000"
+          },
+          "price_monthly": {
+            "net": "4.8500000000",
+            "gross": "4.8500000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0079000000",
+            "gross": "0.0079000000000000"
+          },
+          "price_monthly": {
+            "net": "4.8500000000",
+            "gross": "4.8500000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 5,
+      "name": "cx31",
+      "description": "CX31",
+      "cores": 2,
+      "memory": 8,
+      "disk": 80,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0145000000",
+            "gross": "0.0145000000000000"
+          },
+          "price_monthly": {
+            "net": "9.2000000000",
+            "gross": "9.2000000000000000"
+          }
+        },
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0145000000",
+            "gross": "0.0145000000000000"
+          },
+          "price_monthly": {
+            "net": "9.2000000000",
+            "gross": "9.2000000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0145000000",
+            "gross": "0.0145000000000000"
+          },
+          "price_monthly": {
+            "net": "9.2000000000",
+            "gross": "9.2000000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 7,
+      "name": "cx41",
+      "description": "CX41",
+      "cores": 4,
+      "memory": 16,
+      "disk": 160,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0278000000",
+            "gross": "0.0278000000000000"
+          },
+          "price_monthly": {
+            "net": "16.9000000000",
+            "gross": "16.9000000000000000"
+          }
+        },
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0278000000",
+            "gross": "0.0278000000000000"
+          },
+          "price_monthly": {
+            "net": "16.9000000000",
+            "gross": "16.9000000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0278000000",
+            "gross": "0.0278000000000000"
+          },
+          "price_monthly": {
+            "net": "16.9000000000",
+            "gross": "16.9000000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 9,
+      "name": "cx51",
+      "description": "CX51",
+      "cores": 8,
+      "memory": 32,
+      "disk": 240,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0541000000",
+            "gross": "0.0541000000000000"
+          },
+          "price_monthly": {
+            "net": "32.4000000000",
+            "gross": "32.4000000000000000"
+          }
+        },
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0541000000",
+            "gross": "0.0541000000000000"
+          },
+          "price_monthly": {
+            "net": "32.4000000000",
+            "gross": "32.4000000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0541000000",
+            "gross": "0.0541000000000000"
+          },
+          "price_monthly": {
+            "net": "32.4000000000",
+            "gross": "32.4000000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 22,
+      "name": "cpx11",
+      "description": "CPX 11",
+      "cores": 2,
+      "memory": 2,
+      "disk": 40,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0063000000",
+            "gross": "0.0063000000000000"
+          },
+          "price_monthly": {
+            "net": "3.8500000000",
+            "gross": "3.8500000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0063000000",
+            "gross": "0.0063000000000000"
+          },
+          "price_monthly": {
+            "net": "3.8500000000",
+            "gross": "3.8500000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0063000000",
+            "gross": "0.0063000000000000"
+          },
+          "price_monthly": {
+            "net": "3.8500000000",
+            "gross": "3.8500000000000000"
+          }
+        },
+        {
+          "location": "hil",
+          "price_hourly": {
+            "net": "0.0063000000",
+            "gross": "0.0063000000000000"
+          },
+          "price_monthly": {
+            "net": "3.8500000000",
+            "gross": "3.8500000000000000"
+          }
+        },
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0063000000",
+            "gross": "0.0063000000000000"
+          },
+          "price_monthly": {
+            "net": "3.8500000000",
+            "gross": "3.8500000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 23,
+      "name": "cpx21",
+      "description": "CPX 21",
+      "cores": 3,
+      "memory": 4,
+      "disk": 80,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0112000000",
+            "gross": "0.0112000000000000"
+          },
+          "price_monthly": {
+            "net": "7.0500000000",
+            "gross": "7.0500000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0112000000",
+            "gross": "0.0112000000000000"
+          },
+          "price_monthly": {
+            "net": "7.0500000000",
+            "gross": "7.0500000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0112000000",
+            "gross": "0.0112000000000000"
+          },
+          "price_monthly": {
+            "net": "7.0500000000",
+            "gross": "7.0500000000000000"
+          }
+        },
+        {
+          "location": "hil",
+          "price_hourly": {
+            "net": "0.0112000000",
+            "gross": "0.0112000000000000"
+          },
+          "price_monthly": {
+            "net": "7.0500000000",
+            "gross": "7.0500000000000000"
+          }
+        },
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0112000000",
+            "gross": "0.0112000000000000"
+          },
+          "price_monthly": {
+            "net": "7.0500000000",
+            "gross": "7.0500000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 24,
+      "name": "cpx31",
+      "description": "CPX 31",
+      "cores": 4,
+      "memory": 8,
+      "disk": 160,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "hil",
+          "price_hourly": {
+            "net": "0.0211000000",
+            "gross": "0.0211000000000000"
+          },
+          "price_monthly": {
+            "net": "13.1000000000",
+            "gross": "13.1000000000000000"
+          }
+        },
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0211000000",
+            "gross": "0.0211000000000000"
+          },
+          "price_monthly": {
+            "net": "13.1000000000",
+            "gross": "13.1000000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0211000000",
+            "gross": "0.0211000000000000"
+          },
+          "price_monthly": {
+            "net": "13.1000000000",
+            "gross": "13.1000000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0211000000",
+            "gross": "0.0211000000000000"
+          },
+          "price_monthly": {
+            "net": "13.1000000000",
+            "gross": "13.1000000000000000"
+          }
+        },
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0211000000",
+            "gross": "0.0211000000000000"
+          },
+          "price_monthly": {
+            "net": "13.1000000000",
+            "gross": "13.1000000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 25,
+      "name": "cpx41",
+      "description": "CPX 41",
+      "cores": 8,
+      "memory": 16,
+      "disk": 240,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0409000000",
+            "gross": "0.0409000000000000"
+          },
+          "price_monthly": {
+            "net": "24.7000000000",
+            "gross": "24.7000000000000000"
+          }
+        },
+        {
+          "location": "hil",
+          "price_hourly": {
+            "net": "0.0409000000",
+            "gross": "0.0409000000000000"
+          },
+          "price_monthly": {
+            "net": "24.7000000000",
+            "gross": "24.7000000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0409000000",
+            "gross": "0.0409000000000000"
+          },
+          "price_monthly": {
+            "net": "24.7000000000",
+            "gross": "24.7000000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0409000000",
+            "gross": "0.0409000000000000"
+          },
+          "price_monthly": {
+            "net": "24.7000000000",
+            "gross": "24.7000000000000000"
+          }
+        },
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0409000000",
+            "gross": "0.0409000000000000"
+          },
+          "price_monthly": {
+            "net": "24.7000000000",
+            "gross": "24.7000000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 26,
+      "name": "cpx51",
+      "description": "CPX 51",
+      "cores": 16,
+      "memory": 32,
+      "disk": 360,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0872000000",
+            "gross": "0.0872000000000000"
+          },
+          "price_monthly": {
+            "net": "54.4000000000",
+            "gross": "54.4000000000000000"
+          }
+        },
+        {
+          "location": "hil",
+          "price_hourly": {
+            "net": "0.0872000000",
+            "gross": "0.0872000000000000"
+          },
+          "price_monthly": {
+            "net": "54.4000000000",
+            "gross": "54.4000000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0872000000",
+            "gross": "0.0872000000000000"
+          },
+          "price_monthly": {
+            "net": "54.4000000000",
+            "gross": "54.4000000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0872000000",
+            "gross": "0.0872000000000000"
+          },
+          "price_monthly": {
+            "net": "54.4000000000",
+            "gross": "54.4000000000000000"
+          }
+        },
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0872000000",
+            "gross": "0.0872000000000000"
+          },
+          "price_monthly": {
+            "net": "54.4000000000",
+            "gross": "54.4000000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 45,
+      "name": "cax11",
+      "description": "CAX11",
+      "cores": 2,
+      "memory": 4,
+      "disk": 40,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0053000000",
+            "gross": "0.0053000000000000"
+          },
+          "price_monthly": {
+            "net": "3.2900000000",
+            "gross": "3.2900000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0053000000",
+            "gross": "0.0053000000000000"
+          },
+          "price_monthly": {
+            "net": "3.2900000000",
+            "gross": "3.2900000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0053000000",
+            "gross": "0.0053000000000000"
+          },
+          "price_monthly": {
+            "net": "3.2900000000",
+            "gross": "3.2900000000000000"
+          }
+        },
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0053000000",
+            "gross": "0.0053000000000000"
+          },
+          "price_monthly": {
+            "net": "3.2900000000",
+            "gross": "3.2900000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "arm",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 93,
+      "name": "cax21",
+      "description": "CAX21",
+      "cores": 4,
+      "memory": 8,
+      "disk": 80,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0096000000",
+            "gross": "0.0096000000000000"
+          },
+          "price_monthly": {
+            "net": "5.9900000000",
+            "gross": "5.9900000000000000"
+          }
+        },
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0096000000",
+            "gross": "0.0096000000000000"
+          },
+          "price_monthly": {
+            "net": "5.9900000000",
+            "gross": "5.9900000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0096000000",
+            "gross": "0.0096000000000000"
+          },
+          "price_monthly": {
+            "net": "5.9900000000",
+            "gross": "5.9900000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0096000000",
+            "gross": "0.0096000000000000"
+          },
+          "price_monthly": {
+            "net": "5.9900000000",
+            "gross": "5.9900000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "arm",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 94,
+      "name": "cax31",
+      "description": "CAX31",
+      "cores": 8,
+      "memory": 16,
+      "disk": 160,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0192000000",
+            "gross": "0.0192000000000000"
+          },
+          "price_monthly": {
+            "net": "11.9900000000",
+            "gross": "11.9900000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0192000000",
+            "gross": "0.0192000000000000"
+          },
+          "price_monthly": {
+            "net": "11.9900000000",
+            "gross": "11.9900000000000000"
+          }
+        },
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0192000000",
+            "gross": "0.0192000000000000"
+          },
+          "price_monthly": {
+            "net": "11.9900000000",
+            "gross": "11.9900000000000000"
+          }
+        },
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0192000000",
+            "gross": "0.0192000000000000"
+          },
+          "price_monthly": {
+            "net": "11.9900000000",
+            "gross": "11.9900000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "arm",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 95,
+      "name": "cax41",
+      "description": "CAX41",
+      "cores": 16,
+      "memory": 32,
+      "disk": 320,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0384000000",
+            "gross": "0.0384000000000000"
+          },
+          "price_monthly": {
+            "net": "23.9900000000",
+            "gross": "23.9900000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0384000000",
+            "gross": "0.0384000000000000"
+          },
+          "price_monthly": {
+            "net": "23.9900000000",
+            "gross": "23.9900000000000000"
+          }
+        },
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0384000000",
+            "gross": "0.0384000000000000"
+          },
+          "price_monthly": {
+            "net": "23.9900000000",
+            "gross": "23.9900000000000000"
+          }
+        },
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0384000000",
+            "gross": "0.0384000000000000"
+          },
+          "price_monthly": {
+            "net": "23.9900000000",
+            "gross": "23.9900000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "shared",
+      "architecture": "arm",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 96,
+      "name": "ccx13",
+      "description": "CCX13 Dedicated CPU",
+      "cores": 2,
+      "memory": 8,
+      "disk": 80,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0192000000",
+            "gross": "0.0192000000000000"
+          },
+          "price_monthly": {
+            "net": "11.9900000000",
+            "gross": "11.9900000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0192000000",
+            "gross": "0.0192000000000000"
+          },
+          "price_monthly": {
+            "net": "11.9900000000",
+            "gross": "11.9900000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0192000000",
+            "gross": "0.0192000000000000"
+          },
+          "price_monthly": {
+            "net": "11.9900000000",
+            "gross": "11.9900000000000000"
+          }
+        },
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0192000000",
+            "gross": "0.0192000000000000"
+          },
+          "price_monthly": {
+            "net": "11.9900000000",
+            "gross": "11.9900000000000000"
+          }
+        },
+        {
+          "location": "hil",
+          "price_hourly": {
+            "net": "0.0192000000",
+            "gross": "0.0192000000000000"
+          },
+          "price_monthly": {
+            "net": "11.9900000000",
+            "gross": "11.9900000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "dedicated",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 97,
+      "name": "ccx23",
+      "description": "CCX23 Dedicated CPU",
+      "cores": 4,
+      "memory": 16,
+      "disk": 160,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0384000000",
+            "gross": "0.0384000000000000"
+          },
+          "price_monthly": {
+            "net": "23.9900000000",
+            "gross": "23.9900000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0384000000",
+            "gross": "0.0384000000000000"
+          },
+          "price_monthly": {
+            "net": "23.9900000000",
+            "gross": "23.9900000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0384000000",
+            "gross": "0.0384000000000000"
+          },
+          "price_monthly": {
+            "net": "23.9900000000",
+            "gross": "23.9900000000000000"
+          }
+        },
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0384000000",
+            "gross": "0.0384000000000000"
+          },
+          "price_monthly": {
+            "net": "23.9900000000",
+            "gross": "23.9900000000000000"
+          }
+        },
+        {
+          "location": "hil",
+          "price_hourly": {
+            "net": "0.0384000000",
+            "gross": "0.0384000000000000"
+          },
+          "price_monthly": {
+            "net": "23.9900000000",
+            "gross": "23.9900000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "dedicated",
+      "architecture": "x86",
+      "included_traffic": 21990232555520,
+      "deprecation": null
+    },
+    {
+      "id": 98,
+      "name": "ccx33",
+      "description": "CCX33 Dedicated CPU",
+      "cores": 8,
+      "memory": 32,
+      "disk": 240,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.0769000000",
+            "gross": "0.0769000000000000"
+          },
+          "price_monthly": {
+            "net": "47.9900000000",
+            "gross": "47.9900000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.0769000000",
+            "gross": "0.0769000000000000"
+          },
+          "price_monthly": {
+            "net": "47.9900000000",
+            "gross": "47.9900000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.0769000000",
+            "gross": "0.0769000000000000"
+          },
+          "price_monthly": {
+            "net": "47.9900000000",
+            "gross": "47.9900000000000000"
+          }
+        },
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.0769000000",
+            "gross": "0.0769000000000000"
+          },
+          "price_monthly": {
+            "net": "47.9900000000",
+            "gross": "47.9900000000000000"
+          }
+        },
+        {
+          "location": "hil",
+          "price_hourly": {
+            "net": "0.0769000000",
+            "gross": "0.0769000000000000"
+          },
+          "price_monthly": {
+            "net": "47.9900000000",
+            "gross": "47.9900000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "dedicated",
+      "architecture": "x86",
+      "included_traffic": 32985348833280,
+      "deprecation": null
+    },
+    {
+      "id": 99,
+      "name": "ccx43",
+      "description": "CCX43 Dedicated CPU",
+      "cores": 16,
+      "memory": 64,
+      "disk": 360,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.1538000000",
+            "gross": "0.1538000000000000"
+          },
+          "price_monthly": {
+            "net": "95.9900000000",
+            "gross": "95.9900000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.1538000000",
+            "gross": "0.1538000000000000"
+          },
+          "price_monthly": {
+            "net": "95.9900000000",
+            "gross": "95.9900000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.1538000000",
+            "gross": "0.1538000000000000"
+          },
+          "price_monthly": {
+            "net": "95.9900000000",
+            "gross": "95.9900000000000000"
+          }
+        },
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.1538000000",
+            "gross": "0.1538000000000000"
+          },
+          "price_monthly": {
+            "net": "95.9900000000",
+            "gross": "95.9900000000000000"
+          }
+        },
+        {
+          "location": "hil",
+          "price_hourly": {
+            "net": "0.1538000000",
+            "gross": "0.1538000000000000"
+          },
+          "price_monthly": {
+            "net": "95.9900000000",
+            "gross": "95.9900000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "dedicated",
+      "architecture": "x86",
+      "included_traffic": 43980465111040,
+      "deprecation": null
+    },
+    {
+      "id": 100,
+      "name": "ccx53",
+      "description": "CCX53 Dedicated CPU",
+      "cores": 32,
+      "memory": 128,
+      "disk": 600,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.3077000000",
+            "gross": "0.3077000000000000"
+          },
+          "price_monthly": {
+            "net": "191.9900000000",
+            "gross": "191.9900000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.3077000000",
+            "gross": "0.3077000000000000"
+          },
+          "price_monthly": {
+            "net": "191.9900000000",
+            "gross": "191.9900000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.3077000000",
+            "gross": "0.3077000000000000"
+          },
+          "price_monthly": {
+            "net": "191.9900000000",
+            "gross": "191.9900000000000000"
+          }
+        },
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.3077000000",
+            "gross": "0.3077000000000000"
+          },
+          "price_monthly": {
+            "net": "191.9900000000",
+            "gross": "191.9900000000000000"
+          }
+        },
+        {
+          "location": "hil",
+          "price_hourly": {
+            "net": "0.3077000000",
+            "gross": "0.3077000000000000"
+          },
+          "price_monthly": {
+            "net": "191.9900000000",
+            "gross": "191.9900000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "dedicated",
+      "architecture": "x86",
+      "included_traffic": 54975581388800,
+      "deprecation": null
+    },
+    {
+      "id": 101,
+      "name": "ccx63",
+      "description": "CCX63 Dedicated CPU",
+      "cores": 48,
+      "memory": 192,
+      "disk": 960,
+      "deprecated": false,
+      "prices": [
+        {
+          "location": "fsn1",
+          "price_hourly": {
+            "net": "0.4615000000",
+            "gross": "0.4615000000000000"
+          },
+          "price_monthly": {
+            "net": "287.9900000000",
+            "gross": "287.9900000000000000"
+          }
+        },
+        {
+          "location": "nbg1",
+          "price_hourly": {
+            "net": "0.4615000000",
+            "gross": "0.4615000000000000"
+          },
+          "price_monthly": {
+            "net": "287.9900000000",
+            "gross": "287.9900000000000000"
+          }
+        },
+        {
+          "location": "hel1",
+          "price_hourly": {
+            "net": "0.4615000000",
+            "gross": "0.4615000000000000"
+          },
+          "price_monthly": {
+            "net": "287.9900000000",
+            "gross": "287.9900000000000000"
+          }
+        },
+        {
+          "location": "ash",
+          "price_hourly": {
+            "net": "0.4615000000",
+            "gross": "0.4615000000000000"
+          },
+          "price_monthly": {
+            "net": "287.9900000000",
+            "gross": "287.9900000000000000"
+          }
+        },
+        {
+          "location": "hil",
+          "price_hourly": {
+            "net": "0.4615000000",
+            "gross": "0.4615000000000000"
+          },
+          "price_monthly": {
+            "net": "287.9900000000",
+            "gross": "287.9900000000000000"
+          }
+        }
+      ],
+      "storage_type": "local",
+      "cpu_type": "dedicated",
+      "architecture": "x86",
+      "included_traffic": 65970697666560,
+      "deprecation": null
+    }
+  ],
+  "meta": {
+    "pagination": {
+      "page": 1,
+      "per_page": 25,
+      "previous_page": null,
+      "next_page": null,
+      "last_page": 1,
+      "total_entries": 20
+    }
+  }
+}
