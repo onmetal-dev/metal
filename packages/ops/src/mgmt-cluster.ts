@@ -319,9 +319,22 @@ data: ${JSON.stringify({
       // install cluster-api on the new cluster and move resources (aka the ones for this mgmt cluster into it)
       console.log(chalk.green("Initializing cluster-api on new cluster"));
       await $`clusterctl init ${kubeconfigOptNew}  --core cluster-api --bootstrap kubeadm --control-plane kubeadm --infrastructure hetzner`;
+      console.log(chalk.green("Waiting for pods in new cluster to be ready"));
+      for (const namespace of [
+        "kube-system",
+        "capi-system",
+        "capi-kubeadm-bootstrap-system",
+        "capi-kubeadm-control-plane-system",
+        "caph-system",
+        "cert-manager",
+      ]) {
+        await $`kubectl ${kubeconfigOptNew} wait --for=condition=Ready pod --all --namespace ${namespace} --timeout=1m`;
+      }
+
       console.log(
         chalk.green("moving resources from bootstrap cluster to new cluster")
       );
+      await $`kubectl ${kubeconfigOpt} label cluster ${name} clusterctl.cluster.x-k8s.io/move=`;
       await $`clusterctl move ${kubeconfigOpt} --to-kubeconfig .kubeconfigs/${name}.yaml`
         .text;
 
@@ -338,18 +351,22 @@ data: ${JSON.stringify({
       );
     });
 
-  // delete uses the hcloud api to nuke the servers. use with caution
   program
     .command("delete")
     .description("Delete a management cluster")
     .option("-y, --yes", "Confirm deletion")
+    .option(
+      "-m, --method <method>",
+      "Method to delete the cluster: cluster-api or hcloud-api",
+      "cluster-api"
+    )
     .argument("<name>", "Name of the cluster to delete")
-    .action(async (name: string, { yes }) => {
+    .action(async (name: string, { yes, method }) => {
       if (!readdirSync(".kubeconfigs").includes(`${name}.yaml`)) {
         console.log(chalk.red(`Cluster ${name} not found`));
         process.exit(1);
       }
-      await ensureCommands(["kubectl"]);
+      await ensureCommands(["kind", "kubectl", "clusterctl"]);
       if (!yes) {
         const confirmed = await confirm({
           message: `Are you sure you want to delete cluster ${name}?`,
@@ -360,64 +377,110 @@ data: ${JSON.stringify({
         }
       }
 
-      // figure out external IPs for all nodes in the cluster. This will be how we find the servers to delete in hcloud
-      const nodes =
-        await $`kubectl --kubeconfig .kubeconfigs/${name}.yaml get nodes -ojson`.json();
-      if (!nodes.items || nodes.items.length === 0) {
-        console.log(chalk.red(`No nodes found for cluster ${name}`));
-        process.exit(1);
-      }
-      const externalIps = nodes.items!.map(
-        (node: any) =>
-          node.status!.addresses!.find((a: any) => a.type === "ExternalIP")
-            ?.address
-      );
-
-      const secret =
-        await $`kubectl --kubeconfig .kubeconfigs/${name}.yaml get secret hcloud -n kube-system -ojson`.json();
-      if (!secret.data?.token) {
-        console.log(chalk.red(`No hcloud secret found for cluster ${name}`));
-        process.exit(1);
-      }
-      const token = Buffer.from(secret.data!.token, "base64").toString();
-      const client = createClient<hcloud.paths>({
-        headers: { Authorization: `Bearer ${token}` },
-        baseUrl: "https://api.hetzner.cloud/v1",
-      });
-      const { data, error } = await client.GET("/servers");
-      if (error) {
-        console.log(chalk.red(`Error getting servers: ${error}`));
-        process.exit(1);
-      }
-
-      // figure out which servers map to the external IPs
-      const serversToDelete = data!.servers!.filter((server) =>
-        externalIps.includes(server.public_net!.ipv4!.ip)
-      );
-      if (serversToDelete.length !== externalIps.length) {
-        console.log(
-          chalk.red(
-            `Found ${serversToDelete.length} servers to delete, but ${externalIps.length} nodes in the cluster`
-          )
+      if (method === "cluster-api") {
+        const deleterClusterName = `${name}-deleter`;
+        const { kubeconfigOpt, kubeconfig } = await localKindCluster(
+          deleterClusterName
         );
-        process.exit(1);
-      }
+        console.log(
+          chalk.green("Waiting for pods in deleter cluster to be ready")
+        );
+        for (const namespace of [
+          "kube-system",
+          "capi-system",
+          "capi-kubeadm-bootstrap-system",
+          "capi-kubeadm-control-plane-system",
+          "caph-system",
+          "cert-manager",
+        ]) {
+          await $`kubectl ${kubeconfigOpt} wait --for=condition=Ready pod --all --namespace ${namespace} --timeout=1m`;
+        }
 
-      for (const server of serversToDelete) {
-        console.log(chalk.green(`Deleting server ${server.name}`));
-        const { error } = await client.DELETE("/servers/{id}", {
-          params: { path: { id: server.id } },
-        });
-        if (error) {
+        // make sure the mgmt cluster has a cluster resource corresponding to ${name}
+        const { exitCode } =
+          await $`kubectl --kubeconfig .kubeconfigs/${name}.yaml get cluster ${name}`.nothrow();
+        if (exitCode !== 0) {
           console.log(
-            chalk.red(`Error deleting server ${server.name}: ${error}`)
+            chalk.red(`Cluster ${name} not found as cluster resource`)
           );
           process.exit(1);
         }
-      }
 
+        console.log(
+          chalk.green(
+            `Moving cluster resources for ${name} to local kind cluster`
+          )
+        );
+        await $`clusterctl move --kubeconfig .kubeconfigs/${name}.yaml --to-kubeconfig ${kubeconfig}`;
+
+        console.log(chalk.green(`Deleting cluster ${name}`));
+        await $`kubectl ${kubeconfigOpt} delete cluster ${name}`;
+
+        // delete the deleter kind cluster
+        console.log(
+          chalk.green(`Deleting local kind cluster ${deleterClusterName}`)
+        );
+        await $`kind delete cluster -n ${deleterClusterName}`;
+      } else if (method === "hcloud-api") {
+        // figure out external IPs for all nodes in the cluster. This will be how we find the servers to delete in hcloud
+        const nodes =
+          await $`kubectl --kubeconfig .kubeconfigs/${name}.yaml get nodes -ojson`.json();
+        if (!nodes.items || nodes.items.length === 0) {
+          console.log(chalk.red(`No nodes found for cluster ${name}`));
+          process.exit(1);
+        }
+        const externalIps = nodes.items!.map(
+          (node: any) =>
+            node.status!.addresses!.find((a: any) => a.type === "ExternalIP")
+              ?.address
+        );
+        const secret =
+          await $`kubectl --kubeconfig .kubeconfigs/${name}.yaml get secret hcloud -n kube-system -ojson`.json();
+        if (!secret.data?.token) {
+          console.log(chalk.red(`No hcloud secret found for cluster ${name}`));
+          process.exit(1);
+        }
+        const token = Buffer.from(secret.data!.token, "base64").toString();
+        const client = createClient<hcloud.paths>({
+          headers: { Authorization: `Bearer ${token}` },
+          baseUrl: "https://api.hetzner.cloud/v1",
+        });
+        const { data, error } = await client.GET("/servers");
+        if (error) {
+          console.log(chalk.red(`Error getting servers: ${error}`));
+          process.exit(1);
+        }
+
+        // figure out which servers map to the external IPs
+        const serversToDelete = data!.servers!.filter((server) =>
+          externalIps.includes(server.public_net!.ipv4!.ip)
+        );
+        if (serversToDelete.length !== externalIps.length) {
+          console.log(
+            chalk.red(
+              `Found ${serversToDelete.length} servers to delete, but ${externalIps.length} nodes in the cluster`
+            )
+          );
+          process.exit(1);
+        }
+        for (const server of serversToDelete) {
+          console.log(chalk.green(`Deleting server ${server.name}`));
+          const { error } = await client.DELETE("/servers/{id}", {
+            params: { path: { id: server.id } },
+          });
+          if (error) {
+            console.log(
+              chalk.red(`Error deleting server ${server.name}: ${error}`)
+            );
+            process.exit(1);
+          }
+        }
+        console.log(chalk.green(`Deleted servers for cluster ${name}`));
+      } else {
+        console.log(chalk.red(`Invalid method ${method}`));
+        process.exit(1);
+      }
       await $`rm -f .kubeconfigs/${name}.yaml`;
-      console.log(chalk.green(`Deleted servers for cluster ${name}`));
     });
 
   program
