@@ -151,10 +151,7 @@ jobs:
                 sha256 "${{ needs.build-release.outputs.DARWIN_ARM64_HASH }}"
 
                 def install
-                  command_name = "metal-#{version}-darwin-arm64"
-                  bin.install command_name
-                  # Inspired by: https://github.com/argoproj/homebrew-tap/blob/e8b04ee8b260b5675cd646d8acbbe3e32a9924f5/kubectl-argo-rollouts%401.2.rb#L21
-                  mv bin/ + command_name.to_s, bin/"metal"
+                  bin.install "metal-#{version}-darwin-arm64" => "metal"
                 end
               end
 
@@ -164,9 +161,7 @@ jobs:
 
 
                 def install
-                  command_name = "metal-#{version}-darwin-x64"
-                  bin.install "metal-#{version}-darwin-x64"
-                  mv bin/ + command_name.to_s, bin/"metal"
+                  bin.install "metal-#{version}-darwin-x64" => "metal"
                 end
               end
             end
@@ -177,9 +172,7 @@ jobs:
                 sha256 "${{ needs.build-release.outputs.LINUX_ARM64_HASH }}"
 
                 def install
-                  command_name = "metal-#{version}-linux-arm64"
-                  bin.install "metal-#{version}-linux-arm64"
-                  mv bin/ + command_name.to_s, bin/"metal"
+                  bin.install "metal-#{version}-linux-arm64" => "metal"
                 end
               end
 
@@ -188,9 +181,7 @@ jobs:
                 sha256 "${{ needs.build-release.outputs.LINUX_X64_HASH }}"
 
                 def install
-                  command_name = "metal-#{version}-linux-x64"
-                  bin.install "metal-#{version}-linux-x64"
-                  mv bin/ + command_name.to_s, bin/"metal"
+                  bin.install "metal-#{version}-linux-x64" => "metal"
                 end
               end
             end
