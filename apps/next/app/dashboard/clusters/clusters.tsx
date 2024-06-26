@@ -49,6 +49,13 @@ export function Clusters({ clusters: initialClusters }: ClustersProps) {
     const interval = setInterval(fetchData, 5000); // Poll every 5000 milliseconds (5 seconds)
     return () => clearInterval(interval); // Cleanup interval on component unmount
   }, []);
+  const {
+    addCommandItem,
+    removeCommandItem,
+    setGroupPriority,
+    open: commandMenuOpen,
+  } = useCommandItems();
+  const router = useRouter();
 
   const [focusedClusterIdx, setFocusedClusterIdx] = useState<number>(0);
   const [focusMode, setFocusMode] = useState<"mouse" | "keyboard">("mouse");
@@ -66,6 +73,9 @@ export function Clusters({ clusters: initialClusters }: ClustersProps) {
   );
   // on j or k, switch focus mode to keyboard and set the focused cluster index
   useKeyPressEvent("j", () => {
+    if (commandMenuOpen) {
+      return;
+    }
     if (focusMode !== "keyboard") {
       setFocusMode("keyboard");
     }
@@ -73,7 +83,12 @@ export function Clusters({ clusters: initialClusters }: ClustersProps) {
       setFocusedClusterIdx(focusedClusterIdx + 1);
     }
   });
-  useKeyPressEvent("k", (event) => {
+  useKeyPressEvent("k", () => {
+    console.log("k", commandMenuOpen);
+    if (commandMenuOpen) {
+      return;
+    }
+
     // make sure this isn't a cmd-k
     if (cmdPressed.current) {
       return;
@@ -86,9 +101,26 @@ export function Clusters({ clusters: initialClusters }: ClustersProps) {
     }
   });
 
-  const { addCommandItem, removeCommandItem, setGroupPriority } =
-    useCommandItems();
-  const router = useRouter();
+  // this is incredibly hacky, but this solves for
+  // 1. not interpreting "enter" as go to cluster details when cmd menu is open
+  // 2. race condition where the command menu state gets set to closed before we run the "enter" handler
+  const cmdMenuLastClosedTime = useRef<null | Date>(null);
+  useEffect(() => {
+    if (!commandMenuOpen) {
+      cmdMenuLastClosedTime.current = new Date();
+    }
+  }, [commandMenuOpen]);
+  useKeyPressEvent("Enter", () => {
+    if (
+      commandMenuOpen ||
+      (cmdMenuLastClosedTime.current &&
+        new Date().getTime() - cmdMenuLastClosedTime.current.getTime() < 500)
+    ) {
+      return;
+    }
+    router.push(`/dashboard/clusters/${clusters[focusedClusterIdx]!.name}`);
+  });
+
   useEffect(() => {
     setGroupPriority("Cluster Actions", 99);
     addCommandItem({
@@ -107,12 +139,20 @@ export function Clusters({ clusters: initialClusters }: ClustersProps) {
     setGroupPriority("Selected Cluster Actions", 100);
     addCommandItem({
       group: "Selected Cluster Actions",
+      label: "Cluster Details",
+      onSelect: () => {
+        router.push(`/dashboard/clusters/${clusters[focusedClusterIdx]!.name}`);
+      },
+    });
+    addCommandItem({
+      group: "Selected Cluster Actions",
       label: "Delete Cluster",
       onSelect: () => {
         deleteClusterFormRef.current?.requestSubmit();
       },
     });
     return () => {
+      removeCommandItem("Cluster Details");
       removeCommandItem("Delete Cluster");
     };
   }, [
@@ -200,7 +240,7 @@ export function Clusters({ clusters: initialClusters }: ClustersProps) {
               }
             >
               <Link
-                href={`/dashboard/clusters/${cluster.id}`}
+                href={`/dashboard/clusters/${cluster.name}`}
                 className="text-sm px-8 flex items-center h-full"
               >
                 <div className="flex align-center w-4/12">
@@ -234,16 +274,12 @@ export function Clusters({ clusters: initialClusters }: ClustersProps) {
           ))}
         </div>
 
-        {/* 
-            {selectedClusterIdx !== null && (
-              <div className="mr-2">
-                <DeleteClusterButton
-                  ref={deleteClusterFormRef}
-                  clusterId={clusters[selectedClusterIdx]!.id}
-                />
-              </div>
-            )}
-       */}
+        <div className="hidden mr-2">
+          <DeleteClusterButton
+            ref={deleteClusterFormRef}
+            clusterId={clusters[focusedClusterIdx]!.id}
+          />
+        </div>
       </TooltipProvider>
     </div>
   );

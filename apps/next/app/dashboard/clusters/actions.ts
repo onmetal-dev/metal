@@ -11,19 +11,9 @@ import {
   teams,
   users,
 } from "@/app/server/db/schema";
-import { queueNameForEnv } from "@/lib/constants";
-import { createTemporalClient } from "@/lib/temporal-client";
-import {
-  CreateHetznerProject,
-  DeleteHetznerCluster,
-} from "@/temporal/src/workflows";
+import { getRunOutput, inngest } from "@/lib/inngest";
 import { auth } from "@clerk/nextjs/server";
 import { ServerActionState } from "@lib/action";
-import {
-  ApplicationFailure,
-  WorkflowFailedError,
-  WorkflowNotFoundError,
-} from "@temporalio/client";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import uuidBase62 from "uuid-base62";
@@ -83,27 +73,17 @@ export async function createHetznerProject(
     hetznerApiToken: apiKey,
     creatorId: user.id,
   };
-  const temporalClient = await createTemporalClient;
   let result: HetznerProject | undefined;
-  try {
-    const workflow = await temporalClient.workflow.start(CreateHetznerProject, {
-      workflowId: `createHetznerProject-${spec.hetznerName}-${team.id}`, // for idempotency adopt a unique-enough convention on the workflow id
-      taskQueue: queueNameForEnv(process.env.NODE_ENV!),
-      args: [spec],
-    });
-    result = await workflow.result();
-  } catch (e) {
-    if (
-      e instanceof WorkflowFailedError &&
-      e.cause instanceof ApplicationFailure
-    ) {
-      const { type: name, cause, message } = e.cause;
-      return {
-        isError: true,
-        message: `Hetzner connection failed: ${message}`,
-      };
-    }
-    throw e;
+  const { ids: eventIds } = await inngest.send({
+    name: "hetzner-project/create",
+    data: spec,
+  });
+  const output = await getRunOutput(eventIds[0]!);
+  if (output.type && output.message) {
+    return {
+      isError: true,
+      message: `Hetzner connection failed: ${output.message}`,
+    };
   }
   redirect(`/dashboard/clusters`);
 }
@@ -121,51 +101,11 @@ export async function deleteHetznerCluster(
   if (!cluster) {
     return { isError: true, message: "Cluster not found." };
   }
-  const temporalClient = await createTemporalClient;
-
-  try {
-    // cancel createHetznerCluster and provisionHetznerCluster workflows, in case either is still running
-    try {
-      await temporalClient.workflow
-        .getHandle(`createHetznerCluster-${cluster.name}`)
-        .terminate("Cluster deletion requested");
-    } catch (e) {
-      if (e instanceof WorkflowNotFoundError) {
-        // ignore
-      } else {
-        throw e;
-      }
-    }
-    try {
-      await temporalClient.workflow
-        .getHandle(`provisionHetznerCluster-${cluster.name}`)
-        .terminate("Cluster deletion requested");
-    } catch (e) {
-      if (e instanceof WorkflowNotFoundError) {
-        // ignore
-      } else {
-        throw e;
-      }
-    }
-    const workflow = await temporalClient.workflow.start(DeleteHetznerCluster, {
-      workflowId: `deleteHetznerCluster-${cluster.name}`,
-      taskQueue: queueNameForEnv(process.env.NODE_ENV!),
-      args: [{ clusterId }],
-    });
-    await workflow.result();
-  } catch (e) {
-    if (
-      e instanceof WorkflowFailedError &&
-      e.cause instanceof ApplicationFailure
-    ) {
-      const { type: name, cause, message } = e.cause;
-      return {
-        isError: true,
-        message: `Creating cluster in Hetzner failed: ${message}`,
-      };
-    }
-    throw e;
-  }
+  // todo: figure out how to cancel createHetznerCluster and provisionHetznerCluster workflows, in case either is still running
+  await inngest.send({
+    name: "hetzner-cluster/delete",
+    data: { clusterId },
+  });
   return { isError: false, message: "Cluster deleted." };
 }
 

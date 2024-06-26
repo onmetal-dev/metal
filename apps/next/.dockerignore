@@ -42,7 +42,6 @@ package-lock.json
 
 .nixpacks
 TODO
-temporal/lib
 
 # Deployment files
 temp/

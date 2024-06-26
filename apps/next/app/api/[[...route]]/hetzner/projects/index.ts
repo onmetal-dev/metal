@@ -6,10 +6,7 @@ import {
   hetznerProjects,
   selectHetznerProjectSchema,
 } from "@/app/server/db/schema";
-import { queueNameForEnv } from "@/lib/constants";
-import { createTemporalClient } from "@/lib/temporal-client";
-import { CreateHetznerProject } from "@/temporal/src/workflows";
-import { DeleteHetznerProject } from "@/temporal/src/workflows/deleteHetznerProject";
+import { getRunOutput, inngest } from "@/lib/inngest";
 import {
   getUser,
   idSchema,
@@ -18,7 +15,6 @@ import {
   userTeams,
 } from "@api/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
-import { ApplicationFailure, WorkflowFailedError } from "@temporalio/client";
 import { and, eq, inArray } from "drizzle-orm";
 import { type Context } from "hono";
 import { z } from "zod";
@@ -191,28 +187,12 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
         );
       }
 
-      const temporalClient = await createTemporalClient;
-      try {
-        const workflow = await temporalClient.workflow.start(
-          CreateHetznerProject,
-          {
-            workflowId: `createHetznerProject-${spec.hetznerName}`,
-            taskQueue: queueNameForEnv(process.env.NODE_ENV!),
-            args: [{ ...spec, id: projectId }],
-          }
-        );
-        const result: HetznerProject = await workflow.result();
-        return c.json(result);
-      } catch (e) {
-        if (
-          e instanceof WorkflowFailedError &&
-          e.cause instanceof ApplicationFailure
-        ) {
-          const { type: name, cause, message } = e.cause;
-          return c.json({ error: { name, cause, message } }, 400);
-        }
-        throw e;
-      }
+      const { ids: eventIds } = await inngest.send({
+        name: "hetzner-project/create",
+        data: { ...spec, id: projectId },
+      });
+      const result = await getRunOutput(eventIds[0]!);
+      return c.json(result);
     }
   );
 
@@ -257,28 +237,12 @@ export default function hetznerProjectsRoutes(app: OpenAPIHono) {
         );
       }
 
-      const temporalClient = await createTemporalClient;
-      try {
-        const workflow = await temporalClient.workflow.start(
-          DeleteHetznerProject,
-          {
-            workflowId: `deleteHetznerProject-${projectId}`,
-            taskQueue: queueNameForEnv(process.env.NODE_ENV!),
-            args: [{ projectId: project.id }],
-          }
-        );
-        await workflow.result();
-        return c.json({});
-      } catch (e) {
-        if (
-          e instanceof WorkflowFailedError &&
-          e.cause instanceof ApplicationFailure
-        ) {
-          const { type: name, cause, message } = e.cause;
-          return c.json({ error: { name, cause, message } }, 400);
-        }
-        throw e;
-      }
+      const { ids: eventIds } = await inngest.send({
+        name: "hetzner-project/delete",
+        data: { projectId },
+      });
+      const result = await getRunOutput(eventIds[0]!);
+      return c.json(result);
     }
   );
 }

@@ -1,81 +1,32 @@
-import { db } from "@db/index";
-import {
+import { db } from "@metal/webapp/app/server/db";
+import type {
   HetznerCluster,
   HetznerNodeGroup,
   HetznerProject,
   Team,
+} from "@metal/webapp/app/server/db/schema";
+import {
   hetznerClusters,
   hetznerNodeGroups,
   hetznerProjects,
   teams,
-} from "@db/schema";
-import { serviceName } from "@lib/constants";
-import { findOrCreateNamespace } from "@lib/k8s";
-import { tracedExec } from "@lib/tracedExec";
+} from "@metal/webapp/app/server/db/schema";
+import { serviceName } from "@metal/webapp/lib/constants";
+import { findOrCreateNamespace } from "@metal/webapp/lib/k8s";
+import { tracedExec } from "@metal/webapp/lib/tracedExec";
 import { trace } from "@opentelemetry/api";
 import { eq } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import tmp from "tmp";
 import * as ub62 from "uuid-base62";
+import { inngest } from "./client";
 import {
   findOrCreateSecret,
   generateAwsAccessKeyId,
   generateAwsSecretAccessKey,
   mgmtClusterKubeconfigFile,
 } from "./shared";
-
-export async function provisionHetznerCluster({
-  clusterId,
-}: {
-  clusterId: string;
-}): Promise<void> {
-  return await trace
-    .getTracer(serviceName)
-    .startActiveSpan("provisionHetznerCluster", async (span) => {
-      const cluster: HetznerCluster | undefined =
-        await db.query.hetznerClusters.findFirst({
-          where: eq(hetznerClusters.id, clusterId),
-        });
-      if (!cluster) {
-        throw new Error("Cluster not found");
-      }
-      const nodeGroups: HetznerNodeGroup[] =
-        await db.query.hetznerNodeGroups.findMany({
-          where: eq(hetznerNodeGroups.clusterId, clusterId),
-        });
-      if (nodeGroups.length === 0) {
-        throw new Error("No node groups found");
-      }
-      const hetznerProject: HetznerProject | undefined =
-        await db.query.hetznerProjects.findFirst({
-          where: eq(hetznerProjects.teamId, cluster.teamId),
-        });
-      if (!hetznerProject) {
-        throw new Error("Project not found");
-      }
-      const team: Team | undefined = await db.query.teams.findFirst({
-        where: eq(teams.id, cluster.teamId),
-      });
-      if (!team) {
-        throw new Error("Team not found");
-      }
-      const spanAttributes = {
-        hetznerClusterId: clusterId,
-        hetznerName: cluster.name,
-        teamId: cluster.teamId,
-        creatorId: cluster.creatorId,
-      };
-      span.setAttributes(spanAttributes);
-      return await _provisionHetznerK8sCluster({
-        cluster,
-        nodeGroups,
-        team,
-        hetznerProject,
-        spanAttributes,
-      });
-    });
-}
 
 // teamHetznerSecretName is the name of the secret in the management cluster containing the team's hetzner creds.
 function teamHetznerSecretName(teamId: string): string {
@@ -108,6 +59,62 @@ function envString(env: Record<string, string | number>): string {
       .join(" ") + " "
   );
 }
+
+export const hetznerClusterProvision = inngest.createFunction(
+  { id: "hetzner-cluster-provision" },
+  { event: "hetzner-cluster/provision" },
+  async ({ event, step }) => {
+    return await trace
+      .getTracer(serviceName)
+      .startActiveSpan("provisionHetznerCluster", async (span) => {
+        const clusterId = event.data.clusterId;
+        const cluster: HetznerCluster | undefined =
+          await db.query.hetznerClusters.findFirst({
+            where: eq(hetznerClusters.id, clusterId),
+          });
+        if (!cluster) {
+          throw new Error("Cluster not found");
+        }
+        const nodeGroups: HetznerNodeGroup[] =
+          await db.query.hetznerNodeGroups.findMany({
+            where: eq(hetznerNodeGroups.clusterId, clusterId),
+          });
+        if (nodeGroups.length === 0) {
+          throw new Error("No node groups found");
+        }
+        const hetznerProject: HetznerProject | undefined =
+          await db.query.hetznerProjects.findFirst({
+            where: eq(hetznerProjects.teamId, cluster.teamId),
+          });
+        if (!hetznerProject) {
+          throw new Error("Project not found");
+        }
+        const team: Team | undefined = await db.query.teams.findFirst({
+          where: eq(teams.id, cluster.teamId),
+        });
+        if (!team) {
+          throw new Error("Team not found");
+        }
+        const spanAttributes = {
+          hetznerClusterId: clusterId,
+          hetznerName: cluster.name,
+          teamId: cluster.teamId,
+          creatorId: cluster.creatorId,
+        };
+        span.setAttributes(spanAttributes);
+        return {
+          event,
+          body: await _provisionHetznerK8sCluster({
+            cluster,
+            nodeGroups,
+            team,
+            hetznerProject,
+            spanAttributes,
+          }),
+        };
+      });
+  }
+);
 
 // _provisionH8sCluster provisions a full-on k8s cluster using cluster api hetzner and kubeadm control plane / bootstrap provider
 async function _provisionHetznerK8sCluster({
@@ -271,7 +278,7 @@ patches:
     await tracedExec({
       spanName: "exec-kubectl-apply-cluster-config",
       spanAttributes,
-      command: `KUBECONFIG=${mgmtKubeconfig} kubectl apply -f cluster-template.yaml`,
+      command: `KUBECONFIG=${mgmtKubeconfig} kubectl apply -f ${tmpDirForClusterTemplate.name}/cluster-template.yaml`,
       directory: tmpDirForClusterTemplate.name,
     });
 
@@ -287,6 +294,7 @@ patches:
       const kubeadmControlPlanes = JSON.parse(stdout);
       if (
         kubeadmControlPlanes.items.length === 1 &&
+        kubeadmControlPlanes.items[0].status?.conditions &&
         kubeadmControlPlanes.items[0].status.conditions.some(
           (condition: { type: string; status: string }) =>
             condition.type === "CertificatesAvailable" &&
@@ -1171,7 +1179,7 @@ metadata:
 data:
   trafficRouterPlugins: |-
     - name: "argoproj-labs/gatewayAPI"
-      location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.2.0/gateway-api-plugin-linux-arm64"
+      location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.3.0/gateway-api-plugin-linux-arm64"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

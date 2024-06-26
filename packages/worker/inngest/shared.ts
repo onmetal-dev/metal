@@ -1,5 +1,6 @@
 import * as k8s from "@kubernetes/client-node";
-import { ExecException, exec as execCB } from "child_process";
+import type { ExecException } from "child_process";
+import { exec as execCB } from "child_process";
 import fs from "fs";
 import { dump } from "js-yaml";
 import tmp from "tmp";

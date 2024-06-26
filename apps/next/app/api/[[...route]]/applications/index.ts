@@ -238,28 +238,6 @@ export default function applicationsRoutes(app: OpenAPIHono) {
 
       // TODO: deleting an application is a bit more involved than just removing it from a db
       // have to delete all associated resources, including deployments
-      //   const temporalClient = await createTemporalClient;
-      //   try {
-      //     const workflow = await temporalClient.workflow.start(
-      //       DeleteApplication,
-      //       {
-      //         workflowId: `deleteApplication-${applicationId}`,
-      //         taskQueue: queueNameForEnv(process.env.NODE_ENV!),
-      //         args: [{ applicationId: application.id }],
-      //       }
-      //     );
-      //     await workflow.result();
-      //     return c.json({});
-      //   } catch (e) {
-      //     if (
-      //       e instanceof WorkflowFailedError &&
-      //       e.cause instanceof ApplicationFailure
-      //     ) {
-      //       const { type: name, cause, message } = e.cause;
-      //       return c.json({ error: { name, cause, message } }, 400);
-      //     }
-      //     throw e;
-      //   }
     }
   );
 }

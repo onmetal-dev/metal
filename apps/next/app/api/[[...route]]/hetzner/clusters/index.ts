@@ -15,13 +15,8 @@ import {
   hetznerProjects,
   selectHetznerClusterWithNodeGroupsSchema,
 } from "@/app/server/db/schema";
-import { queueNameForEnv } from "@/lib/constants";
 import { networkZoneForLocation } from "@/lib/hcloud-helpers";
-import { createTemporalClient } from "@/lib/temporal-client";
-import {
-  DeleteHetznerCluster,
-  ProvisionHetznerCluster,
-} from "@/temporal/src/workflows";
+import { getRunOutput, inngest } from "@/lib/inngest";
 import { getUser, idSchema, responseSpecs, userTeams } from "@api/shared";
 import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
 import {
@@ -30,7 +25,6 @@ import {
   colors,
   uniqueNamesGenerator,
 } from "@joaomoreno/unique-names-generator";
-import { ApplicationFailure, WorkflowFailedError } from "@temporalio/client";
 import { and, eq, inArray } from "drizzle-orm";
 import { type Context } from "hono";
 import uuidBase62 from "uuid-base62";
@@ -252,12 +246,9 @@ export default function hetznerClustersRoutes(app: OpenAPIHono) {
       );
       await db.insert(hetznerNodeGroups).values(nodeGroups);
 
-      const temporalClient = await createTemporalClient;
-      // don't await the provision workflow since this does the bulk of the work and can take very long
-      temporalClient.workflow.start(ProvisionHetznerCluster, {
-        workflowId: `provisionHetznerCluster-${cluster.name}`,
-        taskQueue: queueNameForEnv(process.env.NODE_ENV!),
-        args: [{ clusterId }],
+      await inngest.send({
+        name: "hetzner-cluster/provision",
+        data: { clusterId },
       });
       const clusterWithNodeGroups = await db.query.hetznerClusters.findFirst({
         where: eq(hetznerClusters.id, clusterId),
@@ -309,28 +300,12 @@ export default function hetznerClustersRoutes(app: OpenAPIHono) {
         );
       }
 
-      const temporalClient = await createTemporalClient;
-      try {
-        const workflow = await temporalClient.workflow.start(
-          DeleteHetznerCluster,
-          {
-            workflowId: `deleteHetznerCluster-${clusterId}`,
-            taskQueue: queueNameForEnv(process.env.NODE_ENV!),
-            args: [{ clusterId: cluster.id }],
-          }
-        );
-        await workflow.result();
-        return c.json({});
-      } catch (e) {
-        if (
-          e instanceof WorkflowFailedError &&
-          e.cause instanceof ApplicationFailure
-        ) {
-          const { type: name, cause, message } = e.cause;
-          return c.json({ error: { name, cause, message } }, 400);
-        }
-        throw e;
-      }
+      const { ids: eventIds } = await inngest.send({
+        name: "hetzner-cluster/delete",
+        data: { clusterId },
+      });
+      await getRunOutput(eventIds[0]!);
+      return c.json({});
     }
   );
 }

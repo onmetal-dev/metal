@@ -15,12 +15,10 @@ import {
   teams,
   users,
 } from "@/app/server/db/schema";
-import { queueNameForEnv } from "@/lib/constants";
 import { networkZoneForLocation } from "@/lib/hcloud-helpers";
 import hetznerLocations from "@/lib/hcloud/locations";
 import hetznerServerTypes from "@/lib/hcloud/server_types";
-import { createTemporalClient } from "@/lib/temporal-client";
-import { ProvisionHetznerCluster } from "@/temporal/src/workflows";
+import { inngest } from "@/lib/inngest";
 import { auth } from "@clerk/nextjs/server";
 import {
   adjectives,
@@ -130,12 +128,9 @@ export async function createHetznerCluster(
   ];
   await db.insert(hetznerNodeGroups).values(nodeGroups);
 
-  const temporalClient = await createTemporalClient;
-  // don't await the provision workflow since this does the bulk of the work and can take very long
-  temporalClient.workflow.start(ProvisionHetznerCluster, {
-    workflowId: `provisionHetznerCluster-${cluster.name}`,
-    taskQueue: queueNameForEnv(process.env.NODE_ENV!),
-    args: [{ clusterId }],
+  await inngest.send({
+    name: "hetzner-cluster/provision",
+    data: { clusterId },
   });
   redirect(`/dashboard/clusters`);
 }
