@@ -4,9 +4,17 @@
   "type": "module",
   "workspaces": [
     "packages/ops",
-    "packages/hcloud"
+    "packages/hcloud",
+    "packages/worker",
+    "apps/next"
   ],
   "scripts": {
-    "clean": "rm -rf node_modules packages/ops/node_modules packages/hcloud/node_modules bun.lockb packages/ops/bun.lockb packages/hcloud/bun.lockb"
-  }
+    "clean": "rm -rf node_modules packages/ops/node_modules packages/hcloud/node_modules packages/worker/node_modules apps/next/node_modules bun.lockb packages/ops/bun.lockb packages/hcloud/bun.lockb packages/worker/bun.lockb apps/next/bun.lockb",
+    "dev": "bun run --filter './packages/worker' --filter './apps/next' dev | tee /tmp/log.txt"
+  },
+  "trustedDependencies": [
+    "@clerk/shared",
+    "es5-ext",
+    "protobufjs"
+  ]
 }

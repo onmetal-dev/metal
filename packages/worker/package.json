@@ -1,0 +1,22 @@
+{
+  "name": "@metal/worker",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "dev:inngest": "./inngest-dev.sh",
+    "dev:server": "bun run --no-clear-screen --hot index.ts",
+    "dev": "concurrently --kill-others-on-fail --raw \"npm:dev:*\""
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "concurrently": "^8.2.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@metal/webapp": "workspace:*",
+    "@metal/hcloud": "workspace:*",
+    "inngest": "^3.19.17"
+  }
+}
