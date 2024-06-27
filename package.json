@@ -3,14 +3,11 @@
   "private": "true",
   "type": "module",
   "workspaces": [
-    "packages/ops",
-    "packages/hcloud",
-    "packages/worker",
-    "apps/next"
+    "packages/*"
   ],
   "scripts": {
-    "clean": "rm -rf node_modules packages/ops/node_modules packages/hcloud/node_modules packages/worker/node_modules apps/next/node_modules bun.lockb packages/ops/bun.lockb packages/hcloud/bun.lockb packages/worker/bun.lockb apps/next/bun.lockb",
-    "dev": "bun run --filter './packages/worker' --filter './apps/next' dev | tee /tmp/log.txt"
+    "clean": "rm -rf node_modules packages/*/node_modules bun.lockb packages/*/bun.lockb",
+    "dev": "bun run --filter '@metal/worker' --filter '@metal/webapp' dev | tee /tmp/log.txt"
   },
   "trustedDependencies": [
     "@clerk/shared",
