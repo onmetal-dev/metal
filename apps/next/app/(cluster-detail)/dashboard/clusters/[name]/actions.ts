@@ -31,9 +31,11 @@ export async function fetchClusterMetrics({
     endDate: now.toDate(),
   };
   // TODO: Need a better mechanism, e.g. exposing prometheus API directly w/ some HTTP basic auth (similar to docker)
-  const cpu = await clusterData.cpu(range);
-  const mem = await clusterData.mem(range);
-  const cpuRequests = await clusterData.cpuRequests(range);
-  const memRequests = await clusterData.memRequests(range);
+  const [cpu, mem, cpuRequests, memRequests] = await Promise.all([
+    clusterData.cpu(range),
+    clusterData.mem(range),
+    clusterData.cpuRequests(range),
+    clusterData.memRequests(range),
+  ]);
   return { cpu, mem, cpuRequests, memRequests };
 }

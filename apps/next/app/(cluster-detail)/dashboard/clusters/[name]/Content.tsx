@@ -222,7 +222,7 @@ export default function Content({
             className="px-20 mx-auto w-full h-full flex flex-column"
             style={{ minHeight: "calc(100vh - 32px)", willChange: "transform" }}
           >
-            <div id="Sections" className="w-full max-w-4xl py-8 mx-auto">
+            <div id="Sections" className="w-full max-w-4xl pt-4 mx-auto">
               <section id="metrics" className="mb-14">
                 <div className="flex items-center w-full justify-end mb-4">
                   <Tooltip>
