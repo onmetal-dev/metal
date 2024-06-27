@@ -33,6 +33,6 @@ jobs:
           sudo dpkg -i railway-v3.11.0-amd64.deb
 
       - name: Deploy
-        run: bunx @railway/cli up --ci --service worker --environment prod
+        run: railway up --ci --service worker --environment prod
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PROD }}
