@@ -1,0 +1,1680 @@
+// interface for interfacing with prometheus data in a cluster
+
+import { HetznerCluster } from "@/app/server/db/schema";
+import { Serie } from "@nivo/line";
+
+// https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
+interface PrometheusRangeQueryRequestParams {
+  query: string;
+  start: string | number; // RFC3339 (e.g. 2015-07-01T20:10:30.781Z) or Unix timestamp
+  end: string | number; // RFC3339 or Unix timestamp
+  step: string | number; // Duration format or float number of seconds
+  timeout?: string; // Optional duration
+}
+
+// define a type that users of this package can assume has Datum values that are Dates
+export type TimeSeries = Serie;
+
+interface PrometheusRangeQueryResponseBase<T> {
+  status: string;
+  errorType: string;
+  error: string;
+  data: {
+    resultType: string;
+    result: Array<{
+      metric: Record<string, any>;
+      values: T;
+    }>;
+  };
+}
+
+type PromValues = Array<[number, string]>;
+type PromDateValues = Array<[Date, string]>;
+
+type PrometheusRangeQueryResponseRaw =
+  PrometheusRangeQueryResponseBase<PromValues>;
+type PrometheusRangeQueryResponse =
+  PrometheusRangeQueryResponseBase<PromDateValues>;
+
+type PromRangeResult = {
+  metric: Record<string, any>;
+  values: PromDateValues;
+}[];
+
+function promResultToTimeSeries(result: PromRangeResult): TimeSeries[] {
+  return result.map(({ metric, values }, index) => {
+    let id = index.toString();
+    if (Object.keys(metric).length !== 0) {
+      id = JSON.stringify(metric);
+    }
+    return {
+      id,
+      data: values.map(([date, value]) => ({
+        x: date,
+        y: parseFloat(value),
+      })),
+    };
+  });
+}
+
+// define a class that takes in a cluster and when it constructs itself it creates a tmpfile with the kubeconfig for that cluster
+export class PrometheusClient {
+  private endpoint: string;
+  constructor(cluster: HetznerCluster) {
+    this.endpoint = `https://prometheus.${cluster.name}.up.onmetal.dev`;
+  }
+
+  // rangeQuery: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
+  async rangeQuery(
+    params: PrometheusRangeQueryRequestParams
+  ): Promise<PrometheusRangeQueryResponse> {
+    const queryString = new URLSearchParams(params as any).toString();
+    const response = await fetch(
+      `${this.endpoint}/api/v1/query_range?${queryString}`
+    );
+    const raw = (await response.json()) as PrometheusRangeQueryResponseRaw;
+    // convert unix timestamps to dates
+    const ret: PrometheusRangeQueryResponse = {
+      status: raw.status,
+      errorType: raw.errorType,
+      error: raw.error,
+      data: {
+        resultType: raw.data.resultType,
+        result: raw.data.result.map(({ metric, values }) => ({
+          metric,
+          values: values.map(([timestamp, value]) => [
+            new Date(timestamp * 1000),
+            value,
+          ]),
+        })),
+      },
+    };
+    return ret;
+  }
+}
+
+// stepForRange returns the most logical step value for a given time range
+// step can be either 1s, 60s, 5m, 10m, 30m, 1h, 3h, 6h, 12h, 1d
+// the logic starts with a 1s step and seeing how many steps fit into the range
+// if that number is greater than 1440, then we go to the next step size
+// we keep going until we get a step size that puts us under 1440 datapoints
+const steps = [
+  1,
+  60,
+  5 * 60,
+  10 * 60,
+  30 * 60,
+  60 * 60,
+  3 * 60 * 60,
+  6 * 60 * 60,
+  12 * 60 * 60,
+  24 * 60 * 60,
+];
+function stepForRange({
+  startDate,
+  endDate,
+}: {
+  startDate: Date;
+  endDate: Date;
+}): number {
+  const start = Math.floor(startDate.getTime() / 1000);
+  const end = Math.floor(endDate.getTime() / 1000);
+  const range = end - start;
+  for (const step of steps) {
+    if (range / step < 1440) {
+      return step;
+    }
+  }
+  return steps[steps.length - 1]!;
+}
+
+export class ClusterData {
+  private promClient: PrometheusClient;
+  constructor(cluster: HetznerCluster) {
+    this.promClient = new PrometheusClient(cluster);
+  }
+
+  async cpu({
+    startDate,
+    endDate,
+  }: {
+    startDate: Date;
+    endDate: Date;
+  }): Promise<Serie[]> {
+    const start = Math.floor(startDate.getTime() / 1000);
+    const end = Math.floor(endDate.getTime() / 1000);
+
+    const response = await this.promClient.rangeQuery({
+      // this is per node. let's save this for a node-specific view
+      // query: `100*((instance:node_cpu_utilisation:rate5m{job="node-exporter"}) != 0)`,
+      query: `100*cluster:node_cpu:ratio_rate5m`,
+      start,
+      end,
+      step: stepForRange({ startDate, endDate }),
+    });
+    if (response.status === "error") {
+      throw new Error(
+        `prometheus error type=${response.errorType} error=${response.error}`
+      );
+    }
+    return promResultToTimeSeries(response.data.result);
+  }
+
+  async mem({
+    startDate,
+    endDate,
+  }: {
+    startDate: Date;
+    endDate: Date;
+  }): Promise<Serie[]> {
+    const start = Math.floor(startDate.getTime() / 1000);
+    const end = Math.floor(endDate.getTime() / 1000);
+
+    const response = await this.promClient.rangeQuery({
+      // this gives per node, but lets save that for a node-specific view?
+      //      query: `100*((instance:node_memory_utilisation:ratio{job="node-exporter"}) != 0)`,
+      query: `100*(1 - sum(:node_memory_MemAvailable_bytes:sum) / sum(node_memory_MemTotal_bytes{job="node-exporter"}))`,
+      start,
+      end,
+      step: stepForRange({ startDate, endDate }),
+    });
+    if (response.status === "error") {
+      throw new Error(
+        `prometheus error type=${response.errorType} error=${response.error}`
+      );
+    }
+    return promResultToTimeSeries(response.data.result);
+  }
+
+  async cpuRequests({
+    startDate,
+    endDate,
+  }: {
+    startDate: Date;
+    endDate: Date;
+  }): Promise<Serie[]> {
+    const start = Math.floor(startDate.getTime() / 1000);
+    const end = Math.floor(endDate.getTime() / 1000);
+
+    const queries = [
+      `sum(kube_pod_container_resource_requests{resource="cpu"})`,
+      `sum(kube_node_status_allocatable{resource="cpu"})`,
+    ];
+    const series: Serie[] = await Promise.all(
+      queries.map(async (query): Promise<Serie> => {
+        const response = await this.promClient.rangeQuery({
+          query,
+          start,
+          end,
+          step: stepForRange({ startDate, endDate }),
+        });
+        if (response.status === "error") {
+          throw new Error(
+            `prometheus error type=${response.errorType} error=${response.error}`
+          );
+        }
+        const s = promResultToTimeSeries(response.data.result);
+        return s[0]!; // assumes the queries above are all single-series (e.g. a sum)
+      })
+    );
+    series[0]!.id = "requests";
+    series[1]!.id = "allocatable";
+    return series;
+  }
+
+  async memRequests({
+    startDate,
+    endDate,
+  }: {
+    startDate: Date;
+    endDate: Date;
+  }): Promise<Serie[]> {
+    const start = Math.floor(startDate.getTime() / 1000);
+    const end = Math.floor(endDate.getTime() / 1000);
+
+    const queries = [
+      `sum(kube_pod_container_resource_requests{resource="memory"})`,
+      `sum(kube_node_status_allocatable{resource="memory"})`,
+    ];
+    const series: Serie[] = await Promise.all(
+      queries.map(async (query) => {
+        const response = await this.promClient.rangeQuery({
+          query,
+          start,
+          end,
+          step: stepForRange({ startDate, endDate }),
+        });
+        if (response.status === "error") {
+          throw new Error(
+            `prometheus error type=${response.errorType} error=${response.error}`
+          );
+        }
+        const s = promResultToTimeSeries(response.data.result);
+        return s[0]!; // assumes the queries above are all single-series (e.g. a sum)
+      })
+    );
+    series[0]!.id = "requests";
+    series[1]!.id = "allocatable";
+    return series;
+  }
+}
+
+// things we care about: allocatable CPU / Memory in the cluster
+// disk space monitoring
+
+// node exporter defs
+// https://cloud.google.com/stackdriver/docs/managed-prometheus/exporters/node_exporter
+
+// available metrics:
+/*
+:node_memory_MemAvailable_bytes:sum
+ALERTS
+ALERTS_FOR_STATE
+aggregator_discovery_aggregation_count_total
+aggregator_unavailable_apiservice
+alertmanager_alerts
+alertmanager_alerts_invalid_total
+alertmanager_alerts_received_total
+alertmanager_build_info
+alertmanager_cluster_enabled
+alertmanager_config_hash
+alertmanager_config_last_reload_success_timestamp_seconds
+alertmanager_config_last_reload_successful
+alertmanager_dispatcher_aggregation_groups
+alertmanager_dispatcher_alert_processing_duration_seconds_count
+alertmanager_dispatcher_alert_processing_duration_seconds_sum
+alertmanager_http_concurrency_limit_exceeded_total
+alertmanager_http_request_duration_seconds_bucket
+alertmanager_http_request_duration_seconds_count
+alertmanager_http_request_duration_seconds_sum
+alertmanager_http_requests_in_flight
+alertmanager_http_response_size_bytes_bucket
+alertmanager_http_response_size_bytes_count
+alertmanager_http_response_size_bytes_sum
+alertmanager_inhibition_rules
+alertmanager_integrations
+alertmanager_marked_alerts
+alertmanager_nflog_gc_duration_seconds_count
+alertmanager_nflog_gc_duration_seconds_sum
+alertmanager_nflog_gossip_messages_propagated_total
+alertmanager_nflog_maintenance_errors_total
+alertmanager_nflog_maintenance_total
+alertmanager_nflog_queries_total
+alertmanager_nflog_query_duration_seconds_bucket
+alertmanager_nflog_query_duration_seconds_count
+alertmanager_nflog_query_duration_seconds_sum
+alertmanager_nflog_query_errors_total
+alertmanager_nflog_snapshot_duration_seconds_count
+alertmanager_nflog_snapshot_duration_seconds_sum
+alertmanager_nflog_snapshot_size_bytes
+alertmanager_notification_latency_seconds_bucket
+alertmanager_notification_latency_seconds_count
+alertmanager_notification_latency_seconds_sum
+alertmanager_notification_requests_failed_total
+alertmanager_notification_requests_total
+alertmanager_notifications_failed_total
+alertmanager_notifications_suppressed_total
+alertmanager_notifications_total
+alertmanager_receivers
+alertmanager_silences
+alertmanager_silences_gc_duration_seconds_count
+alertmanager_silences_gc_duration_seconds_sum
+alertmanager_silences_gossip_messages_propagated_total
+alertmanager_silences_maintenance_errors_total
+alertmanager_silences_maintenance_total
+alertmanager_silences_queries_total
+alertmanager_silences_query_duration_seconds_bucket
+alertmanager_silences_query_duration_seconds_count
+alertmanager_silences_query_duration_seconds_sum
+alertmanager_silences_query_errors_total
+alertmanager_silences_snapshot_duration_seconds_count
+alertmanager_silences_snapshot_duration_seconds_sum
+alertmanager_silences_snapshot_size_bytes
+apiextensions_openapi_v2_regeneration_count
+apiextensions_openapi_v3_regeneration_count
+apiserver_admission_controller_admission_duration_seconds_bucket
+apiserver_admission_controller_admission_duration_seconds_count
+apiserver_admission_controller_admission_duration_seconds_sum
+apiserver_admission_step_admission_duration_seconds_bucket
+apiserver_admission_step_admission_duration_seconds_count
+apiserver_admission_step_admission_duration_seconds_sum
+apiserver_admission_step_admission_duration_seconds_summary
+apiserver_admission_step_admission_duration_seconds_summary_count
+apiserver_admission_step_admission_duration_seconds_summary_sum
+apiserver_admission_webhook_admission_duration_seconds_bucket
+apiserver_admission_webhook_admission_duration_seconds_count
+apiserver_admission_webhook_admission_duration_seconds_sum
+apiserver_admission_webhook_fail_open_count
+apiserver_admission_webhook_request_total
+apiserver_audit_event_total
+apiserver_audit_requests_rejected_total
+apiserver_cache_list_fetched_objects_total
+apiserver_cache_list_returned_objects_total
+apiserver_cache_list_total
+apiserver_cel_compilation_duration_seconds_bucket
+apiserver_cel_compilation_duration_seconds_count
+apiserver_cel_compilation_duration_seconds_sum
+apiserver_cel_evaluation_duration_seconds_bucket
+apiserver_cel_evaluation_duration_seconds_count
+apiserver_cel_evaluation_duration_seconds_sum
+apiserver_client_certificate_expiration_seconds_bucket
+apiserver_client_certificate_expiration_seconds_count
+apiserver_client_certificate_expiration_seconds_sum
+apiserver_current_inflight_requests
+apiserver_current_inqueue_requests
+apiserver_delegated_authn_request_duration_seconds_bucket
+apiserver_delegated_authn_request_duration_seconds_count
+apiserver_delegated_authn_request_duration_seconds_sum
+apiserver_delegated_authn_request_total
+apiserver_delegated_authz_request_duration_seconds_bucket
+apiserver_delegated_authz_request_duration_seconds_count
+apiserver_delegated_authz_request_duration_seconds_sum
+apiserver_delegated_authz_request_total
+apiserver_encryption_config_controller_automatic_reload_failures_total
+apiserver_encryption_config_controller_automatic_reload_success_total
+apiserver_envelope_encryption_dek_cache_fill_percent
+apiserver_flowcontrol_current_executing_requests
+apiserver_flowcontrol_current_executing_seats
+apiserver_flowcontrol_current_inqueue_requests
+apiserver_flowcontrol_current_inqueue_seats
+apiserver_flowcontrol_current_limit_seats
+apiserver_flowcontrol_current_r
+apiserver_flowcontrol_demand_seats_average
+apiserver_flowcontrol_demand_seats_bucket
+apiserver_flowcontrol_demand_seats_count
+apiserver_flowcontrol_demand_seats_high_watermark
+apiserver_flowcontrol_demand_seats_smoothed
+apiserver_flowcontrol_demand_seats_stdev
+apiserver_flowcontrol_demand_seats_sum
+apiserver_flowcontrol_dispatch_r
+apiserver_flowcontrol_dispatched_requests_total
+apiserver_flowcontrol_latest_s
+apiserver_flowcontrol_lower_limit_seats
+apiserver_flowcontrol_next_discounted_s_bounds
+apiserver_flowcontrol_next_s_bounds
+apiserver_flowcontrol_nominal_limit_seats
+apiserver_flowcontrol_priority_level_request_utilization_bucket
+apiserver_flowcontrol_priority_level_request_utilization_count
+apiserver_flowcontrol_priority_level_request_utilization_sum
+apiserver_flowcontrol_priority_level_seat_utilization_bucket
+apiserver_flowcontrol_priority_level_seat_utilization_count
+apiserver_flowcontrol_priority_level_seat_utilization_sum
+apiserver_flowcontrol_read_vs_write_current_requests_bucket
+apiserver_flowcontrol_read_vs_write_current_requests_count
+apiserver_flowcontrol_read_vs_write_current_requests_sum
+apiserver_flowcontrol_request_concurrency_in_use
+apiserver_flowcontrol_request_concurrency_limit
+apiserver_flowcontrol_request_execution_seconds_bucket
+apiserver_flowcontrol_request_execution_seconds_count
+apiserver_flowcontrol_request_execution_seconds_sum
+apiserver_flowcontrol_request_queue_length_after_enqueue_bucket
+apiserver_flowcontrol_request_queue_length_after_enqueue_count
+apiserver_flowcontrol_request_queue_length_after_enqueue_sum
+apiserver_flowcontrol_request_wait_duration_seconds_bucket
+apiserver_flowcontrol_request_wait_duration_seconds_count
+apiserver_flowcontrol_request_wait_duration_seconds_sum
+apiserver_flowcontrol_seat_fair_frac
+apiserver_flowcontrol_target_seats
+apiserver_flowcontrol_upper_limit_seats
+apiserver_flowcontrol_watch_count_samples_bucket
+apiserver_flowcontrol_watch_count_samples_count
+apiserver_flowcontrol_watch_count_samples_sum
+apiserver_flowcontrol_work_estimated_seats_bucket
+apiserver_flowcontrol_work_estimated_seats_count
+apiserver_flowcontrol_work_estimated_seats_sum
+apiserver_init_events_total
+apiserver_kube_aggregator_x509_insecure_sha1_total
+apiserver_kube_aggregator_x509_missing_san_total
+apiserver_longrunning_requests
+apiserver_request:availability30d
+apiserver_request:burnrate1d
+apiserver_request:burnrate1h
+apiserver_request:burnrate2h
+apiserver_request:burnrate30m
+apiserver_request:burnrate3d
+apiserver_request:burnrate5m
+apiserver_request:burnrate6h
+apiserver_request_duration_seconds_bucket
+apiserver_request_duration_seconds_count
+apiserver_request_duration_seconds_sum
+apiserver_request_filter_duration_seconds_bucket
+apiserver_request_filter_duration_seconds_count
+apiserver_request_filter_duration_seconds_sum
+apiserver_request_post_timeout_total
+apiserver_request_sli_duration_seconds_bucket
+apiserver_request_sli_duration_seconds_count
+apiserver_request_sli_duration_seconds_sum
+apiserver_request_terminations_total
+apiserver_request_timestamp_comparison_time_bucket
+apiserver_request_timestamp_comparison_time_count
+apiserver_request_timestamp_comparison_time_sum
+apiserver_request_total
+apiserver_response_sizes_bucket
+apiserver_response_sizes_count
+apiserver_response_sizes_sum
+apiserver_selfrequest_total
+apiserver_storage_data_key_generation_duration_seconds_bucket
+apiserver_storage_data_key_generation_duration_seconds_count
+apiserver_storage_data_key_generation_duration_seconds_sum
+apiserver_storage_data_key_generation_failures_total
+apiserver_storage_db_total_size_in_bytes
+apiserver_storage_envelope_transformation_cache_misses_total
+apiserver_storage_list_evaluated_objects_total
+apiserver_storage_list_fetched_objects_total
+apiserver_storage_list_returned_objects_total
+apiserver_storage_list_total
+apiserver_storage_objects
+apiserver_storage_size_bytes
+apiserver_storage_transformation_duration_seconds_bucket
+apiserver_storage_transformation_duration_seconds_count
+apiserver_storage_transformation_duration_seconds_sum
+apiserver_storage_transformation_operations_total
+apiserver_tls_handshake_errors_total
+apiserver_watch_cache_events_dispatched_total
+apiserver_watch_cache_events_received_total
+apiserver_watch_cache_initializations_total
+apiserver_watch_events_sizes_bucket
+apiserver_watch_events_sizes_count
+apiserver_watch_events_sizes_sum
+apiserver_watch_events_total
+apiserver_webhooks_x509_insecure_sha1_total
+apiserver_webhooks_x509_missing_san_total
+attachdetach_controller_total_volumes
+authenticated_user_requests
+authentication_attempts
+authentication_duration_seconds_bucket
+authentication_duration_seconds_count
+authentication_duration_seconds_sum
+authentication_token_cache_active_fetch_count
+authentication_token_cache_fetch_total
+authentication_token_cache_request_duration_seconds_bucket
+authentication_token_cache_request_duration_seconds_count
+authentication_token_cache_request_duration_seconds_sum
+authentication_token_cache_request_total
+authorization_attempts_total
+authorization_duration_seconds_bucket
+authorization_duration_seconds_count
+authorization_duration_seconds_sum
+cadvisor_version_info
+cluster:namespace:pod_cpu:active:kube_pod_container_resource_requests
+cluster:namespace:pod_memory:active:kube_pod_container_resource_limits
+cluster:namespace:pod_memory:active:kube_pod_container_resource_requests
+cluster:node_cpu:ratio
+cluster:node_cpu:ratio_rate5m
+cluster:node_cpu:sum_rate5m
+cluster_quantile:apiserver_request_sli_duration_seconds:histogram_quantile
+cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile
+cluster_verb_scope:apiserver_request_sli_duration_seconds_count:increase1h
+cluster_verb_scope:apiserver_request_sli_duration_seconds_count:increase30d
+cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase1h
+cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d
+code:apiserver_request_total:increase30d
+code_resource:apiserver_request_total:rate5m
+code_verb:apiserver_request_total:increase1h
+code_verb:apiserver_request_total:increase30d
+container_blkio_device_usage_total
+container_cpu_usage_seconds_total
+container_fs_reads_bytes_total
+container_fs_reads_total
+container_fs_writes_bytes_total
+container_fs_writes_total
+container_last_seen
+container_memory_cache
+container_memory_failcnt
+container_memory_failures_total
+container_memory_max_usage_bytes
+container_memory_rss
+container_memory_usage_bytes
+container_memory_working_set_bytes
+container_network_receive_bytes_total
+container_network_receive_errors_total
+container_network_receive_packets_dropped_total
+container_network_receive_packets_total
+container_network_transmit_bytes_total
+container_network_transmit_errors_total
+container_network_transmit_packets_dropped_total
+container_network_transmit_packets_total
+container_oom_events_total
+container_processes
+container_scrape_error
+container_sockets
+container_start_time_seconds
+container_threads
+container_ulimits_soft
+coredns_build_info
+coredns_cache_entries
+coredns_cache_hits_total
+coredns_cache_misses_total
+coredns_cache_requests_total
+coredns_dns_request_duration_seconds_bucket
+coredns_dns_request_duration_seconds_count
+coredns_dns_request_duration_seconds_sum
+coredns_dns_request_size_bytes_bucket
+coredns_dns_request_size_bytes_count
+coredns_dns_request_size_bytes_sum
+coredns_dns_requests_total
+coredns_dns_response_size_bytes_bucket
+coredns_dns_response_size_bytes_count
+coredns_dns_response_size_bytes_sum
+coredns_dns_responses_total
+coredns_forward_conn_cache_hits_total
+coredns_forward_conn_cache_misses_total
+coredns_forward_healthcheck_broken_total
+coredns_forward_healthcheck_failures_total
+coredns_forward_max_concurrent_rejects_total
+coredns_forward_request_duration_seconds_bucket
+coredns_forward_request_duration_seconds_count
+coredns_forward_request_duration_seconds_sum
+coredns_forward_requests_total
+coredns_forward_responses_total
+coredns_health_request_duration_seconds_bucket
+coredns_health_request_duration_seconds_count
+coredns_health_request_duration_seconds_sum
+coredns_health_request_failures_total
+coredns_hosts_reload_timestamp_seconds
+coredns_kubernetes_dns_programming_duration_seconds_bucket
+coredns_kubernetes_dns_programming_duration_seconds_count
+coredns_kubernetes_dns_programming_duration_seconds_sum
+coredns_local_localhost_requests_total
+coredns_panics_total
+coredns_plugin_enabled
+coredns_reload_failed_total
+count:up0
+count:up1
+cronjob_controller_job_creation_skew_duration_seconds_bucket
+cronjob_controller_job_creation_skew_duration_seconds_count
+cronjob_controller_job_creation_skew_duration_seconds_sum
+csi_operations_seconds_bucket
+csi_operations_seconds_count
+csi_operations_seconds_sum
+disabled_metrics_total
+endpoint_slice_controller_changes
+endpoint_slice_controller_desired_endpoint_slices
+endpoint_slice_controller_endpoints_added_per_sync_bucket
+endpoint_slice_controller_endpoints_added_per_sync_count
+endpoint_slice_controller_endpoints_added_per_sync_sum
+endpoint_slice_controller_endpoints_desired
+endpoint_slice_controller_endpoints_removed_per_sync_bucket
+endpoint_slice_controller_endpoints_removed_per_sync_count
+endpoint_slice_controller_endpoints_removed_per_sync_sum
+endpoint_slice_controller_endpointslices_changed_per_sync_bucket
+endpoint_slice_controller_endpointslices_changed_per_sync_count
+endpoint_slice_controller_endpointslices_changed_per_sync_sum
+endpoint_slice_controller_num_endpoint_slices
+endpoint_slice_controller_syncs
+endpoint_slice_mirroring_controller_addresses_skipped_per_sync_bucket
+endpoint_slice_mirroring_controller_addresses_skipped_per_sync_count
+endpoint_slice_mirroring_controller_addresses_skipped_per_sync_sum
+endpoint_slice_mirroring_controller_changes
+endpoint_slice_mirroring_controller_desired_endpoint_slices
+endpoint_slice_mirroring_controller_endpoints_added_per_sync_bucket
+endpoint_slice_mirroring_controller_endpoints_added_per_sync_count
+endpoint_slice_mirroring_controller_endpoints_added_per_sync_sum
+endpoint_slice_mirroring_controller_endpoints_desired
+endpoint_slice_mirroring_controller_endpoints_removed_per_sync_bucket
+endpoint_slice_mirroring_controller_endpoints_removed_per_sync_count
+endpoint_slice_mirroring_controller_endpoints_removed_per_sync_sum
+endpoint_slice_mirroring_controller_endpoints_sync_duration_bucket
+endpoint_slice_mirroring_controller_endpoints_sync_duration_count
+endpoint_slice_mirroring_controller_endpoints_sync_duration_sum
+endpoint_slice_mirroring_controller_endpoints_updated_per_sync_bucket
+endpoint_slice_mirroring_controller_endpoints_updated_per_sync_count
+endpoint_slice_mirroring_controller_endpoints_updated_per_sync_sum
+endpoint_slice_mirroring_controller_num_endpoint_slices
+ephemeral_volume_controller_create_failures_total
+ephemeral_volume_controller_create_total
+etcd_bookmark_counts
+etcd_lease_object_counts_bucket
+etcd_lease_object_counts_count
+etcd_lease_object_counts_sum
+etcd_request_duration_seconds_bucket
+etcd_request_duration_seconds_count
+etcd_request_duration_seconds_sum
+etcd_request_errors_total
+etcd_requests_total
+field_validation_request_duration_seconds_bucket
+field_validation_request_duration_seconds_count
+field_validation_request_duration_seconds_sum
+force_cleaned_failed_volume_operation_errors_total
+force_cleaned_failed_volume_operations_total
+garbagecollector_controller_resources_sync_error_total
+get_token_count
+get_token_fail_count
+go_cgo_go_to_c_calls_calls_total
+go_cpu_classes_gc_mark_assist_cpu_seconds_total
+go_cpu_classes_gc_mark_dedicated_cpu_seconds_total
+go_cpu_classes_gc_mark_idle_cpu_seconds_total
+go_cpu_classes_gc_pause_cpu_seconds_total
+go_cpu_classes_gc_total_cpu_seconds_total
+go_cpu_classes_idle_cpu_seconds_total
+go_cpu_classes_scavenge_assist_cpu_seconds_total
+go_cpu_classes_scavenge_background_cpu_seconds_total
+go_cpu_classes_scavenge_total_cpu_seconds_total
+go_cpu_classes_total_cpu_seconds_total
+go_cpu_classes_user_cpu_seconds_total
+go_gc_cycles_automatic_gc_cycles_total
+go_gc_cycles_forced_gc_cycles_total
+go_gc_cycles_total_gc_cycles_total
+go_gc_duration_seconds
+go_gc_duration_seconds_count
+go_gc_duration_seconds_sum
+go_gc_gogc_percent
+go_gc_gomemlimit_bytes
+go_gc_heap_allocs_by_size_bytes_bucket
+go_gc_heap_allocs_by_size_bytes_count
+go_gc_heap_allocs_by_size_bytes_sum
+go_gc_heap_allocs_bytes_total
+go_gc_heap_allocs_objects_total
+go_gc_heap_frees_by_size_bytes_bucket
+go_gc_heap_frees_by_size_bytes_count
+go_gc_heap_frees_by_size_bytes_sum
+go_gc_heap_frees_bytes_total
+go_gc_heap_frees_objects_total
+go_gc_heap_goal_bytes
+go_gc_heap_live_bytes
+go_gc_heap_objects_objects
+go_gc_heap_tiny_allocs_objects_total
+go_gc_limiter_last_enabled_gc_cycle
+go_gc_pauses_seconds_bucket
+go_gc_pauses_seconds_count
+go_gc_pauses_seconds_sum
+go_gc_scan_globals_bytes
+go_gc_scan_heap_bytes
+go_gc_scan_stack_bytes
+go_gc_scan_total_bytes
+go_gc_stack_starting_size_bytes
+go_godebug_non_default_behavior_execerrdot_events_total
+go_godebug_non_default_behavior_gocachehash_events_total
+go_godebug_non_default_behavior_gocachetest_events_total
+go_godebug_non_default_behavior_gocacheverify_events_total
+go_godebug_non_default_behavior_http2client_events_total
+go_godebug_non_default_behavior_http2server_events_total
+go_godebug_non_default_behavior_installgoroot_events_total
+go_godebug_non_default_behavior_jstmpllitinterp_events_total
+go_godebug_non_default_behavior_multipartmaxheaders_events_total
+go_godebug_non_default_behavior_multipartmaxparts_events_total
+go_godebug_non_default_behavior_multipathtcp_events_total
+go_godebug_non_default_behavior_panicnil_events_total
+go_godebug_non_default_behavior_randautoseed_events_total
+go_godebug_non_default_behavior_tarinsecurepath_events_total
+go_godebug_non_default_behavior_tlsmaxrsasize_events_total
+go_godebug_non_default_behavior_x509sha1_events_total
+go_godebug_non_default_behavior_x509usefallbackroots_events_total
+go_godebug_non_default_behavior_zipinsecurepath_events_total
+go_goroutines
+go_info
+go_memory_classes_heap_free_bytes
+go_memory_classes_heap_objects_bytes
+go_memory_classes_heap_released_bytes
+go_memory_classes_heap_stacks_bytes
+go_memory_classes_heap_unused_bytes
+go_memory_classes_metadata_mcache_free_bytes
+go_memory_classes_metadata_mcache_inuse_bytes
+go_memory_classes_metadata_mspan_free_bytes
+go_memory_classes_metadata_mspan_inuse_bytes
+go_memory_classes_metadata_other_bytes
+go_memory_classes_os_stacks_bytes
+go_memory_classes_other_bytes
+go_memory_classes_profiling_buckets_bytes
+go_memory_classes_total_bytes
+go_memstats_alloc_bytes
+go_memstats_alloc_bytes_total
+go_memstats_buck_hash_sys_bytes
+go_memstats_frees_total
+go_memstats_gc_sys_bytes
+go_memstats_heap_alloc_bytes
+go_memstats_heap_idle_bytes
+go_memstats_heap_inuse_bytes
+go_memstats_heap_objects
+go_memstats_heap_released_bytes
+go_memstats_heap_sys_bytes
+go_memstats_last_gc_time_seconds
+go_memstats_lookups_total
+go_memstats_mallocs_total
+go_memstats_mcache_inuse_bytes
+go_memstats_mcache_sys_bytes
+go_memstats_mspan_inuse_bytes
+go_memstats_mspan_sys_bytes
+go_memstats_next_gc_bytes
+go_memstats_other_sys_bytes
+go_memstats_stack_inuse_bytes
+go_memstats_stack_sys_bytes
+go_memstats_sys_bytes
+go_sched_gomaxprocs_threads
+go_sched_goroutines_goroutines
+go_sched_latencies_seconds_bucket
+go_sched_latencies_seconds_count
+go_sched_latencies_seconds_sum
+go_sync_mutex_wait_total_seconds_total
+go_threads
+grpc_client_handled_total
+grpc_client_msg_received_total
+grpc_client_msg_sent_total
+grpc_client_started_total
+hidden_metrics_total
+instance:node_cpu:rate:sum
+instance:node_cpu:ratio
+instance:node_cpu_utilisation:rate5m
+instance:node_load1_per_cpu:ratio
+instance:node_memory_utilisation:ratio
+instance:node_network_receive_bytes:rate:sum
+instance:node_network_receive_bytes_excluding_lo:rate5m
+instance:node_network_receive_drop_excluding_lo:rate5m
+instance:node_network_transmit_bytes:rate:sum
+instance:node_network_transmit_bytes_excluding_lo:rate5m
+instance:node_network_transmit_drop_excluding_lo:rate5m
+instance:node_num_cpu:sum
+instance:node_vmstat_pgmajfault:rate5m
+instance_device:node_disk_io_time_seconds:rate5m
+instance_device:node_disk_io_time_weighted_seconds:rate5m
+job_controller_job_pods_finished_total
+job_controller_job_sync_duration_seconds_bucket
+job_controller_job_sync_duration_seconds_count
+job_controller_job_sync_duration_seconds_sum
+job_controller_job_syncs_total
+job_controller_jobs_finished_total
+job_controller_terminated_pods_tracking_finalizer_total
+kube_apiserver_clusterip_allocator_allocated_ips
+kube_apiserver_clusterip_allocator_allocation_total
+kube_apiserver_clusterip_allocator_available_ips
+kube_apiserver_nodeport_allocator_allocated_ports
+kube_apiserver_nodeport_allocator_allocation_total
+kube_apiserver_nodeport_allocator_available_ports
+kube_apiserver_pod_logs_backend_tls_failure_total
+kube_apiserver_pod_logs_insecure_backend_total
+kube_certificatesigningrequest_cert_length
+kube_certificatesigningrequest_condition
+kube_certificatesigningrequest_created
+kube_configmap_created
+kube_configmap_info
+kube_configmap_metadata_resource_version
+kube_cronjob_created
+kube_cronjob_info
+kube_cronjob_metadata_resource_version
+kube_cronjob_spec_failed_job_history_limit
+kube_cronjob_spec_successful_job_history_limit
+kube_cronjob_spec_suspend
+kube_cronjob_status_active
+kube_daemonset_created
+kube_daemonset_metadata_generation
+kube_daemonset_status_current_number_scheduled
+kube_daemonset_status_desired_number_scheduled
+kube_daemonset_status_number_available
+kube_daemonset_status_number_misscheduled
+kube_daemonset_status_number_ready
+kube_daemonset_status_number_unavailable
+kube_daemonset_status_observed_generation
+kube_daemonset_status_updated_number_scheduled
+kube_deployment_created
+kube_deployment_metadata_generation
+kube_deployment_spec_paused
+kube_deployment_spec_replicas
+kube_deployment_spec_strategy_rollingupdate_max_surge
+kube_deployment_spec_strategy_rollingupdate_max_unavailable
+kube_deployment_status_condition
+kube_deployment_status_observed_generation
+kube_deployment_status_replicas
+kube_deployment_status_replicas_available
+kube_deployment_status_replicas_ready
+kube_deployment_status_replicas_unavailable
+kube_deployment_status_replicas_updated
+kube_endpoint_address
+kube_endpoint_address_available
+kube_endpoint_address_not_ready
+kube_endpoint_created
+kube_endpoint_info
+kube_endpoint_ports
+kube_lease_owner
+kube_lease_renew_time
+kube_mutatingwebhookconfiguration_created
+kube_mutatingwebhookconfiguration_info
+kube_mutatingwebhookconfiguration_metadata_resource_version
+kube_mutatingwebhookconfiguration_webhook_clientconfig_service
+kube_namespace_created
+kube_namespace_status_phase
+kube_node_created
+kube_node_info
+kube_node_role
+kube_node_spec_unschedulable
+kube_node_status_addresses
+kube_node_status_allocatable
+kube_node_status_capacity
+kube_node_status_condition
+kube_persistentvolume_capacity_bytes
+kube_persistentvolume_claim_ref
+kube_persistentvolume_created
+kube_persistentvolume_info
+kube_persistentvolume_status_phase
+kube_persistentvolumeclaim_access_mode
+kube_persistentvolumeclaim_created
+kube_persistentvolumeclaim_info
+kube_persistentvolumeclaim_resource_requests_storage_bytes
+kube_persistentvolumeclaim_status_phase
+kube_pod_completion_time
+kube_pod_container_info
+kube_pod_container_resource_limits
+kube_pod_container_resource_requests
+kube_pod_container_state_started
+kube_pod_container_status_last_terminated_exitcode
+kube_pod_container_status_last_terminated_reason
+kube_pod_container_status_last_terminated_timestamp
+kube_pod_container_status_ready
+kube_pod_container_status_restarts_total
+kube_pod_container_status_running
+kube_pod_container_status_terminated
+kube_pod_container_status_terminated_reason
+kube_pod_container_status_waiting
+kube_pod_container_status_waiting_reason
+kube_pod_created
+kube_pod_deletion_timestamp
+kube_pod_info
+kube_pod_init_container_info
+kube_pod_init_container_resource_requests
+kube_pod_init_container_status_ready
+kube_pod_init_container_status_restarts_total
+kube_pod_init_container_status_running
+kube_pod_init_container_status_terminated
+kube_pod_init_container_status_terminated_reason
+kube_pod_init_container_status_waiting
+kube_pod_ips
+kube_pod_owner
+kube_pod_restart_policy
+kube_pod_scheduler
+kube_pod_service_account
+kube_pod_spec_volumes_persistentvolumeclaims_info
+kube_pod_spec_volumes_persistentvolumeclaims_readonly
+kube_pod_start_time
+kube_pod_status_container_ready_time
+kube_pod_status_initialized_time
+kube_pod_status_phase
+kube_pod_status_qos_class
+kube_pod_status_ready
+kube_pod_status_ready_time
+kube_pod_status_reason
+kube_pod_status_scheduled
+kube_pod_status_scheduled_time
+kube_pod_tolerations
+kube_replicaset_created
+kube_replicaset_metadata_generation
+kube_replicaset_owner
+kube_replicaset_spec_replicas
+kube_replicaset_status_fully_labeled_replicas
+kube_replicaset_status_observed_generation
+kube_replicaset_status_ready_replicas
+kube_replicaset_status_replicas
+kube_secret_created
+kube_secret_info
+kube_secret_metadata_resource_version
+kube_secret_owner
+kube_secret_type
+kube_service_created
+kube_service_info
+kube_service_spec_type
+kube_service_status_load_balancer_ingress
+kube_statefulset_created
+kube_statefulset_metadata_generation
+kube_statefulset_persistentvolumeclaim_retention_policy
+kube_statefulset_replicas
+kube_statefulset_status_current_revision
+kube_statefulset_status_observed_generation
+kube_statefulset_status_replicas
+kube_statefulset_status_replicas_available
+kube_statefulset_status_replicas_current
+kube_statefulset_status_replicas_ready
+kube_statefulset_status_replicas_updated
+kube_statefulset_status_update_revision
+kube_storageclass_created
+kube_storageclass_info
+kube_validatingwebhookconfiguration_created
+kube_validatingwebhookconfiguration_info
+kube_validatingwebhookconfiguration_metadata_resource_version
+kube_validatingwebhookconfiguration_webhook_clientconfig_service
+kube_volumeattachment_created
+kube_volumeattachment_info
+kube_volumeattachment_labels
+kube_volumeattachment_spec_source_persistentvolume
+kube_volumeattachment_status_attached
+kube_volumeattachment_status_attachment_metadata
+kubelet_active_pods
+kubelet_certificate_manager_client_expiration_renew_errors
+kubelet_certificate_manager_client_ttl_seconds
+kubelet_certificate_manager_server_rotation_seconds_bucket
+kubelet_certificate_manager_server_rotation_seconds_count
+kubelet_certificate_manager_server_rotation_seconds_sum
+kubelet_certificate_manager_server_ttl_seconds
+kubelet_cgroup_manager_duration_seconds_bucket
+kubelet_cgroup_manager_duration_seconds_count
+kubelet_cgroup_manager_duration_seconds_sum
+kubelet_container_log_filesystem_used_bytes
+kubelet_containers_per_pod_count_bucket
+kubelet_containers_per_pod_count_count
+kubelet_containers_per_pod_count_sum
+kubelet_cpu_manager_pinning_errors_total
+kubelet_cpu_manager_pinning_requests_total
+kubelet_desired_pods
+kubelet_evented_pleg_connection_error_count
+kubelet_evented_pleg_connection_latency_seconds_bucket
+kubelet_evented_pleg_connection_latency_seconds_count
+kubelet_evented_pleg_connection_latency_seconds_sum
+kubelet_evented_pleg_connection_success_count
+kubelet_graceful_shutdown_end_time_seconds
+kubelet_graceful_shutdown_start_time_seconds
+kubelet_http_inflight_requests
+kubelet_http_requests_duration_seconds_bucket
+kubelet_http_requests_duration_seconds_count
+kubelet_http_requests_duration_seconds_sum
+kubelet_http_requests_total
+kubelet_lifecycle_handler_http_fallbacks_total
+kubelet_managed_ephemeral_containers
+kubelet_mirror_pods
+kubelet_node_name
+kubelet_orphan_pod_cleaned_volumes
+kubelet_orphan_pod_cleaned_volumes_errors
+kubelet_orphaned_runtime_pods_total
+kubelet_pleg_discard_events
+kubelet_pleg_last_seen_seconds
+kubelet_pleg_relist_duration_seconds_bucket
+kubelet_pleg_relist_duration_seconds_count
+kubelet_pleg_relist_duration_seconds_sum
+kubelet_pleg_relist_interval_seconds_bucket
+kubelet_pleg_relist_interval_seconds_count
+kubelet_pleg_relist_interval_seconds_sum
+kubelet_pod_start_duration_seconds_bucket
+kubelet_pod_start_duration_seconds_count
+kubelet_pod_start_duration_seconds_sum
+kubelet_pod_start_sli_duration_seconds_bucket
+kubelet_pod_start_sli_duration_seconds_count
+kubelet_pod_start_sli_duration_seconds_sum
+kubelet_pod_status_sync_duration_seconds_bucket
+kubelet_pod_status_sync_duration_seconds_count
+kubelet_pod_status_sync_duration_seconds_sum
+kubelet_pod_worker_duration_seconds_bucket
+kubelet_pod_worker_duration_seconds_count
+kubelet_pod_worker_duration_seconds_sum
+kubelet_pod_worker_start_duration_seconds_bucket
+kubelet_pod_worker_start_duration_seconds_count
+kubelet_pod_worker_start_duration_seconds_sum
+kubelet_restarted_pods_total
+kubelet_run_podsandbox_duration_seconds_bucket
+kubelet_run_podsandbox_duration_seconds_count
+kubelet_run_podsandbox_duration_seconds_sum
+kubelet_running_containers
+kubelet_running_pods
+kubelet_runtime_operations_duration_seconds_bucket
+kubelet_runtime_operations_duration_seconds_count
+kubelet_runtime_operations_duration_seconds_sum
+kubelet_runtime_operations_errors_total
+kubelet_runtime_operations_total
+kubelet_server_expiration_renew_errors
+kubelet_started_containers_errors_total
+kubelet_started_containers_total
+kubelet_started_pods_errors_total
+kubelet_started_pods_total
+kubelet_topology_manager_admission_duration_ms_bucket
+kubelet_topology_manager_admission_duration_ms_count
+kubelet_topology_manager_admission_duration_ms_sum
+kubelet_topology_manager_admission_errors_total
+kubelet_topology_manager_admission_requests_total
+kubelet_volume_metric_collection_duration_seconds_bucket
+kubelet_volume_metric_collection_duration_seconds_count
+kubelet_volume_metric_collection_duration_seconds_sum
+kubelet_volume_stats_available_bytes
+kubelet_volume_stats_capacity_bytes
+kubelet_volume_stats_inodes
+kubelet_volume_stats_inodes_free
+kubelet_volume_stats_inodes_used
+kubelet_volume_stats_used_bytes
+kubelet_working_pods
+kubernetes_build_info
+kubernetes_feature_enabled
+leader_election_master_status
+machine_cpu_cores
+machine_cpu_physical_cores
+machine_cpu_sockets
+machine_memory_bytes
+machine_nvm_avg_power_budget_watts
+machine_nvm_capacity
+machine_scrape_error
+namespace_cpu:kube_pod_container_resource_requests:sum
+namespace_memory:kube_pod_container_resource_limits:sum
+namespace_memory:kube_pod_container_resource_requests:sum
+namespace_workload_pod:kube_pod_owner:relabel
+net_conntrack_dialer_conn_attempted_total
+net_conntrack_dialer_conn_closed_total
+net_conntrack_dialer_conn_established_total
+net_conntrack_dialer_conn_failed_total
+net_conntrack_listener_conn_accepted_total
+net_conntrack_listener_conn_closed_total
+node:node_cpu_utilization:ratio_rate5m
+node:node_num_cpu:sum
+node_arp_entries
+node_authorizer_graph_actions_duration_seconds_bucket
+node_authorizer_graph_actions_duration_seconds_count
+node_authorizer_graph_actions_duration_seconds_sum
+node_boot_time_seconds
+node_collector_evictions_total
+node_collector_unhealthy_nodes_in_zone
+node_collector_update_all_nodes_health_duration_seconds_bucket
+node_collector_update_all_nodes_health_duration_seconds_count
+node_collector_update_all_nodes_health_duration_seconds_sum
+node_collector_update_node_health_duration_seconds_bucket
+node_collector_update_node_health_duration_seconds_count
+node_collector_update_node_health_duration_seconds_sum
+node_collector_zone_health
+node_collector_zone_size
+node_context_switches_total
+node_cpu_guest_seconds_total
+node_cpu_seconds_total
+node_disk_discard_time_seconds_total
+node_disk_discarded_sectors_total
+node_disk_discards_completed_total
+node_disk_discards_merged_total
+node_disk_filesystem_info
+node_disk_flush_requests_time_seconds_total
+node_disk_flush_requests_total
+node_disk_info
+node_disk_io_now
+node_disk_io_time_seconds_total
+node_disk_io_time_weighted_seconds_total
+node_disk_read_bytes_total
+node_disk_read_time_seconds_total
+node_disk_reads_completed_total
+node_disk_reads_merged_total
+node_disk_write_time_seconds_total
+node_disk_writes_completed_total
+node_disk_writes_merged_total
+node_disk_written_bytes_total
+node_dmi_info
+node_entropy_available_bits
+node_entropy_pool_size_bits
+node_exporter_build_info
+node_filefd_allocated
+node_filefd_maximum
+node_filesystem_avail_bytes
+node_filesystem_device_error
+node_filesystem_files
+node_filesystem_files_free
+node_filesystem_free_bytes
+node_filesystem_readonly
+node_filesystem_size_bytes
+node_forks_total
+node_intr_total
+node_ipam_controller_cidrset_allocation_tries_per_request_bucket
+node_ipam_controller_cidrset_allocation_tries_per_request_count
+node_ipam_controller_cidrset_allocation_tries_per_request_sum
+node_ipam_controller_cidrset_cidrs_allocations_total
+node_ipam_controller_cidrset_usage_cidrs
+node_ipam_controller_cirdset_max_cidrs
+node_load1
+node_load15
+node_load5
+node_memory_Active_anon_bytes
+node_memory_Active_bytes
+node_memory_Active_file_bytes
+node_memory_AnonHugePages_bytes
+node_memory_AnonPages_bytes
+node_memory_Bounce_bytes
+node_memory_Buffers_bytes
+node_memory_Cached_bytes
+node_memory_CmaFree_bytes
+node_memory_CmaTotal_bytes
+node_memory_CommitLimit_bytes
+node_memory_Committed_AS_bytes
+node_memory_Dirty_bytes
+node_memory_FileHugePages_bytes
+node_memory_FilePmdMapped_bytes
+node_memory_HardwareCorrupted_bytes
+node_memory_HugePages_Free
+node_memory_HugePages_Rsvd
+node_memory_HugePages_Surp
+node_memory_HugePages_Total
+node_memory_Hugepagesize_bytes
+node_memory_Hugetlb_bytes
+node_memory_Inactive_anon_bytes
+node_memory_Inactive_bytes
+node_memory_Inactive_file_bytes
+node_memory_KReclaimable_bytes
+node_memory_KernelStack_bytes
+node_memory_Mapped_bytes
+node_memory_MemAvailable_bytes
+node_memory_MemFree_bytes
+node_memory_MemTotal_bytes
+node_memory_Mlocked_bytes
+node_memory_NFS_Unstable_bytes
+node_memory_PageTables_bytes
+node_memory_Percpu_bytes
+node_memory_SReclaimable_bytes
+node_memory_SUnreclaim_bytes
+node_memory_ShmemHugePages_bytes
+node_memory_ShmemPmdMapped_bytes
+node_memory_Shmem_bytes
+node_memory_Slab_bytes
+node_memory_SwapCached_bytes
+node_memory_SwapFree_bytes
+node_memory_SwapTotal_bytes
+node_memory_Unevictable_bytes
+node_memory_VmallocChunk_bytes
+node_memory_VmallocTotal_bytes
+node_memory_VmallocUsed_bytes
+node_memory_WritebackTmp_bytes
+node_memory_Writeback_bytes
+node_namespace_pod:kube_pod_info:
+node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate
+node_namespace_pod_container:container_memory_cache
+node_namespace_pod_container:container_memory_rss
+node_namespace_pod_container:container_memory_working_set_bytes
+node_netstat_Icmp6_InErrors
+node_netstat_Icmp6_InMsgs
+node_netstat_Icmp6_OutMsgs
+node_netstat_Icmp_InErrors
+node_netstat_Icmp_InMsgs
+node_netstat_Icmp_OutMsgs
+node_netstat_Ip6_InOctets
+node_netstat_Ip6_OutOctets
+node_netstat_IpExt_InOctets
+node_netstat_IpExt_OutOctets
+node_netstat_Ip_Forwarding
+node_netstat_TcpExt_ListenDrops
+node_netstat_TcpExt_ListenOverflows
+node_netstat_TcpExt_SyncookiesFailed
+node_netstat_TcpExt_SyncookiesRecv
+node_netstat_TcpExt_SyncookiesSent
+node_netstat_TcpExt_TCPOFOQueue
+node_netstat_TcpExt_TCPSynRetrans
+node_netstat_TcpExt_TCPTimeouts
+node_netstat_Tcp_ActiveOpens
+node_netstat_Tcp_CurrEstab
+node_netstat_Tcp_InErrs
+node_netstat_Tcp_InSegs
+node_netstat_Tcp_OutRsts
+node_netstat_Tcp_OutSegs
+node_netstat_Tcp_PassiveOpens
+node_netstat_Tcp_RetransSegs
+node_netstat_Udp6_InDatagrams
+node_netstat_Udp6_InErrors
+node_netstat_Udp6_NoPorts
+node_netstat_Udp6_OutDatagrams
+node_netstat_Udp6_RcvbufErrors
+node_netstat_Udp6_SndbufErrors
+node_netstat_UdpLite6_InErrors
+node_netstat_UdpLite_InErrors
+node_netstat_Udp_InDatagrams
+node_netstat_Udp_InErrors
+node_netstat_Udp_NoPorts
+node_netstat_Udp_OutDatagrams
+node_netstat_Udp_RcvbufErrors
+node_netstat_Udp_SndbufErrors
+node_network_address_assign_type
+node_network_carrier
+node_network_carrier_changes_total
+node_network_carrier_down_changes_total
+node_network_carrier_up_changes_total
+node_network_device_id
+node_network_dormant
+node_network_flags
+node_network_iface_id
+node_network_iface_link
+node_network_iface_link_mode
+node_network_info
+node_network_mtu_bytes
+node_network_name_assign_type
+node_network_net_dev_group
+node_network_protocol_type
+node_network_receive_bytes_total
+node_network_receive_compressed_total
+node_network_receive_drop_total
+node_network_receive_errs_total
+node_network_receive_fifo_total
+node_network_receive_frame_total
+node_network_receive_multicast_total
+node_network_receive_nohandler_total
+node_network_receive_packets_total
+node_network_speed_bytes
+node_network_transmit_bytes_total
+node_network_transmit_carrier_total
+node_network_transmit_colls_total
+node_network_transmit_compressed_total
+node_network_transmit_drop_total
+node_network_transmit_errs_total
+node_network_transmit_fifo_total
+node_network_transmit_packets_total
+node_network_transmit_queue_length
+node_network_up
+node_nf_conntrack_entries
+node_nf_conntrack_entries_limit
+node_os_info
+node_os_version
+node_pressure_cpu_waiting_seconds_total
+node_pressure_io_stalled_seconds_total
+node_pressure_io_waiting_seconds_total
+node_pressure_memory_stalled_seconds_total
+node_pressure_memory_waiting_seconds_total
+node_procs_blocked
+node_procs_running
+node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile
+node_schedstat_running_seconds_total
+node_schedstat_timeslices_total
+node_schedstat_waiting_seconds_total
+node_scrape_collector_duration_seconds
+node_scrape_collector_success
+node_selinux_enabled
+node_sockstat_FRAG6_inuse
+node_sockstat_FRAG6_memory
+node_sockstat_FRAG_inuse
+node_sockstat_FRAG_memory
+node_sockstat_RAW6_inuse
+node_sockstat_RAW_inuse
+node_sockstat_TCP6_inuse
+node_sockstat_TCP_alloc
+node_sockstat_TCP_inuse
+node_sockstat_TCP_mem
+node_sockstat_TCP_mem_bytes
+node_sockstat_TCP_orphan
+node_sockstat_TCP_tw
+node_sockstat_UDP6_inuse
+node_sockstat_UDPLITE6_inuse
+node_sockstat_UDPLITE_inuse
+node_sockstat_UDP_inuse
+node_sockstat_UDP_mem
+node_sockstat_UDP_mem_bytes
+node_sockstat_sockets_used
+node_softnet_backlog_len
+node_softnet_cpu_collision_total
+node_softnet_dropped_total
+node_softnet_flow_limit_count_total
+node_softnet_processed_total
+node_softnet_received_rps_total
+node_softnet_times_squeezed_total
+node_textfile_scrape_error
+node_time_clocksource_available_info
+node_time_clocksource_current_info
+node_time_seconds
+node_time_zone_offset_seconds
+node_timex_estimated_error_seconds
+node_timex_frequency_adjustment_ratio
+node_timex_loop_time_constant
+node_timex_maxerror_seconds
+node_timex_offset_seconds
+node_timex_pps_calibration_total
+node_timex_pps_error_total
+node_timex_pps_frequency_hertz
+node_timex_pps_jitter_seconds
+node_timex_pps_jitter_total
+node_timex_pps_shift_seconds
+node_timex_pps_stability_exceeded_total
+node_timex_pps_stability_hertz
+node_timex_status
+node_timex_sync_status
+node_timex_tai_offset_seconds
+node_timex_tick_seconds
+node_udp_queues
+node_uname_info
+node_vmstat_oom_kill
+node_vmstat_pgfault
+node_vmstat_pgmajfault
+node_vmstat_pgpgin
+node_vmstat_pgpgout
+node_vmstat_pswpin
+node_vmstat_pswpout
+plugin_manager_total_plugins
+pod_security_evaluations_total
+pod_security_exemptions_total
+prober_probe_duration_seconds_bucket
+prober_probe_duration_seconds_count
+prober_probe_duration_seconds_sum
+prober_probe_total
+process_cpu_seconds_total
+process_max_fds
+process_open_fds
+process_resident_memory_bytes
+process_start_time_seconds
+process_virtual_memory_bytes
+process_virtual_memory_max_bytes
+prometheus_api_remote_read_queries
+prometheus_build_info
+prometheus_config_last_reload_success_timestamp_seconds
+prometheus_config_last_reload_successful
+prometheus_engine_queries
+prometheus_engine_queries_concurrent_max
+prometheus_engine_query_duration_seconds
+prometheus_engine_query_duration_seconds_count
+prometheus_engine_query_duration_seconds_sum
+prometheus_engine_query_log_enabled
+prometheus_engine_query_log_failures_total
+prometheus_engine_query_samples_total
+prometheus_http_request_duration_seconds_bucket
+prometheus_http_request_duration_seconds_count
+prometheus_http_request_duration_seconds_sum
+prometheus_http_requests_total
+prometheus_http_response_size_bytes_bucket
+prometheus_http_response_size_bytes_count
+prometheus_http_response_size_bytes_sum
+prometheus_notifications_alertmanagers_discovered
+prometheus_notifications_dropped_total
+prometheus_notifications_errors_total
+prometheus_notifications_latency_seconds
+prometheus_notifications_latency_seconds_count
+prometheus_notifications_latency_seconds_sum
+prometheus_notifications_queue_capacity
+prometheus_notifications_queue_length
+prometheus_notifications_sent_total
+prometheus_operator_build_info
+prometheus_operator_kubernetes_client_http_request_duration_seconds_count
+prometheus_operator_kubernetes_client_http_request_duration_seconds_sum
+prometheus_operator_kubernetes_client_http_requests_total
+prometheus_operator_kubernetes_client_rate_limiter_duration_seconds_count
+prometheus_operator_kubernetes_client_rate_limiter_duration_seconds_sum
+prometheus_operator_list_operations_failed_total
+prometheus_operator_list_operations_total
+prometheus_operator_managed_resources
+prometheus_operator_node_address_lookup_errors_total
+prometheus_operator_node_syncs_failed_total
+prometheus_operator_node_syncs_total
+prometheus_operator_ready
+prometheus_operator_reconcile_duration_seconds_bucket
+prometheus_operator_reconcile_duration_seconds_count
+prometheus_operator_reconcile_duration_seconds_sum
+prometheus_operator_reconcile_errors_total
+prometheus_operator_reconcile_operations_total
+prometheus_operator_reconcile_sts_delete_create_total
+prometheus_operator_spec_replicas
+prometheus_operator_spec_shards
+prometheus_operator_status_update_errors_total
+prometheus_operator_status_update_operations_total
+prometheus_operator_syncs
+prometheus_operator_triggered_total
+prometheus_operator_watch_operations_failed_total
+prometheus_operator_watch_operations_total
+prometheus_ready
+prometheus_remote_storage_exemplars_in_total
+prometheus_remote_storage_highest_timestamp_in_seconds
+prometheus_remote_storage_histograms_in_total
+prometheus_remote_storage_samples_in_total
+prometheus_remote_storage_string_interner_zero_reference_releases_total
+prometheus_rule_evaluation_duration_seconds
+prometheus_rule_evaluation_duration_seconds_count
+prometheus_rule_evaluation_duration_seconds_sum
+prometheus_rule_evaluation_failures_total
+prometheus_rule_evaluations_total
+prometheus_rule_group_duration_seconds
+prometheus_rule_group_duration_seconds_count
+prometheus_rule_group_duration_seconds_sum
+prometheus_rule_group_interval_seconds
+prometheus_rule_group_iterations_missed_total
+prometheus_rule_group_iterations_total
+prometheus_rule_group_last_duration_seconds
+prometheus_rule_group_last_evaluation_samples
+prometheus_rule_group_last_evaluation_timestamp_seconds
+prometheus_rule_group_rules
+prometheus_sd_azure_cache_hit_total
+prometheus_sd_azure_failures_total
+prometheus_sd_consul_rpc_duration_seconds
+prometheus_sd_consul_rpc_duration_seconds_count
+prometheus_sd_consul_rpc_duration_seconds_sum
+prometheus_sd_consul_rpc_failures_total
+prometheus_sd_discovered_targets
+prometheus_sd_dns_lookup_failures_total
+prometheus_sd_dns_lookups_total
+prometheus_sd_failed_configs
+prometheus_sd_file_read_errors_total
+prometheus_sd_file_scan_duration_seconds
+prometheus_sd_file_scan_duration_seconds_count
+prometheus_sd_file_scan_duration_seconds_sum
+prometheus_sd_file_watcher_errors_total
+prometheus_sd_http_failures_total
+prometheus_sd_kubernetes_events_total
+prometheus_sd_kubernetes_http_request_duration_seconds_count
+prometheus_sd_kubernetes_http_request_duration_seconds_sum
+prometheus_sd_kubernetes_http_request_total
+prometheus_sd_kubernetes_workqueue_depth
+prometheus_sd_kubernetes_workqueue_items_total
+prometheus_sd_kubernetes_workqueue_latency_seconds_count
+prometheus_sd_kubernetes_workqueue_latency_seconds_sum
+prometheus_sd_kubernetes_workqueue_longest_running_processor_seconds
+prometheus_sd_kubernetes_workqueue_unfinished_work_seconds
+prometheus_sd_kubernetes_workqueue_work_duration_seconds_count
+prometheus_sd_kubernetes_workqueue_work_duration_seconds_sum
+prometheus_sd_kuma_fetch_duration_seconds
+prometheus_sd_kuma_fetch_duration_seconds_count
+prometheus_sd_kuma_fetch_duration_seconds_sum
+prometheus_sd_kuma_fetch_failures_total
+prometheus_sd_kuma_fetch_skipped_updates_total
+prometheus_sd_linode_failures_total
+prometheus_sd_nomad_failures_total
+prometheus_sd_received_updates_total
+prometheus_sd_updates_delayed_total
+prometheus_sd_updates_total
+prometheus_target_interval_length_seconds
+prometheus_target_interval_length_seconds_count
+prometheus_target_interval_length_seconds_sum
+prometheus_target_metadata_cache_bytes
+prometheus_target_metadata_cache_entries
+prometheus_target_scrape_pool_exceeded_label_limits_total
+prometheus_target_scrape_pool_exceeded_target_limit_total
+prometheus_target_scrape_pool_reloads_failed_total
+prometheus_target_scrape_pool_reloads_total
+prometheus_target_scrape_pool_sync_total
+prometheus_target_scrape_pool_target_limit
+prometheus_target_scrape_pool_targets
+prometheus_target_scrape_pools_failed_total
+prometheus_target_scrape_pools_total
+prometheus_target_scrapes_cache_flush_forced_total
+prometheus_target_scrapes_exceeded_body_size_limit_total
+prometheus_target_scrapes_exceeded_native_histogram_bucket_limit_total
+prometheus_target_scrapes_exceeded_sample_limit_total
+prometheus_target_scrapes_exemplar_out_of_order_total
+prometheus_target_scrapes_sample_duplicate_timestamp_total
+prometheus_target_scrapes_sample_out_of_bounds_total
+prometheus_target_scrapes_sample_out_of_order_total
+prometheus_target_sync_failed_total
+prometheus_target_sync_length_seconds
+prometheus_target_sync_length_seconds_count
+prometheus_target_sync_length_seconds_sum
+prometheus_template_text_expansion_failures_total
+prometheus_template_text_expansions_total
+prometheus_treecache_watcher_goroutines
+prometheus_treecache_zookeeper_failures_total
+prometheus_tsdb_blocks_loaded
+prometheus_tsdb_checkpoint_creations_failed_total
+prometheus_tsdb_checkpoint_creations_total
+prometheus_tsdb_checkpoint_deletions_failed_total
+prometheus_tsdb_checkpoint_deletions_total
+prometheus_tsdb_clean_start
+prometheus_tsdb_compaction_chunk_range_seconds_bucket
+prometheus_tsdb_compaction_chunk_range_seconds_count
+prometheus_tsdb_compaction_chunk_range_seconds_sum
+prometheus_tsdb_compaction_chunk_samples_bucket
+prometheus_tsdb_compaction_chunk_samples_count
+prometheus_tsdb_compaction_chunk_samples_sum
+prometheus_tsdb_compaction_chunk_size_bytes_bucket
+prometheus_tsdb_compaction_chunk_size_bytes_count
+prometheus_tsdb_compaction_chunk_size_bytes_sum
+prometheus_tsdb_compaction_duration_seconds_bucket
+prometheus_tsdb_compaction_duration_seconds_count
+prometheus_tsdb_compaction_duration_seconds_sum
+prometheus_tsdb_compaction_populating_block
+prometheus_tsdb_compactions_failed_total
+prometheus_tsdb_compactions_skipped_total
+prometheus_tsdb_compactions_total
+prometheus_tsdb_compactions_triggered_total
+prometheus_tsdb_data_replay_duration_seconds
+prometheus_tsdb_exemplar_exemplars_appended_total
+prometheus_tsdb_exemplar_exemplars_in_storage
+prometheus_tsdb_exemplar_last_exemplars_timestamp_seconds
+prometheus_tsdb_exemplar_max_exemplars
+prometheus_tsdb_exemplar_out_of_order_exemplars_total
+prometheus_tsdb_exemplar_series_with_exemplars_in_storage
+prometheus_tsdb_head_active_appenders
+prometheus_tsdb_head_chunks
+prometheus_tsdb_head_chunks_created_total
+prometheus_tsdb_head_chunks_removed_total
+prometheus_tsdb_head_chunks_storage_size_bytes
+prometheus_tsdb_head_gc_duration_seconds_count
+prometheus_tsdb_head_gc_duration_seconds_sum
+prometheus_tsdb_head_max_time
+prometheus_tsdb_head_max_time_seconds
+prometheus_tsdb_head_min_time
+prometheus_tsdb_head_min_time_seconds
+prometheus_tsdb_head_out_of_order_samples_appended_total
+prometheus_tsdb_head_samples_appended_total
+prometheus_tsdb_head_series
+prometheus_tsdb_head_series_created_total
+prometheus_tsdb_head_series_not_found_total
+prometheus_tsdb_head_series_removed_total
+prometheus_tsdb_head_truncations_failed_total
+prometheus_tsdb_head_truncations_total
+prometheus_tsdb_isolation_high_watermark
+prometheus_tsdb_isolation_low_watermark
+prometheus_tsdb_lowest_timestamp
+prometheus_tsdb_lowest_timestamp_seconds
+prometheus_tsdb_mmap_chunk_corruptions_total
+prometheus_tsdb_mmap_chunks_total
+prometheus_tsdb_out_of_bound_samples_total
+prometheus_tsdb_out_of_order_samples_total
+prometheus_tsdb_reloads_failures_total
+prometheus_tsdb_reloads_total
+prometheus_tsdb_retention_limit_bytes
+prometheus_tsdb_retention_limit_seconds
+prometheus_tsdb_size_retentions_total
+prometheus_tsdb_snapshot_replay_error_total
+prometheus_tsdb_storage_blocks_bytes
+prometheus_tsdb_symbol_table_size_bytes
+prometheus_tsdb_time_retentions_total
+prometheus_tsdb_tombstone_cleanup_seconds_bucket
+prometheus_tsdb_tombstone_cleanup_seconds_count
+prometheus_tsdb_tombstone_cleanup_seconds_sum
+prometheus_tsdb_too_old_samples_total
+prometheus_tsdb_vertical_compactions_total
+prometheus_tsdb_wal_completed_pages_total
+prometheus_tsdb_wal_corruptions_total
+prometheus_tsdb_wal_fsync_duration_seconds
+prometheus_tsdb_wal_fsync_duration_seconds_count
+prometheus_tsdb_wal_fsync_duration_seconds_sum
+prometheus_tsdb_wal_page_flushes_total
+prometheus_tsdb_wal_segment_current
+prometheus_tsdb_wal_storage_size_bytes
+prometheus_tsdb_wal_truncate_duration_seconds_count
+prometheus_tsdb_wal_truncate_duration_seconds_sum
+prometheus_tsdb_wal_truncations_failed_total
+prometheus_tsdb_wal_truncations_total
+prometheus_tsdb_wal_writes_failed_total
+prometheus_web_federation_errors_total
+prometheus_web_federation_warnings_total
+promhttp_metric_handler_errors_total
+promhttp_metric_handler_requests_in_flight
+promhttp_metric_handler_requests_total
+pv_collector_bound_pv_count
+pv_collector_bound_pvc_count
+pv_collector_total_pv_count
+reconstruct_volume_operations_errors_total
+reconstruct_volume_operations_total
+registered_metrics_total
+reloader_config_apply_operations_failed_total
+reloader_config_apply_operations_total
+reloader_info
+reloader_last_reload_success_timestamp_seconds
+reloader_last_reload_successful
+reloader_reloads_failed_total
+reloader_reloads_total
+reloader_watch_errors_total
+reloader_watch_events_total
+reloader_watches
+replicaset_controller_sorting_deletion_age_ratio_bucket
+replicaset_controller_sorting_deletion_age_ratio_count
+replicaset_controller_sorting_deletion_age_ratio_sum
+rest_client_exec_plugin_certificate_rotation_age_bucket
+rest_client_exec_plugin_certificate_rotation_age_count
+rest_client_exec_plugin_certificate_rotation_age_sum
+rest_client_exec_plugin_ttl_seconds
+rest_client_rate_limiter_duration_seconds_bucket
+rest_client_rate_limiter_duration_seconds_count
+rest_client_rate_limiter_duration_seconds_sum
+rest_client_request_duration_seconds_bucket
+rest_client_request_duration_seconds_count
+rest_client_request_duration_seconds_sum
+rest_client_request_size_bytes_bucket
+rest_client_request_size_bytes_count
+rest_client_request_size_bytes_sum
+rest_client_requests_total
+rest_client_response_size_bytes_bucket
+rest_client_response_size_bytes_count
+rest_client_response_size_bytes_sum
+rest_client_transport_cache_entries
+rest_client_transport_create_calls_total
+retroactive_storageclass_errors_total
+retroactive_storageclass_total
+root_ca_cert_publisher_sync_duration_seconds_bucket
+root_ca_cert_publisher_sync_duration_seconds_count
+root_ca_cert_publisher_sync_duration_seconds_sum
+root_ca_cert_publisher_sync_total
+running_managed_controllers
+scheduler_framework_extension_point_duration_seconds_bucket
+scheduler_framework_extension_point_duration_seconds_count
+scheduler_framework_extension_point_duration_seconds_sum
+scheduler_goroutines
+scheduler_pending_pods
+scheduler_plugin_evaluation_total
+scheduler_plugin_execution_duration_seconds_bucket
+scheduler_plugin_execution_duration_seconds_count
+scheduler_plugin_execution_duration_seconds_sum
+scheduler_pod_scheduling_attempts_bucket
+scheduler_pod_scheduling_attempts_count
+scheduler_pod_scheduling_attempts_sum
+scheduler_pod_scheduling_duration_seconds_bucket
+scheduler_pod_scheduling_duration_seconds_count
+scheduler_pod_scheduling_duration_seconds_sum
+scheduler_preemption_attempts_total
+scheduler_preemption_victims_bucket
+scheduler_preemption_victims_count
+scheduler_preemption_victims_sum
+scheduler_queue_incoming_pods_total
+scheduler_schedule_attempts_total
+scheduler_scheduler_cache_size
+scheduler_scheduling_algorithm_duration_seconds_bucket
+scheduler_scheduling_algorithm_duration_seconds_count
+scheduler_scheduling_algorithm_duration_seconds_sum
+scheduler_scheduling_attempt_duration_seconds_bucket
+scheduler_scheduling_attempt_duration_seconds_count
+scheduler_scheduling_attempt_duration_seconds_sum
+scheduler_unschedulable_pods
+scrape_duration_seconds
+scrape_samples_post_metric_relabeling
+scrape_samples_scraped
+scrape_series_added
+serviceaccount_legacy_tokens_total
+serviceaccount_stale_tokens_total
+serviceaccount_valid_tokens_total
+storage_count_attachable_volumes_in_use
+storage_operation_duration_seconds_bucket
+storage_operation_duration_seconds_count
+storage_operation_duration_seconds_sum
+ttl_after_finished_controller_job_deletion_duration_seconds_bucket
+ttl_after_finished_controller_job_deletion_duration_seconds_count
+ttl_after_finished_controller_job_deletion_duration_seconds_sum
+up
+volume_manager_selinux_container_errors_total
+volume_manager_selinux_container_warnings_total
+volume_manager_selinux_pod_context_mismatch_errors_total
+volume_manager_selinux_pod_context_mismatch_warnings_total
+volume_manager_selinux_volume_context_mismatch_errors_total
+volume_manager_selinux_volume_context_mismatch_warnings_total
+volume_manager_selinux_volumes_admitted_total
+volume_manager_total_volumes
+volume_operation_total_seconds_bucket
+volume_operation_total_seconds_count
+volume_operation_total_seconds_sum
+watch_cache_capacity
+watch_cache_capacity_decrease_total
+watch_cache_capacity_increase_total
+workqueue_adds_total
+workqueue_depth
+workqueue_longest_running_processor_seconds
+workqueue_queue_duration_seconds_bucket
+workqueue_queue_duration_seconds_count
+workqueue_queue_duration_seconds_sum
+workqueue_retries_total
+workqueue_unfinished_work_seconds
+workqueue_work_duration_seconds_bucket
+workqueue_work_duration_seconds_count
+workqueue_work_duration_seconds_sum
+*/

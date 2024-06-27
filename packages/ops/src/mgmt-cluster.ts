@@ -94,6 +94,8 @@ export default function mgmtCluster(program: Command) {
       .string()
       .describe("Path to SSH private key file")
       .refine(existsSync, "SSH private key file does not exist"),
+    cfApiToken: z.string().describe("Cloudflare API token"),
+    cfApiEmail: z.string().describe("Cloudflare API email"),
     name: z
       .string()
       .describe("Cluster name")
@@ -162,6 +164,14 @@ export default function mgmtCluster(program: Command) {
       "--ssh-priv-path [sshPrivPath]",
       optionDescription("sshPrivPath")
     )
+    .requiredOption(
+      "--cf-api-token [cfApiToken]",
+      optionDescription("cfApiToken")
+    )
+    .requiredOption(
+      "--cf-api-email [cfApiEmail]",
+      optionDescription("cfApiEmail")
+    )
     .action(async (name: string, options: CreateHcloudOptions) => {
       options.name = name;
       const parsed = createHcloudSchema.safeParse(options);
@@ -196,6 +206,8 @@ export default function mgmtCluster(program: Command) {
         workerMachineCount,
         sshPubPath,
         sshPrivPath,
+        cfApiToken,
+        cfApiEmail,
       } = parsed.data;
       console.log(
         chalk.green(`Creating management cluster ${name} in Hetzner Cloud`)
@@ -291,9 +303,9 @@ export default function mgmtCluster(program: Command) {
       console.log(chalk.green("installing hcloud cloud controller manager"));
       // ccm requires a secret on the cluster named 'hcloud' that includes the network name in hetzner cloud
       // do it via a yaml file so that we specify base64 values and avoid mistakes escaping any special chars
-      const secretYaml = tmp.fileSync();
+      const hcloudSecret = tmp.fileSync();
       writeFileSync(
-        secretYaml.name,
+        hcloudSecret.name,
         `apiVersion: v1
 kind: Secret
 metadata:
@@ -308,7 +320,7 @@ data: ${JSON.stringify({
         })}
       `
       );
-      await $`kubectl ${kubeconfigOptNew} apply -f ${secretYaml.name}`.quiet();
+      await $`kubectl ${kubeconfigOptNew} apply -f ${hcloudSecret.name}`.quiet();
       await $`helm ${kubeconfigOptNew} repo add hcloud https://charts.hetzner.cloud`;
       await $`helm ${kubeconfigOptNew} repo update hcloud`;
       await $`helm ${kubeconfigOptNew} upgrade --install hccm hcloud/hcloud-cloud-controller-manager --version 1.19.0 --namespace kube-system`;
@@ -330,6 +342,115 @@ data: ${JSON.stringify({
       ]) {
         await $`kubectl ${kubeconfigOptNew} wait --for=condition=Ready pod --all --namespace ${namespace} --timeout=1m`;
       }
+
+      // set up external-dns to set cloudflare dns records
+      console.log(chalk.green("installing external-dns on new cluster"));
+      await $`kubectl ${kubeconfigOptNew} create ns external-dns`;
+      const cfSecret = tmp.fileSync();
+      writeFileSync(
+        cfSecret.name,
+        `apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudflare-api-token
+  namespace: external-dns
+type: Opaque
+data: ${JSON.stringify({
+          apiToken: Buffer.from(cfApiToken).toString("base64"),
+          email: Buffer.from(cfApiEmail).toString("base64"),
+        })}
+      `
+      );
+      await $`kubectl ${kubeconfigOptNew} apply -f ${cfSecret.name}`;
+      const externalDnsValues = tmp.fileSync();
+      writeFileSync(
+        externalDnsValues.name,
+        `provider:
+  name: cloudflare
+crd:
+  create: true
+sources:
+  - crd
+cloudflare:
+  proxied: true
+policy: sync
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token
+        key: apiToken
+        namespace: external-dns
+  - name: CF_API_EMAIL
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token
+        key: email
+        namespace: external-dns`
+      );
+      await $`helm ${kubeconfigOptNew} repo add external-dns https://kubernetes-sigs.github.io/external-dns/`;
+      await $`helm ${kubeconfigOptNew} repo update external-dns`;
+      await $`helm ${kubeconfigOptNew} upgrade --install external-dns external-dns/external-dns --values ${externalDnsValues.name} --namespace external-dns`;
+
+      // install cert-manager on the mgmt cluster to create certs for user clusters
+      console.log(chalk.green("installing letsencrypt issuer on new cluster"));
+      const cmSecret = tmp.fileSync();
+      writeFileSync(
+        cmSecret.name,
+        `apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudflare-api-token
+  namespace: cert-manager
+type: Opaque
+data: ${JSON.stringify({
+          apiToken: Buffer.from(cfApiToken).toString("base64"),
+          email: Buffer.from(cfApiEmail).toString("base64"),
+        })}
+      `
+      );
+      await $`kubectl ${kubeconfigOptNew} apply -f ${cmSecret.name}`;
+      const letsencryptIssuers = tmp.fileSync();
+      writeFileSync(
+        letsencryptIssuers.name,
+        `---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    email: certs@onmetal.dev
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-private-key
+    solvers:
+    - dns01:
+        cloudflare:
+          email: ${cfApiEmail}
+          apiTokenSecretRef:
+            name: cloudflare-api-token
+            key: apiToken
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-production
+spec:
+  acme:
+    email: certs@onmetal.dev
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-production-private-key
+    solvers:
+    - dns01:
+        cloudflare:
+          email: ${cfApiEmail}
+          apiTokenSecretRef:
+            name: cloudflare-api-token
+            key: apiToken`
+      );
+      await $`kubectl ${kubeconfigOptNew} apply -f ${letsencryptIssuers.name}`;
 
       console.log(
         chalk.green("moving resources from bootstrap cluster to new cluster")
@@ -377,6 +498,76 @@ data: ${JSON.stringify({
         }
       }
 
+      // check that there aren't any other cluster resources other than ${name}
+      const clusters =
+        await $`kubectl --kubeconfig .kubeconfigs/${name}.yaml get cluster -ojson`.json();
+      const found = clusters.items?.find((c: any) => c.metadata!.name === name);
+      if (!found) {
+        console.log(chalk.red(`No cluster resource found for ${name}`));
+        process.exit(1);
+      }
+      const extraClusters = clusters.items?.filter(
+        (c: any) => c.metadata!.name !== name
+      );
+      if (extraClusters && extraClusters.length > 0) {
+        console.log(
+          chalk.red(
+            `Found extra cluster resources: ${extraClusters
+              .map((c: any) => c.metadata!.name)
+              .join(", ")}`
+          )
+        );
+        for (const cluster of extraClusters) {
+          const confirmed = await confirm({
+            message: `Would you like to delete cluster ${
+              cluster.metadata!.name
+            }?`,
+          });
+          if (!confirmed) {
+            console.log(
+              chalk.green(`not deleting cluster ${cluster.metadata!.name}`)
+            );
+            continue;
+          }
+          console.log(
+            chalk.green(`Deleting cluster resource ${cluster.metadata!.name}`)
+          );
+          await $`kubectl --kubeconfig .kubeconfigs/${name}.yaml delete cluster ${
+            cluster.metadata!.name
+          }`;
+        }
+      }
+
+      // check for any dnsendpoint resources to clean up
+      const dnsendpoints =
+        await $`kubectl --kubeconfig .kubeconfigs/${name}.yaml get dnsendpoint --namespace external-dns -ojson`.json();
+      if (dnsendpoints.items && dnsendpoints.items.length > 0) {
+        console.log(
+          chalk.red(
+            `Found ${dnsendpoints.items.length} dnsendpoint resources to clean up`
+          )
+        );
+        for (const dnsendpoint of dnsendpoints.items!) {
+          const confirmed = await confirm({
+            message: `Would you like to delete dnsendpoint ${
+              dnsendpoint.metadata!.name
+            }?`,
+          });
+          if (!confirmed) {
+            console.log(chalk.green("not deleting dnsendpoint resources"));
+            continue;
+          }
+          console.log(
+            chalk.green(
+              `Deleting dnsendpoint resource ${dnsendpoint.metadata!.name}`
+            )
+          );
+          await $`kubectl --kubeconfig .kubeconfigs/${name}.yaml delete dnsendpoint ${
+            dnsendpoint.metadata!.name
+          } --namespace external-dns`;
+        }
+      }
+
       if (method === "cluster-api") {
         const deleterClusterName = `${name}-deleter`;
         const { kubeconfigOpt, kubeconfig } = await localKindCluster(
@@ -394,16 +585,6 @@ data: ${JSON.stringify({
           "cert-manager",
         ]) {
           await $`kubectl ${kubeconfigOpt} wait --for=condition=Ready pod --all --namespace ${namespace} --timeout=1m`;
-        }
-
-        // make sure the mgmt cluster has a cluster resource corresponding to ${name}
-        const { exitCode } =
-          await $`kubectl --kubeconfig .kubeconfigs/${name}.yaml get cluster ${name}`.nothrow();
-        if (exitCode !== 0) {
-          console.log(
-            chalk.red(`Cluster ${name} not found as cluster resource`)
-          );
-          process.exit(1);
         }
 
         console.log(

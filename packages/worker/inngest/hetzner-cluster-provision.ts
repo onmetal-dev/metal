@@ -1236,6 +1236,42 @@ subjects:
     });
   }
 
+  // Expose kube-prometheus-kube-prome-prometheus Service on the Gateway
+  const tmpDirForPrometheusGateway = tmp.dirSync();
+  await fs.writeFileSync(
+    path.join(tmpDirForPrometheusGateway.name, "prometheus-gateway.yaml"),
+    `---
+kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  parentRefs:
+  - kind: Gateway
+    name: cilium
+    namespace: gateway
+    port: 443
+  hostnames:
+  - 'prometheus.${cluster.name}.up.onmetal.dev'
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: kube-prometheus-kube-prome-prometheus
+      kind: Service
+      port: 9090
+`
+  );
+  await tracedExec({
+    spanName: "expose-prometheus",
+    spanAttributes,
+    command: `KUBECONFIG=${clusterKubeconfigFile.name} kubectl apply -n monitoring -f prometheus-gateway.yaml`,
+    directory: tmpDirForPrometheusGateway.name,
+  });
+
   // add an example rollout of a simple app (podinfo) that produces logs and traces
   await findOrCreateNamespace(clusterKubeconfigFile.name, "test-service");
   const tmpDirForTestService = tmp.dirSync();
