@@ -5,7 +5,8 @@
   "scripts": {
     "dev:inngest": "./inngest-dev.sh",
     "dev:server": "bun run --no-clear-screen --hot index.ts",
-    "dev": "concurrently --kill-others-on-fail --raw \"npm:dev:*\""
+    "dev": "concurrently --kill-others-on-fail --raw \"npm:dev:*\"",
+    "start": "bun run index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -11,7 +11,6 @@ jobs:
       run:
         working-directory: ./apps/next
     env:
-      NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: 1
 
     steps:
@@ -43,6 +42,6 @@ jobs:
       - name: Deploy
         run: |
           bash <(curl -fsSL cli.new) && \
-          railway up --ci --service website
+          railway up --ci --service worker --environment prod
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PROD }}

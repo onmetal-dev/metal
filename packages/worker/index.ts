@@ -1,8 +1,10 @@
 import { serve } from "inngest/bun";
 import { client, functions } from "./inngest";
 
+const port = process.env.PORT ?? 3010;
+console.log("Serving on port", port);
 Bun.serve({
-  port: 3010,
+  port,
   fetch(request: Request) {
     const url = new URL(request.url);
 

@@ -3,11 +3,6 @@ SHELL ["/bin/bash", "-c"]
 RUN apt update && apt upgrade -y
 RUN apt install wget curl unzip -y
 
-# install node 20
-RUN curl -sL https://deb.nodesource.com/setup_20.x | bash -
-RUN apt update && apt upgrade -y
-RUN apt install nodejs -y
-
 # install bun
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH "$PATH:/root/.bun/bin"
@@ -29,9 +24,5 @@ RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc && chmod +x mc && mv
 # install the app
 ADD . /app
 WORKDIR /app
-RUN bun install --no-save --frozen-lockfile
-RUN bun run build:worker
-RUN rm -rf node_modules
 RUN bun install --no-save --frozen-lockfile --production
-RUN bun pm cache rm
-CMD bun run start:worker
+CMD bun run --filter @metal/worker start
