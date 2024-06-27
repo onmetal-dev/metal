@@ -102,7 +102,7 @@ export const SidebarNav = () => {
       href: "/dashboard/add-ons",
       Icon: Blocks,
       label: "Add-ons",
-      keyCombo: ["G", "A"],
+      keyCombo: ["G", "O"],
     },
     {
       href: "/dashboard/integrations",
