@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./packages/worker
+        working-directory: ./
     env:
       NEXT_TELEMETRY_DISABLED: 1
 
@@ -29,7 +29,6 @@ jobs:
       #     run: bun test
 
       - name: Deploy
-        run: |
-          bunx @railway/cli up --ci --service worker --environment prod
+        run: bunx @railway/cli up --ci --service worker --environment prod
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PROD }}
