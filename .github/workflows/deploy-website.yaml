@@ -11,6 +11,8 @@ jobs:
       run:
         working-directory: ./apps/next
     env:
+      # logic for figuring out which schema in pg to use depends on NODE_ENV
+      NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: 1
 
     steps:
@@ -39,7 +41,12 @@ jobs:
           NODE_TLS_REJECT_UNAUTHORIZED: "0"
           POSTGRES_URL: ${{ secrets.POSTGRES_URL_PROD }}
 
+      - name: Install Railway cli
+        run: |
+          wget https://github.com/railwayapp/cli/releases/download/v3.11.0/railway-v3.11.0-amd64.deb
+          sudo dpkg -i railway-v3.11.0-amd64.deb
+
       - name: Deploy
-        run: bunx @railway/cli up --ci --service worker --environment prod
+        run: railway up --ci --service worker --environment prod
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PROD }}

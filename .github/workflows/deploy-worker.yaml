@@ -27,6 +27,7 @@ jobs:
 
       #   - name: Run tests
       #     run: bun test
+
       - name: Install Railway cli
         run: |
           wget https://github.com/railwayapp/cli/releases/download/v3.11.0/railway-v3.11.0-amd64.deb
