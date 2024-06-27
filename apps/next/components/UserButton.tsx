@@ -26,7 +26,7 @@ export const UserButton = () => {
       {!isLoaded ? (
         <Skeleton className="w-8 h-8 rounded-full" />
       ) : (
-        <>
+        <div className="cursor-pointer">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Avatar>
@@ -37,23 +37,27 @@ export const UserButton = () => {
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuLabel></DropdownMenuLabel>
               <DropdownMenuGroup>
-                <DropdownMenuItem asChild>
-                  {/* Create a fictional link to /subscriptions */}
+                <DropdownMenuItem asChild className="cursor-pointer">
                   <Link href="/dashboard">Dashboard</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openUserProfile()}>
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => openUserProfile()}
+                >
                   Profile
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => signOut(() => router.push("/"))}>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => signOut(() => router.push("/"))}
+              >
                 Sign Out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </>
+        </div>
       )}
     </>
   );

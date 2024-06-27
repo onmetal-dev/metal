@@ -26,6 +26,21 @@ export async function mustGetClerkUser(): Promise<ClerkUser> {
   return clerkUser;
 }
 
+export async function mustGetClerkActiveOrg(): Promise<ClerkOrganization> {
+  const clerkAuth: AuthObject = auth();
+  if (!clerkAuth.orgSlug) {
+    throw new Error("Clerk auth() returned null unexpectedly");
+  }
+  const clerkOrg: ClerkOrganization | null =
+    await clerkClient.organizations.getOrganization({
+      slug: clerkAuth.orgSlug,
+    });
+  if (!clerkOrg) {
+    throw new Error("Clerk getOrganization() returned null unexpectedly");
+  }
+  return clerkOrg;
+}
+
 export async function findCreateClerkOrganizationCreatedByUser({
   name,
   createdByClerkId,

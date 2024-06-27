@@ -203,22 +203,30 @@ export type HetznerClusterStatusEnum =
   (typeof hetznerClusterStatusEnum.enumValues)[number];
 
 // hetznerClusters. This represents k8s clusters that we spin up within a user's Hetzner account.
-export const hetznerClusters = metalSchema.table("hetzner_clusters", {
-  ...schemaDefaults,
-  creatorId: varchar("creator_id", { length: 22 }).notNull(),
-  teamId: varchar("team_id", { length: 22 })
-    .notNull()
-    .references(() => teams.id, { onDelete: "cascade" }),
-  hetznerProjectId: varchar("hetzner_project_id", { length: 22 }).notNull(),
-  name: text("name").notNull(), // what we call it in the cluster api (assigned)
-  status: hetznerClusterStatusEnum("status").notNull(),
-  networkZone: hetznerNetworkZoneEnum("network_zone").notNull(),
-  location: hetznerLocationEnum("location").notNull(),
-  k8sVersion: text("k8s_version").notNull(),
-  clusterctlVersion: text("clusterctl_version"),
-  clusterctlTemplate: text("clusterctl_manifest"),
-  kubeconfig: text("kubeconfig"),
-});
+export const hetznerClusters = metalSchema.table(
+  "hetzner_clusters",
+  {
+    ...schemaDefaults,
+    creatorId: varchar("creator_id", { length: 22 }).notNull(),
+    teamId: varchar("team_id", { length: 22 })
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    hetznerProjectId: varchar("hetzner_project_id", { length: 22 }).notNull(),
+    name: text("name").notNull(), // what we call it in the cluster api (assigned)
+    status: hetznerClusterStatusEnum("status").notNull(),
+    networkZone: hetznerNetworkZoneEnum("network_zone").notNull(),
+    location: hetznerLocationEnum("location").notNull(),
+    k8sVersion: text("k8s_version").notNull(),
+    clusterctlVersion: text("clusterctl_version"),
+    clusterctlTemplate: text("clusterctl_manifest"),
+    kubeconfig: text("kubeconfig"),
+  },
+  (table) => {
+    return {
+      nameIdx: index().on(table.name),
+    };
+  }
+);
 
 export const insertHetznerClusterSchema = createInsertSchema(hetznerClusters);
 export type HetznerClusterInsert = z.infer<typeof insertHetznerClusterSchema>;

@@ -9,7 +9,7 @@ export const inngest = new Inngest({
 
 async function getRuns(eventId: string) {
   const response = await fetch(
-    `${process.env.INNGEST_BASE_UR}/v1/events/${eventId}/runs`,
+    `${process.env.INNGEST_BASE_URL}/v1/events/${eventId}/runs`,
     {
       headers: {
         Authorization: `Bearer ${process.env.INNGEST_SIGNING_KEY}`,

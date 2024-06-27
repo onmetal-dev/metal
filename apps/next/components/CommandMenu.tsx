@@ -28,12 +28,16 @@ const CommandItemsContext = createContext<{
   addCommandItem: (item: CommandItem) => void;
   removeCommandItem: (label: string) => void;
   setGroupPriority: (groupName: string, priority: number) => void;
+  open: boolean;
+  setOpen: (open: boolean) => void;
 }>({
   commandItems: new Map<string, CommandItem>(),
   groupPriorities: new Map<string, number>(),
   addCommandItem: (item: CommandItem) => {},
   removeCommandItem: (label: string) => {},
   setGroupPriority: (groupName: string, priority: number) => {},
+  open: false,
+  setOpen: (open: boolean) => {},
 });
 
 export function useCommandItems() {
@@ -53,6 +57,7 @@ export function CommandItemsProvider({ children }: { children: ReactNode }) {
   const [groupPriorities, setGroupPriorities] = useState<Map<string, number>>(
     new Map<string, number>()
   );
+  const [open, setOpen] = useState(false);
 
   const addCommandItem = useCallback((item: CommandItem) => {
     setCommandItems((prevItems) => {
@@ -89,6 +94,8 @@ export function CommandItemsProvider({ children }: { children: ReactNode }) {
         addCommandItem,
         removeCommandItem,
         setGroupPriority,
+        open,
+        setOpen,
       }}
     >
       {children}
@@ -97,14 +104,14 @@ export function CommandItemsProvider({ children }: { children: ReactNode }) {
 }
 
 export function CommandMenu() {
-  const [open, setOpen] = useState(false);
-  const { commandItems, groupPriorities } = useCommandItems();
+  // const [open, setOpen] = useState(false);
+  const { commandItems, groupPriorities, open, setOpen } = useCommandItems();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setOpen((open) => !open);
+        setOpen(!open);
       }
     };
     document.addEventListener("keydown", down);
