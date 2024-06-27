@@ -16,8 +16,5 @@ ENV PATH "$PATH:/root/.bun/bin"
 ADD . /app
 WORKDIR /app
 RUN bun install --no-save --frozen-lockfile
-RUN bun run build:website
-RUN rm -rf node_modules
-RUN bun install --no-save --frozen-lockfile --production
-RUN bun pm cache rm
-CMD bun run start:website
+RUN bun run --filter @metal/webapp build
+CMD bun run --filter @metal/webapp start
