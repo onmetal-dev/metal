@@ -45,3 +45,6 @@ TODO
 temp/
 *.gz
 ups
+
+# Sentry Config File
+.env.sentry-build-plugin
