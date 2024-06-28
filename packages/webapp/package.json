@@ -11,7 +11,7 @@
     "db:studio": "NODE_TLS_REJECT_UNAUTHORIZED=0 bunx drizzle-kit studio",
     "db:nuke": "bun run ./app/server/db/nuke.ts",
     "db:psql": "bun exec 'psql $POSTGRES_URL'",
-    "dev": "next dev --turbo -p 4000",
+    "dev": "next dev -p 4000",
     "lint": "next lint",
     "start": "next start"
   },
