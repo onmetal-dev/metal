@@ -3,9 +3,9 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'img.clerk.com',
-        port: '',
+        protocol: "https",
+        hostname: "img.clerk.com",
+        port: "",
       },
     ],
   },
@@ -16,10 +16,6 @@ const nextConfig = {
   eslint: {
     // speed up builds--`next lint` will happen in gh actions
     ignoreDuringBuilds: true,
-  },
-  experimental: {
-    // for opentelemetry tracing
-    instrumentationHook: true,
   },
 };
 

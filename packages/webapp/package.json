@@ -51,7 +51,6 @@
     "@rwh/react-keystrokes": "^1.5.6",
     "@tanstack/react-table": "^8.16.0",
     "@tsconfig/node20": "^20.1.4",
-    "@vercel/otel": "^1.9.1",
     "canvas-confetti": "^1.9.3",
     "cdk8s": "^2.68.77",
     "cdk8s-plus": "^0.33.0",
