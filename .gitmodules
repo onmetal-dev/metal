@@ -1,3 +1,0 @@
-[submodule "apps/next/hack/opentelemetry-collector-dev-setup"]
-	path = apps/next/hack/opentelemetry-collector-dev-setup
-	url = git@github.com:vercel/opentelemetry-collector-dev-setup

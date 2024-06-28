@@ -1,0 +1,6 @@
+{
+  "name": "@metal/opentelemetry-collector",
+  "scripts": {
+    "dev": "./run.sh"
+  }
+}

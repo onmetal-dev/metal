@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "clean": "rm -rf node_modules packages/*/node_modules bun.lockb packages/*/bun.lockb",
-    "dev": "bun run --filter '@metal/worker' --filter '@metal/webapp' dev | tee /tmp/log.txt"
+    "dev": "bun run --filter @metal/worker --filter @metal/webapp --filter @metal/opentelemetry-collector dev | tee /tmp/log.txt"
   },
   "trustedDependencies": [
     "@clerk/shared",
