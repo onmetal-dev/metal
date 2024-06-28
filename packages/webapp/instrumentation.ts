@@ -1,13 +1,9 @@
-import { registerOTel } from "@vercel/otel";
-
-// for some god awful reason you have to do imports inside
-// the register function
-// https://github.com/vercel/next.js/issues/49565
-
 export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    registerOTel({
-      serviceName: "webapp",
-    });
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    await import('./sentry.server.config');
+  }
+
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    await import('./sentry.edge.config');
   }
 }
