@@ -36,7 +36,8 @@ jobs:
         run: bun test
 
       - name: Push DB changes
-        run: bun run --filter @metal/webapp db:push
+        working-directory: ./packages/webapp
+        run: bun run db:push
         env:
           NODE_TLS_REJECT_UNAUTHORIZED: "0"
           POSTGRES_URL: ${{ secrets.POSTGRES_URL_PROD }}
