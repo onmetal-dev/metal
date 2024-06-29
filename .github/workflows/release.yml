@@ -1,0 +1,207 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # push:
+  #   branches:
+  #     - main  # Change this to the branch you want to trigger the action
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/cli
+    outputs:
+      PREVIOUS_VERSION: ${{ steps.previous-cli-version.outputs.PREVIOUS_VERSION }}
+      DARWIN_ARM64_HASH: ${{ steps.hashes.outputs.DARWIN_ARM64_HASH }}
+      DARWIN_X64_HASH: ${{ steps.hashes.outputs.DARWIN_X64_HASH }}
+      LINUX_ARM64_HASH: ${{ steps.hashes.outputs.LINUX_ARM64_HASH }}
+      LINUX_X64_HASH: ${{ steps.hashes.outputs.LINUX_X64_HASH }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ">=20"
+
+      - name: Use Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install packages
+        run: bun install --frozen-lockfile
+
+      - name: Create Release file
+        run: |
+          echo "Version: ${{ github.ref_name }}" > Release.txt
+          echo "Commit: ${{ github.sha }}" >> Release.txt
+
+      - name: Build executables to release
+        run: |
+          bun build --compile --target=bun-darwin-x64 --outfile metal-${{ github.ref_name }}-darwin-x64 src/index.ts
+          bun build --compile --target=bun-darwin-arm64 --outfile metal-${{ github.ref_name }}-darwin-arm64 src/index.ts
+          bun build --compile --target=bun-linux-arm64 --outfile metal-${{ github.ref_name }}-linux-arm64 src/index.ts
+          bun build --compile --target=bun-linux-x64 --outfile metal-${{ github.ref_name }}-linux-x64 src/index.ts
+          # NB: the output file name here ends with ".exe"
+          bun build --compile --target=bun-windows-x64 --outfile metal-${{ github.ref_name }}-windows-x64.exe src/index.ts
+
+      - name: Compress the executables
+        run: |
+          tar -czvf metal-${{ github.ref_name }}-darwin-arm64.tar.gz metal-${{ github.ref_name }}-darwin-arm64
+          tar -czvf metal-${{ github.ref_name }}-darwin-x64.tar.gz metal-${{ github.ref_name }}-darwin-x64
+          tar -czvf metal-${{ github.ref_name }}-linux-arm64.tar.gz metal-${{ github.ref_name }}-linux-arm64
+          tar -czvf metal-${{ github.ref_name }}-linux-x64.tar.gz metal-${{ github.ref_name }}-linux-x64
+          tar -czvf metal-${{ github.ref_name }}-windows-x64.tar.gz metal-${{ github.ref_name }}-windows-x64.exe
+
+      - name: Save binaries' hashes
+        run: |
+          echo "Hashes of binaries:" >> Release.txt
+          sha256sum metal-*.tar.gz >> Release.txt
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            ./apps/cli/metal-*.tar.gz
+            ./apps/cli/Release.txt
+            LICENSE
+
+      - name: Get hashes for CLI binaries
+        id: hashes
+        run: |
+          echo "DARWIN_ARM64_HASH=$(sha256sum metal-${{ github.ref_name }}-darwin-arm64.tar.gz | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+          echo "DARWIN_X64_HASH=$(sha256sum metal-${{ github.ref_name }}-darwin-x64.tar.gz | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+          echo "LINUX_ARM64_HASH=$(sha256sum metal-${{ github.ref_name }}-linux-arm64.tar.gz | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+          echo "LINUX_X64_HASH=$(sha256sum metal-${{ github.ref_name }}-linux-x64.tar.gz | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+
+      - name: Get previous CLI version
+        id: previous-cli-version
+        run: |
+          git pull --tags origin ${{ github.ref_name }}
+          # NB: this strips out the leading 'v' in the version
+          echo "PREVIOUS_VERSION=$(git tag -l --sort=-version:refname | sed -n 2p | sed 's/^v//')" >> $GITHUB_OUTPUT
+
+  update-homebrew-tap:
+    runs-on: ubuntu-latest
+    needs: build-release
+
+    steps:
+      - name: Checkout onmetal-dev/homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: onmetal-dev/homebrew-tap
+          ref: main
+          fetch-depth: 2
+          token: ${{ secrets.GH_TOKEN_FOR_HOMEBREW_TAP }}
+
+      - name: Demote the old CLI version
+        run: |
+          FILE_NAME_PREVIOUS_VERSION="cli@${{ needs.build-release.outputs.PREVIOUS_VERSION }}.rb"
+          mv cli.rb $FILE_NAME_PREVIOUS_VERSION
+
+          # Homebrew doesn't have elegant support for versions of custom taps. This is a work-around for that, and a similar thing can be seen in the tap for Argo Rollouts:
+          # https://github.com/argoproj/homebrew-tap/blob/e8b04ee8b260b5675cd646d8acbbe3e32a9924f5/kubectl-argo-rollouts%401.2.rb#L2
+          CLASS_NAME_PREVIOUS_VERSION=$(\
+            # NB: these commands are piped into each other.
+            # Thanks to ChatGPT for a lot of the commands below!
+            echo "$FILE_NAME_PREVIOUS_VERSION" | \
+            sed 's/\.rb$//' | \
+            sed 's/@/_AT/' | \
+
+            # Selects alphanumeric chars, uses -c to invert to non-alphanumeric chars and then replaces them with underscores.
+            tr -c '[:alnum:]' '_' | \
+
+            # Replaces multiple underscores with a single underscore
+            awk '{gsub(/_+/, "_"); print}' | \
+
+            # Uppercase the first letter
+            # Capitalizes the first letter of each word. Then concatenates words by removing their leading underscores.
+            awk -F_ '{for (i=1; i<=NF; i++) $i=toupper(substr($i,1,1)) substr($i,2)}1' OFS='' \
+          )
+          echo $FILE_NAME_PREVIOUS_VERSION
+          echo $CLASS_NAME_PREVIOUS_VERSION
+          sed -i "s/class Cli/class ${CLASS_NAME_PREVIOUS_VERSION}/" $FILE_NAME_PREVIOUS_VERSION
+
+      - name: Generate Homebrew formula for Metal CLI
+        id: generate-cli-formula
+        run: |
+          cat <<EOF > cli.rb
+          # THIS IS A GENERATED FILE, DO NOT EDIT. GENERATED BY https://github.com/onmetal-dev/metal/actions/workflows/release.yml
+          class Cli < Formula
+            desc "The missing PaaS for Hetzner"
+            homepage "https://github.com/onmetal-dev/metal"
+            version "${{ github.ref_name }}"
+            base_url = "https://github.com/onmetal-dev/metal/releases/download/#{version}"
+
+            # Each release of the Metal CLI contains binaries for MacOS, Linux etc compressed into
+            # separate .tar.gz files. So no building of source code is necessary. We only need
+            # to download, verify and install those binaries. That's why we use bin.install.
+            # For more info on that method, see:
+            # https://docs.brew.sh/Formula-Cookbook#bininstall-foo
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "#{base_url}/metal-#{version}-darwin-arm64.tar.gz"
+                sha256 "${{ needs.build-release.outputs.DARWIN_ARM64_HASH }}"
+
+                def install
+                  bin.install "metal-#{version}-darwin-arm64" => "metal"
+                end
+              end
+
+              if Hardware::CPU.intel?
+                url "#{base_url}/metal-#{version}-darwin-x64.tar.gz"
+                sha256 "${{ needs.build-release.outputs.DARWIN_X64_HASH }}"
+
+
+                def install
+                  bin.install "metal-#{version}-darwin-x64" => "metal"
+                end
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.arm?
+                url "#{base_url}/metal-#{version}-linux-arm64.tar.gz"
+                sha256 "${{ needs.build-release.outputs.LINUX_ARM64_HASH }}"
+
+                def install
+                  bin.install "metal-#{version}-linux-arm64" => "metal"
+                end
+              end
+
+              if Hardware::CPU.intel?
+                url "#{base_url}/metal-#{version}-linux-x64.tar.gz"
+                sha256 "${{ needs.build-release.outputs.LINUX_X64_HASH }}"
+
+                def install
+                  bin.install "metal-#{version}-linux-x64" => "metal"
+                end
+              end
+            end
+
+            test do
+              system "#{bin}/metal", "--version"
+              system "metal", "--version"
+            end
+          end
+          EOF
+
+      - name: Update Homebrew tap
+        run: |
+          git config user.name release-gha
+          git config user.email release-gha@onmetal.dev
+
+          git add cli*.rb
+
+          git commit -m "Bump CLI from v${{ needs.build-release.outputs.PREVIOUS_VERSION }} to ${{ github.ref_name }}"
+
+          git pull --rebase
+
+          git push
