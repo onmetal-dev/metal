@@ -1,0 +1,215 @@
+{
+  "components": {
+    "schemas": {
+      "AddonID": {
+        "type": "string",
+        "description": "Addon ID"
+      },
+      "AuthorizedKey": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Key name"
+              },
+              "fingerprint": {
+                "type": "string",
+                "description": "Key fingerprint"
+              },
+              "type": {
+                "type": "string",
+                "description": "Key type"
+              },
+              "size": {
+                "type": "integer",
+                "description": "Key size"
+              }
+            }
+          }
+        }
+      },
+      "HostKey": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "object",
+            "properties": {
+              "fingerprint": {
+                "type": "string",
+                "description": "Key fingerprint"
+              },
+              "type": {
+                "type": "string",
+                "description": "Key type"
+              },
+              "size": {
+                "type": "integer",
+                "description": "Key size"
+              }
+            }
+          }
+        }
+      },
+      "OrderComment": {
+        "type": "string",
+        "description": "Supplied order comment"
+      },
+      "OrderedServerProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "array",
+            "description": "Textual description",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota"
+          },
+          "dist": {
+            "type": "string",
+            "description": "Ordered distribution"
+          },
+          "@deprecated arch": {
+            "type": "integer",
+            "description": "Ordered distribution architecture"
+          },
+          "lang": {
+            "type": "string",
+            "description": "Ordered distribution language"
+          },
+          "location": {
+            "type": "string",
+            "description": "Ordered location"
+          }
+        }
+      },
+      "OrderTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Transaction ID"
+          },
+          "date": {
+            "type": "string",
+            "description": "Transaction date"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID if transaction status is \"ready\", null otherwise"
+          },
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address if transaction status is \"ready\", null otherwise"
+          },
+          "authorized_key": {
+            "type": "array",
+            "description": "Array with supplied public SSH keys",
+            "items": {
+              "$ref": "#/components/schemas/AuthorizedKey"
+            }
+          },
+          "host_key": {
+            "type": "array",
+            "description": "Array with servers public host keys",
+            "items": {
+              "$ref": "#/components/schemas/HostKey"
+            }
+          },
+          "comment": {
+            "$ref": "#/components/schemas/OrderComment"
+          },
+          "product": {
+            "$ref": "#/components/schemas/OrderedServerProduct"
+          },
+          "addons": {
+            "type": "array",
+            "description": "Array of Addon IDs",
+            "items": {
+              "$ref": "#/components/schemas/AddonID"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "OrderTransactionResponse": {
+        "description": "A specific order transaction details",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OrderTransaction"
+            }
+          }
+        }
+      },
+      "OrderTransactionNotFoundError": {
+        "description": "Transaction not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/order/server/transaction/{id}": {
+      "get": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "Query a specific order transaction",
+        "description": "Retrieve details of a specific server order transaction.",
+        "operationId": "getServerOrderTransactionByID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Transaction ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OrderTransactionResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrderTransactionNotFoundError"
+          }
+        }
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 19202,
+      "completion_tokens": 671,
+      "total_tokens": 19873
+    }
+  }
+}

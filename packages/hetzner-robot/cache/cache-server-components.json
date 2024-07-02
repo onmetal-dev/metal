@@ -1,0 +1,280 @@
+{
+  "components": {
+    "schemas": {
+      "ErrorFormat": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "HTTP Status Code"
+              },
+              "code": {
+                "type": "string",
+                "description": "Specific error code"
+              },
+              "message": {
+                "type": "string",
+                "description": "Specific error message"
+              }
+            }
+          }
+        }
+      },
+      "ErrorFormatInvalidInput": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "HTTP Status Code",
+                "example": 400
+              },
+              "code": {
+                "type": "string",
+                "example": "INVALID_INPUT"
+              },
+              "message": {
+                "type": "string",
+                "example": "invalid input"
+              },
+              "missing": {
+                "type": "array",
+                "description": "Array of missing input parameters or null",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "invalid": {
+                "type": "array",
+                "description": "Array of invalid input parameters or null",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AuthError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "HTTP Status Code",
+                "example": 401
+              },
+              "code": {
+                "type": "string",
+                "example": "UNAUTHORIZED"
+              },
+              "message": {
+                "type": "string",
+                "example": "Authentication failed"
+              }
+            }
+          }
+        }
+      },
+      "RateLimitError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "HTTP Status Code",
+                "example": 403
+              },
+              "code": {
+                "type": "string",
+                "example": "RATE_LIMIT_EXCEEDED"
+              },
+              "max_request": {
+                "type": "integer",
+                "description": "Maximum allowed requests"
+              },
+              "interval": {
+                "type": "integer",
+                "description": "Time interval in seconds"
+              },
+              "message": {
+                "type": "string",
+                "example": "rate limit exceeded"
+              }
+            }
+          }
+        }
+      },
+      "MaintenanceError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "HTTP Status Code",
+                "example": 503
+              },
+              "code": {
+                "type": "string",
+                "example": "SERVICE_UNAVAILABLE"
+              },
+              "message": {
+                "type": "string",
+                "example": "Service unavailable due to maintenance"
+              }
+            }
+          }
+        }
+      },
+      "Server": {
+        "type": "object",
+        "properties": {
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address"
+          },
+          "server_ipv6_net": {
+            "type": "string",
+            "description": "Server main IPv6 net address"
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID"
+          },
+          "server_name": {
+            "type": "string",
+            "description": "Server name"
+          },
+          "product": {
+            "type": "string",
+            "description": "Server product name"
+          },
+          "dc": {
+            "type": "string",
+            "description": "Data center"
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota, 'unlimited' in case of unlimited traffic"
+          },
+          "status": {
+            "type": "string",
+            "description": "Server status"
+          },
+          "cancelled": {
+            "type": "boolean",
+            "description": "Status of server cancellation"
+          },
+          "paid_until": {
+            "type": "string",
+            "description": "Paid until date"
+          },
+          "ip": {
+            "type": "array",
+            "description": "Array of assigned single IP addresses",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subnet": {
+            "type": "array",
+            "description": "Array of assigned subnets",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ip": {
+                  "type": "string"
+                },
+                "mask": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Cancellation": {
+        "type": "object",
+        "properties": {
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address"
+          },
+          "server_ipv6_net": {
+            "type": "string",
+            "description": "Server main IPv6 address"
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID"
+          },
+          "server_name": {
+            "type": "string",
+            "description": "Server name"
+          },
+          "earliest_cancellation_date": {
+            "type": "string",
+            "description": "Earliest possible cancellation date"
+          },
+          "cancelled": {
+            "type": "boolean",
+            "description": "Status of server cancellation"
+          },
+          "reservation_possible": {
+            "type": "boolean",
+            "description": "Indicates whether the current server location is eligible for reservation after server cancellation"
+          },
+          "reserved": {
+            "type": "boolean",
+            "description": "Indicates whether the current server location will be reserved after server cancellation"
+          },
+          "cancellation_date": {
+            "type": "string",
+            "description": "Cancellation date if cancellation is active, otherwise null"
+          },
+          "cancellation_reason": {
+            "type": "array",
+            "description": "Array of possible cancellation reasons",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "BasicAuth": {
+        "scheme": "basic",
+        "type": "http"
+      }
+    }
+  },
+  "componentsCreated": [
+    "#/components/schemas/ErrorFormat",
+    "#/components/schemas/ErrorFormatInvalidInput",
+    "#/components/schemas/AuthError",
+    "#/components/schemas/RateLimitError",
+    "#/components/schemas/MaintenanceError",
+    "#/components/schemas/Server",
+    "#/components/schemas/Cancellation",
+    "#/components/securitySchemes/BasicAuth"
+  ],
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 5250,
+      "completion_tokens": 1555,
+      "total_tokens": 6805
+    }
+  }
+}

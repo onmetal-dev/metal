@@ -1,0 +1,136 @@
+{
+  "components": {
+    "schemas": {
+      "OrderServerProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "array",
+            "description": "Textual description",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota"
+          },
+          "dist": {
+            "type": "array",
+            "description": "Available distributions",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arch": {
+            "type": "array",
+            "description": "Available distribution architectures",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "lang": {
+            "type": "array",
+            "description": "Available languages",
+            "items": {
+              "type": "string"
+            }
+          },
+          "location": {
+            "type": "array",
+            "description": "Available locations",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductPrice"
+            }
+          },
+          "orderable_addons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductAddon"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "OrderServerProductResponse": {
+        "description": "A specific server product details",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OrderServerProduct"
+            }
+          }
+        }
+      },
+      "OrderProductNotFoundError": {
+        "description": "Product not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/order/server/product/{product-id}": {
+      "get": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "Query a specific server product",
+        "description": "Query a specific server product",
+        "operationId": "getServerProductById",
+        "parameters": [
+          {
+            "name": "product-id",
+            "in": "path",
+            "description": "Product ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OrderServerProductResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrderProductNotFoundError"
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 18244,
+      "completion_tokens": 386,
+      "total_tokens": 18630
+    }
+  }
+}

@@ -1,0 +1,261 @@
+{
+  "components": {
+    "schemas": {
+      "OrderServerMarketTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Transaction ID"
+          },
+          "date": {
+            "type": "string",
+            "description": "Transaction date"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID if transaction status is \"ready\", null otherwise"
+          },
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address if transaction status is \"ready\", null otherwise"
+          },
+          "authorized_key": {
+            "type": "array",
+            "description": "Array with supplied public SSH keys",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Key name"
+                    },
+                    "fingerprint": {
+                      "type": "string",
+                      "description": "Key fingerprint"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Key type"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "description": "Key size"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "host_key": {
+            "type": "array",
+            "description": "Array with servers public host keys",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "object",
+                  "properties": {
+                    "fingerprint": {
+                      "type": "string",
+                      "description": "Key fingerprint"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Key type"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "description": "Key size"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "comment": {
+            "type": "string",
+            "description": "Supplied order comment"
+          },
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Product ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Product name"
+              },
+              "description": {
+                "type": "array",
+                "description": "Textual description",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "traffic": {
+                "type": "string",
+                "description": "Free traffic quota"
+              },
+              "dist": {
+                "type": "string",
+                "description": "Ordered distribution"
+              },
+              "arch": {
+                "type": "integer",
+                "description": "Ordered distribution architecture"
+              },
+              "lang": {
+                "type": "string",
+                "description": "Ordered distribution language"
+              },
+              "location": {
+                "type": "string",
+                "description": "Ordered location"
+              }
+            }
+          },
+          "addons": {
+            "type": "array",
+            "description": "Array of Addon IDs",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "OrderServerMarketTransactionSuccess": {
+        "description": "Order a new server from the server market response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OrderServerMarketTransaction"
+            }
+          }
+        }
+      },
+      "OrderServerMarketTransactionInvalidInput": {
+        "description": "Invalid input parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormatInvalidInput"
+            }
+          }
+        }
+      },
+      "OrderServerMarketTransactionError": {
+        "description": "The transaction failed due to an internal error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      }
+    },
+    "requestBodies": {
+      "OrderServerMarketTransaction": {
+        "description": "Order a new server from the server market. If the order is successful, the status code 201 CREATED is returned.",
+        "content": {
+          "application/x-www-form-urlencoded": {
+            "schema": {
+              "required": [
+                "product_id"
+              ],
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "description": "Product ID"
+                },
+                "authorized_key": {
+                  "type": "array",
+                  "description": "One or more SSH key fingerprints (Optional, you can use either parameter \"authorized_key\" or parameter \"password\")",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "password": {
+                  "type": "string",
+                  "description": "Root password (Optional: you can use either parameter \"authorized_key\" or parameter \"password\")"
+                },
+                "dist": {
+                  "type": "string",
+                  "description": "Distribution name which should be preinstalled (optional)"
+                },
+                "arch": {
+                  "type": "string",
+                  "description": "Architecture of preinstalled distribution (optional)",
+                  "deprecated": true
+                },
+                "lang": {
+                  "type": "string",
+                  "description": "Language of preinstalled distribution (optional)"
+                },
+                "comment": {
+                  "type": "string",
+                  "description": "Order comment (optional); Please note that if a comment is supplied, the order will be processed manually."
+                },
+                "addon": {
+                  "type": "array",
+                  "description": "Array of addon IDs (optional)",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "test": {
+                  "type": "boolean",
+                  "description": "The order will not be processed if set to \"true\" (optional)"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/order/server_market/transaction": {
+      "post": {
+        "summary": "Order a new server from the server market",
+        "description": "Order a new server from the server market. If the order is successful, the status code 201 CREATED is returned.",
+        "operationId": "orderServerMarketTransaction",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/OrderServerMarketTransaction"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/OrderServerMarketTransactionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/OrderServerMarketTransactionInvalidInput"
+          },
+          "500": {
+            "$ref": "#/components/responses/OrderServerMarketTransactionError"
+          }
+        }
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 21336,
+      "completion_tokens": 939,
+      "total_tokens": 22275
+    }
+  }
+}

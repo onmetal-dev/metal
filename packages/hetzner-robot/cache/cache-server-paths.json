@@ -1,0 +1,378 @@
+{
+  "paths": {
+    "/server": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Get all servers",
+        "description": "Query data of all servers",
+        "operationId": "getAllServers",
+        "responses": {
+          "200": {
+            "description": "A list of servers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Server"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No server found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    },
+    "/server/{server-number}": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Get server data by server number",
+        "description": "Query server data for a specific server",
+        "operationId": "getServerByNumber",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "Server number ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Server"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Server with the specified number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Update server name by server number",
+        "description": "Update server name for a specific server",
+        "operationId": "updateServerNameByNumber",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "Server number ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "required": [
+                  "server_name"
+                ],
+                "type": "object",
+                "properties": {
+                  "server_name": {
+                    "type": "string",
+                    "description": "Server name"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated server data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Server"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormatInvalidInput"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Server with the specified number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    },
+    "/server/{server-number}/cancellation": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Get server cancellation data by server number",
+        "description": "Query cancellation data for a server",
+        "operationId": "getServerCancellationByNumber",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "Server number ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server cancellation data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cancellation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Server with the specified number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Cancel a server by server number",
+        "description": "Cancel a server",
+        "operationId": "cancelServerByNumber",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "Server number ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "required": [
+                  "cancellation_date"
+                ],
+                "type": "object",
+                "properties": {
+                  "cancellation_date": {
+                    "type": "string",
+                    "description": "Date to which the server should be cancelled or 'now' to cancel immediately",
+                    "format": "date"
+                  },
+                  "cancellation_reason": {
+                    "type": "string",
+                    "description": "Cancellation reason, optional"
+                  },
+                  "reserve_location": {
+                    "type": "string",
+                    "description": "Whether server location shall be reserved ('true' or 'false')"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Server cancellation data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cancellation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Server with the specified number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict error (e.g., server already cancelled, active transfer, etc.)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Withdraw a server cancellation by server number",
+        "description": "Withdraw a server cancellation",
+        "operationId": "withdrawServerCancellationByNumber",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "Server number ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content - Cancellation withdrawn"
+          },
+          "404": {
+            "description": "Server with the specified number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict error (e.g., cancellation cannot be revoked)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 4739,
+      "completion_tokens": 2005,
+      "total_tokens": 6744
+    }
+  }
+}

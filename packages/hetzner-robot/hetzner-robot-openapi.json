@@ -1,0 +1,2960 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Hetzner Robot API",
+    "description": "API for managing servers and orders on Hetzner.",
+    "termsOfService": "https://www.hetzner.com/legal/terms-of-service",
+    "contact": {
+      "name": "Hetzner Online GmbH",
+      "url": "https://www.hetzner.com",
+      "email": "info@hetzner.com"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    },
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://robot-ws.your-server.de",
+      "description": "Hetzner Robot API Server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Servers",
+      "description": "Manage servers"
+    },
+    {
+      "name": "Server Ordering",
+      "description": "Order server products"
+    }
+  ],
+  "paths": {
+    "/server": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Get all servers",
+        "description": "Query data of all servers",
+        "operationId": "getAllServers",
+        "responses": {
+          "200": {
+            "description": "A list of servers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Server"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No server found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    },
+    "/server/{server-number}": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Get server data by server number",
+        "description": "Query server data for a specific server",
+        "operationId": "getServerByNumber",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "Server number ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Server"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Server with the specified number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Update server name by server number",
+        "description": "Update server name for a specific server",
+        "operationId": "updateServerNameByNumber",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "Server number ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "required": [
+                  "server_name"
+                ],
+                "type": "object",
+                "properties": {
+                  "server_name": {
+                    "type": "string",
+                    "description": "Server name"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated server data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Server"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormatInvalidInput"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Server with the specified number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    },
+    "/server/{server-number}/cancellation": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Get server cancellation data by server number",
+        "description": "Query cancellation data for a server",
+        "operationId": "getServerCancellationByNumber",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "Server number ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server cancellation data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cancellation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Server with the specified number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Cancel a server by server number",
+        "description": "Cancel a server",
+        "operationId": "cancelServerByNumber",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "Server number ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "required": [
+                  "cancellation_date"
+                ],
+                "type": "object",
+                "properties": {
+                  "cancellation_date": {
+                    "type": "string",
+                    "description": "Date to which the server should be cancelled or 'now' to cancel immediately",
+                    "format": "date"
+                  },
+                  "cancellation_reason": {
+                    "type": "string",
+                    "description": "Cancellation reason, optional"
+                  },
+                  "reserve_location": {
+                    "type": "string",
+                    "description": "Whether server location shall be reserved ('true' or 'false')"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Server cancellation data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cancellation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Server with the specified number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict error (e.g., server already cancelled, active transfer, etc.)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Withdraw a server cancellation by server number",
+        "description": "Withdraw a server cancellation",
+        "operationId": "withdrawServerCancellationByNumber",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "Server number ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content - Cancellation withdrawn"
+          },
+          "404": {
+            "description": "Server with the specified number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict error (e.g., cancellation cannot be revoked)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    },
+    "/order/server/product": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Get a list of server products",
+        "description": "Product overview of currently offered standard server products",
+        "externalDocs": {
+          "description": "Find more info here",
+          "url": "https://robot-ws.your-server.de/docs"
+        },
+        "operationId": "getServerProducts",
+        "parameters": [
+          {
+            "name": "min_price",
+            "in": "query",
+            "description": "Minimum monthly price",
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "name": "max_price",
+            "in": "query",
+            "description": "Maximum monthly price",
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "name": "min_price_setup",
+            "in": "query",
+            "description": "Minimum one time fee",
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "name": "max_price_setup",
+            "in": "query",
+            "description": "Maximum one time fee",
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "description": "The desired location",
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerProductListResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/order/server/product/{product-id}": {
+      "get": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "Query a specific server product",
+        "description": "Query a specific server product",
+        "operationId": "getServerProductById",
+        "parameters": [
+          {
+            "name": "product-id",
+            "in": "path",
+            "description": "Product ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OrderServerProductResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrderProductNotFoundError"
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    },
+    "/order/server/transaction": {
+      "post": {
+        "tags": [
+          "Server Ordering"
+        ],
+        "summary": "Order a new server",
+        "description": "Order a new server. If the order is successful, the status code 201 CREATED is returned.",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "required": [
+                  "product_id"
+                ],
+                "type": "object",
+                "properties": {
+                  "product_id": {
+                    "type": "string",
+                    "description": "Product ID"
+                  },
+                  "authorized_key": {
+                    "type": "array",
+                    "description": "One or more SSH key fingerprints (Optional, you can use either parameter 'authorized_key' or parameter 'password')",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Root password (Optional: you can use either parameter 'authorized_key' or parameter 'password')"
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The desired location"
+                  },
+                  "dist": {
+                    "type": "string",
+                    "description": "Distribution name which should be preinstalled (optional)"
+                  },
+                  "arch": {
+                    "type": "string",
+                    "description": "Architecture of preinstalled distribution (optional)"
+                  },
+                  "lang": {
+                    "type": "string",
+                    "description": "Language of preinstalled distribution (optional)"
+                  },
+                  "comment": {
+                    "type": "string",
+                    "description": "Order comment (optional); Please note that if a comment is supplied, the order will be processed manually."
+                  },
+                  "addon": {
+                    "type": "array",
+                    "description": "Array of addon IDs (optional)",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "test": {
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "type": "string",
+                    "description": "The order will not be processed if set to 'true' (optional)"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderServerTransaction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormatInvalidInput"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    },
+    "/order/server/transaction/{id}": {
+      "get": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "Query a specific order transaction",
+        "description": "Retrieve details of a specific server order transaction.",
+        "operationId": "getServerOrderTransactionByID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Transaction ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OrderTransactionResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/OrderTransactionNotFoundError"
+          }
+        }
+      }
+    },
+    "/order/server_market/product": {
+      "get": {
+        "tags": [
+          "Server Market"
+        ],
+        "summary": "Retrieve a list of server market products",
+        "description": "Product overview of currently offered server market products",
+        "operationId": "getServerMarketProducts",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerMarketProductListResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ServerMarketProductNotFoundError"
+          }
+        }
+      }
+    },
+    "/order/server_market/product/{product-id}": {
+      "get": {
+        "tags": [
+          "ServerMarketProduct"
+        ],
+        "summary": "Query a specific server market product",
+        "description": "Query a specific server market product",
+        "externalDocs": {
+          "description": "Learn more about server market products provided by this API.",
+          "url": "http://api.example.com/docs/server-market-products/"
+        },
+        "operationId": "getServerMarketProductById",
+        "parameters": [
+          {
+            "name": "product-id",
+            "in": "path",
+            "description": "Product ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerMarketProductDetailsResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/SpecificServerMarketProductNotFoundError"
+          }
+        }
+      }
+    },
+    "/order/server_market/transaction": {
+      "post": {
+        "summary": "Order a new server from the server market",
+        "description": "Order a new server from the server market. If the order is successful, the status code 201 CREATED is returned.",
+        "operationId": "orderServerMarketTransaction",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/OrderServerMarketTransaction"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/OrderServerMarketTransactionSuccess"
+          },
+          "400": {
+            "$ref": "#/components/responses/OrderServerMarketTransactionInvalidInput"
+          },
+          "500": {
+            "$ref": "#/components/responses/OrderServerMarketTransactionError"
+          }
+        }
+      }
+    },
+    "/order/server_market/transaction/{id}": {
+      "get": {
+        "tags": [
+          "Server Market Transactions"
+        ],
+        "summary": "Query a specific order transaction",
+        "description": "Query a specific order transaction by ID",
+        "operationId": "getServerMarketTransactionById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Transaction ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerMarketTransactionResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ServerTransactionNotFoundResponse"
+          }
+        }
+      }
+    },
+    "/order/server_addon/{server-number}/product": {
+      "get": {
+        "tags": [
+          "Server Addon"
+        ],
+        "summary": "Retrieve available server addons",
+        "description": "Product overview of available server addons for a specific server",
+        "operationId": "getServerAddonProducts",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "The server number",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AddonProductListResponse"
+          },
+          "404": {
+            "$ref": "#/components/schemas/ErrorFormat"
+          }
+        }
+      }
+    },
+    "/order/server_addon/transaction": {
+      "post": {
+        "tags": [
+          "Server Addon"
+        ],
+        "summary": "Order an addon for a server.",
+        "description": "Order an addon for a server. If the order is successful, the status code 201 CREATED will be returned.",
+        "operationId": "orderAddonForServer",
+        "requestBody": {
+          "description": "Order a new addon for the server.",
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AddonOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddonOrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/AddonOrderInvalidInput"
+          },
+          "409": {
+            "$ref": "#/components/responses/AddonOrderConflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/AddonOrderError"
+          }
+        }
+      }
+    },
+    "/order/server_addon/transaction/{id}": {
+      "get": {
+        "tags": [
+          "Server Addon Orders"
+        ],
+        "summary": "Query a specific order transaction",
+        "description": "Retrieves details of a specific server addon order transaction",
+        "operationId": "getServerAddonTransaction",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Transaction ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerAddonTransactionResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorFormat": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "HTTP Status Code"
+              },
+              "code": {
+                "type": "string",
+                "description": "Specific error code"
+              },
+              "message": {
+                "type": "string",
+                "description": "Specific error message"
+              }
+            }
+          }
+        }
+      },
+      "ErrorFormatInvalidInput": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "HTTP Status Code",
+                "example": 400
+              },
+              "code": {
+                "type": "string",
+                "example": "INVALID_INPUT"
+              },
+              "message": {
+                "type": "string",
+                "example": "invalid input"
+              },
+              "missing": {
+                "type": "array",
+                "description": "Array of missing input parameters or null",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "invalid": {
+                "type": "array",
+                "description": "Array of invalid input parameters or null",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AuthError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "HTTP Status Code",
+                "example": 401
+              },
+              "code": {
+                "type": "string",
+                "example": "UNAUTHORIZED"
+              },
+              "message": {
+                "type": "string",
+                "example": "Authentication failed"
+              }
+            }
+          }
+        }
+      },
+      "RateLimitError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "HTTP Status Code",
+                "example": 403
+              },
+              "code": {
+                "type": "string",
+                "example": "RATE_LIMIT_EXCEEDED"
+              },
+              "max_request": {
+                "type": "integer",
+                "description": "Maximum allowed requests"
+              },
+              "interval": {
+                "type": "integer",
+                "description": "Time interval in seconds"
+              },
+              "message": {
+                "type": "string",
+                "example": "rate limit exceeded"
+              }
+            }
+          }
+        }
+      },
+      "MaintenanceError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "HTTP Status Code",
+                "example": 503
+              },
+              "code": {
+                "type": "string",
+                "example": "SERVICE_UNAVAILABLE"
+              },
+              "message": {
+                "type": "string",
+                "example": "Service unavailable due to maintenance"
+              }
+            }
+          }
+        }
+      },
+      "Server": {
+        "type": "object",
+        "properties": {
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address"
+          },
+          "server_ipv6_net": {
+            "type": "string",
+            "description": "Server main IPv6 net address"
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID"
+          },
+          "server_name": {
+            "type": "string",
+            "description": "Server name"
+          },
+          "product": {
+            "type": "string",
+            "description": "Server product name"
+          },
+          "dc": {
+            "type": "string",
+            "description": "Data center"
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota, 'unlimited' in case of unlimited traffic"
+          },
+          "status": {
+            "type": "string",
+            "description": "Server status"
+          },
+          "cancelled": {
+            "type": "boolean",
+            "description": "Status of server cancellation"
+          },
+          "paid_until": {
+            "type": "string",
+            "description": "Paid until date"
+          },
+          "ip": {
+            "type": "array",
+            "description": "Array of assigned single IP addresses",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subnet": {
+            "type": "array",
+            "description": "Array of assigned subnets",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ip": {
+                  "type": "string"
+                },
+                "mask": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Cancellation": {
+        "type": "object",
+        "properties": {
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address"
+          },
+          "server_ipv6_net": {
+            "type": "string",
+            "description": "Server main IPv6 address"
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID"
+          },
+          "server_name": {
+            "type": "string",
+            "description": "Server name"
+          },
+          "earliest_cancellation_date": {
+            "type": "string",
+            "description": "Earliest possible cancellation date"
+          },
+          "cancelled": {
+            "type": "boolean",
+            "description": "Status of server cancellation"
+          },
+          "reservation_possible": {
+            "type": "boolean",
+            "description": "Indicates whether the current server location is eligible for reservation after server cancellation"
+          },
+          "reserved": {
+            "type": "boolean",
+            "description": "Indicates whether the current server location will be reserved after server cancellation"
+          },
+          "cancellation_date": {
+            "type": "string",
+            "description": "Cancellation date if cancellation is active, otherwise null"
+          },
+          "cancellation_reason": {
+            "type": "array",
+            "description": "Array of possible cancellation reasons",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "array",
+            "description": "Textual description",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota"
+          },
+          "dist": {
+            "type": "array",
+            "description": "Available distributions",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arch": {
+            "type": "array",
+            "description": "Available distribution architectures",
+            "deprecated": true,
+            "items": {
+              "type": "integer"
+            }
+          },
+          "lang": {
+            "type": "array",
+            "description": "Available distribution languages",
+            "items": {
+              "type": "string"
+            }
+          },
+          "location": {
+            "type": "array",
+            "description": "Available locations",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductPrice"
+            }
+          },
+          "orderable_addons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductAddon"
+            }
+          }
+        }
+      },
+      "ProductPrice": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "Location"
+          },
+          "price": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "Monthly price in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "Monthly price in euros with VAT"
+              },
+              "hourly_net": {
+                "type": "string",
+                "description": "Hourly price in euros, if the product is billed hourly"
+              },
+              "hourly_gross": {
+                "type": "string",
+                "description": "Hourly price in euros with VAT, if the product is billed hourly"
+              }
+            }
+          },
+          "price_setup": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "One time fee in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "One time fee in euros with VAT"
+              }
+            }
+          }
+        }
+      },
+      "ProductAddon": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Addon ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Addon name"
+          },
+          "min": {
+            "type": "integer",
+            "description": "Minimum orderable amount"
+          },
+          "max": {
+            "type": "integer",
+            "description": "Maximum orderable amount"
+          },
+          "prices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductAddonPrice"
+            }
+          }
+        }
+      },
+      "ProductAddonPrice": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "Location"
+          },
+          "price": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "Monthly price in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "Monthly price in euros with VAT"
+              },
+              "hourly_net": {
+                "type": "string",
+                "description": "Hourly price in euros, if the product is billed hourly"
+              },
+              "hourly_gross": {
+                "type": "string",
+                "description": "Hourly price in euros with VAT, if the product is billed hourly"
+              }
+            }
+          },
+          "price_setup": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "One time fee in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "One time fee in euros with VAT"
+              }
+            }
+          }
+        }
+      },
+      "ServerProduct": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          }
+        }
+      },
+      "OrderServerProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "array",
+            "description": "Textual description",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota"
+          },
+          "dist": {
+            "type": "array",
+            "description": "Available distributions",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arch": {
+            "type": "array",
+            "description": "Available distribution architectures",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "lang": {
+            "type": "array",
+            "description": "Available languages",
+            "items": {
+              "type": "string"
+            }
+          },
+          "location": {
+            "type": "array",
+            "description": "Available locations",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductPrice"
+            }
+          },
+          "orderable_addons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductAddon"
+            }
+          }
+        }
+      },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Transaction ID"
+          },
+          "date": {
+            "type": "string",
+            "description": "Transaction date"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID if transaction status is \"ready\", null otherwise"
+          },
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address if transaction status is \"ready\", null otherwise"
+          },
+          "authorized_key": {
+            "type": "array",
+            "description": "Array with supplied public SSH keys",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Key name"
+                    },
+                    "fingerprint": {
+                      "type": "string",
+                      "description": "Key fingerprint"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Key type"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "description": "Key size"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "comment": {
+        "type": "string",
+        "description": "Supplied order comment"
+      },
+      "product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "array",
+            "description": "Textual description",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota"
+          },
+          "dist": {
+            "type": "string",
+            "description": "Ordered distribution"
+          },
+          "@deprecated arch": {
+            "type": "integer",
+            "description": "Ordered distribution architecture"
+          },
+          "lang": {
+            "type": "string",
+            "description": "Ordered distribution language"
+          },
+          "location": {
+            "type": "string",
+            "description": "Ordered location"
+          }
+        }
+      },
+      "addons": {
+        "type": "array",
+        "description": "Array of Addon IDs",
+        "items": {
+          "type": "string"
+        }
+      },
+      "OrderServerTransaction": {
+        "type": "object",
+        "properties": {
+          "transaction": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Transaction ID"
+              },
+              "date": {
+                "type": "string",
+                "description": "Transaction date"
+              },
+              "status": {
+                "type": "string",
+                "description": "Transaction status, 'ready', 'in process' or 'cancelled'"
+              },
+              "server_number": {
+                "type": "integer",
+                "description": "Server ID if transaction status is 'ready', null otherwise",
+                "nullable": true
+              },
+              "server_ip": {
+                "type": "string",
+                "description": "Server main IP address if transaction status is 'ready', null otherwise",
+                "nullable": true
+              },
+              "authorized_key": {
+                "type": "array",
+                "description": "Array with supplied public SSH keys",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "fingerprint": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "size": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "comment": {
+                "type": "string",
+                "description": "Supplied order comment",
+                "nullable": true
+              },
+              "product": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Product ID"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Product name"
+                  },
+                  "description": {
+                    "type": "array",
+                    "description": "Textual description",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "traffic": {
+                    "type": "string",
+                    "description": "Free traffic quota"
+                  },
+                  "dist": {
+                    "type": "string",
+                    "description": "Ordered distribution"
+                  },
+                  "arch": {
+                    "type": "string",
+                    "description": "Ordered distribution architecture"
+                  },
+                  "lang": {
+                    "type": "string",
+                    "description": "Ordered distribution language"
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "Ordered location"
+                  }
+                }
+              },
+              "addons": {
+                "type": "array",
+                "description": "Array of Addon IDs",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AddonID": {
+        "type": "string",
+        "description": "Addon ID"
+      },
+      "AuthorizedKey": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Key name"
+              },
+              "fingerprint": {
+                "type": "string",
+                "description": "Key fingerprint"
+              },
+              "type": {
+                "type": "string",
+                "description": "Key type"
+              },
+              "size": {
+                "type": "integer",
+                "description": "Key size"
+              }
+            }
+          }
+        }
+      },
+      "HostKey": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "object",
+            "properties": {
+              "fingerprint": {
+                "type": "string",
+                "description": "Key fingerprint"
+              },
+              "type": {
+                "type": "string",
+                "description": "Key type"
+              },
+              "size": {
+                "type": "integer",
+                "description": "Key size"
+              }
+            }
+          }
+        }
+      },
+      "OrderComment": {
+        "type": "string",
+        "description": "Supplied order comment"
+      },
+      "OrderedServerProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "array",
+            "description": "Textual description",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota"
+          },
+          "dist": {
+            "type": "string",
+            "description": "Ordered distribution"
+          },
+          "@deprecated arch": {
+            "type": "integer",
+            "description": "Ordered distribution architecture"
+          },
+          "lang": {
+            "type": "string",
+            "description": "Ordered distribution language"
+          },
+          "location": {
+            "type": "string",
+            "description": "Ordered location"
+          }
+        }
+      },
+      "OrderTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Transaction ID"
+          },
+          "date": {
+            "type": "string",
+            "description": "Transaction date"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID if transaction status is \"ready\", null otherwise"
+          },
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address if transaction status is \"ready\", null otherwise"
+          },
+          "authorized_key": {
+            "type": "array",
+            "description": "Array with supplied public SSH keys",
+            "items": {
+              "$ref": "#/components/schemas/AuthorizedKey"
+            }
+          },
+          "host_key": {
+            "type": "array",
+            "description": "Array with servers public host keys",
+            "items": {
+              "$ref": "#/components/schemas/HostKey"
+            }
+          },
+          "comment": {
+            "$ref": "#/components/schemas/OrderComment"
+          },
+          "product": {
+            "$ref": "#/components/schemas/OrderedServerProduct"
+          },
+          "addons": {
+            "type": "array",
+            "description": "Array of Addon IDs",
+            "items": {
+              "$ref": "#/components/schemas/AddonID"
+            }
+          }
+        }
+      },
+      "ServerMarketProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "array",
+            "description": "Textual description",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota"
+          },
+          "dist": {
+            "type": "array",
+            "description": "Available distributions",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arch": {
+            "type": "array",
+            "description": "Available distribution architectures",
+            "deprecated": true,
+            "items": {
+              "type": "integer"
+            }
+          },
+          "lang": {
+            "type": "array",
+            "description": "Available distribution languages",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cpu": {
+            "type": "string",
+            "description": "CPU model name"
+          },
+          "cpu_benchmark": {
+            "type": "integer",
+            "description": "CPU benchmark value"
+          },
+          "memory_size": {
+            "type": "integer",
+            "description": "Main memory size in GB"
+          },
+          "hdd_size": {
+            "type": "integer",
+            "description": "Drive size in GB"
+          },
+          "hdd_text": {
+            "type": "string",
+            "description": "Drive special tags"
+          },
+          "hdd_count": {
+            "type": "integer",
+            "description": "Drive count"
+          },
+          "datacenter": {
+            "type": "string",
+            "description": "Data center"
+          },
+          "network_speed": {
+            "type": "string",
+            "description": "Server network speed"
+          },
+          "price": {
+            "type": "string",
+            "description": "Monthly price in euros"
+          },
+          "price_hourly": {
+            "type": "string",
+            "description": "Hourly price in euros, if the product is billed hourly, null otherwise"
+          },
+          "price_setup": {
+            "type": "string",
+            "description": "One time fee in euros"
+          },
+          "price_vat": {
+            "type": "string",
+            "description": "Monthly price in euros with VAT"
+          },
+          "price_hourly_vat": {
+            "type": "string",
+            "description": "Hourly price in euros with VAT, if the product is billed hourly, null otherwise"
+          },
+          "price_setup_vat": {
+            "type": "string",
+            "description": "One time fee in euros with VAT"
+          },
+          "fixed_price": {
+            "type": "boolean",
+            "description": "Set to \"true\" if product has a fixed price"
+          },
+          "next_reduce": {
+            "type": "integer",
+            "description": "Countdown until next price reduction in seconds"
+          },
+          "next_reduce_date": {
+            "type": "string",
+            "description": "Next price reduction date"
+          },
+          "orderable_addons": {
+            "type": "array",
+            "description": "Array of orderable addons",
+            "items": {
+              "$ref": "#/components/schemas/ProductAddon"
+            }
+          }
+        }
+      },
+      "ServerMarketProductDetails": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "array",
+            "description": "Textual description",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota"
+          },
+          "dist": {
+            "type": "array",
+            "description": "Available distributions",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arch": {
+            "type": "array",
+            "description": "Available distribution architectures",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "lang": {
+            "type": "array",
+            "description": "Available distribution languages",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cpu": {
+            "type": "string",
+            "description": "CPU model name"
+          },
+          "cpu_benchmark": {
+            "type": "integer",
+            "description": "CPU benchmark value"
+          },
+          "memory_size": {
+            "type": "integer",
+            "description": "Main memory size in GB"
+          },
+          "hdd_size": {
+            "type": "integer",
+            "description": "Drive size in GB"
+          },
+          "hdd_text": {
+            "type": "string",
+            "description": "Drive special tags"
+          },
+          "hdd_count": {
+            "type": "integer",
+            "description": "Drive count"
+          },
+          "datacenter": {
+            "type": "string",
+            "description": "Data center"
+          },
+          "network_speed": {
+            "type": "string",
+            "description": "Server network speed"
+          },
+          "price": {
+            "type": "string",
+            "description": "Monthly price in euros"
+          },
+          "price_hourly": {
+            "type": "string",
+            "description": "Hourly price in euros, if the product is billed hourly, null otherwise"
+          },
+          "price_setup": {
+            "type": "string",
+            "description": "One time fee in euros"
+          },
+          "price_vat": {
+            "type": "string",
+            "description": "Monthly price in euros with VAT"
+          },
+          "price_hourly_vat": {
+            "type": "string",
+            "description": "Hourly price in euros with VAT, if the product is billed hourly, null otherwise"
+          },
+          "price_setup_vat": {
+            "type": "string",
+            "description": "One time fee in euros with VAT"
+          },
+          "fixed_price": {
+            "type": "boolean",
+            "description": "Set to \"true\" if product has a fixed price"
+          },
+          "next_reduce": {
+            "type": "integer",
+            "description": "Countdown until next price reduction in seconds"
+          },
+          "next_reduce_date": {
+            "type": "string",
+            "description": "Next price reduction date"
+          },
+          "orderable_addons": {
+            "type": "array",
+            "description": "Array of orderable addons",
+            "items": {
+              "$ref": "#/components/schemas/ProductAddon"
+            }
+          }
+        }
+      },
+      "ServerTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Transaction ID"
+          },
+          "date": {
+            "type": "string",
+            "description": "Transaction date"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID if transaction status is \"ready\", null otherwise"
+          },
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address if transaction status is \"ready\", null otherwise"
+          },
+          "authorized_key": {
+            "type": "array",
+            "description": "Array with supplied public SSH keys",
+            "items": {
+              "$ref": "#/components/schemas/AuthorizedKey"
+            }
+          },
+          "host_key": {
+            "type": "array",
+            "description": "Array with servers public host keys",
+            "items": {
+              "$ref": "#/components/schemas/HostKey"
+            }
+          },
+          "comment": {
+            "$ref": "#/components/schemas/OrderComment"
+          },
+          "product": {
+            "$ref": "#/components/schemas/OrderedServerProduct"
+          },
+          "addons": {
+            "type": "array",
+            "description": "Array of Addon IDs",
+            "items": {
+              "$ref": "#/components/schemas/AddonID"
+            }
+          }
+        }
+      },
+      "ServerTransactionList": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ServerTransaction"
+        }
+      },
+      "OrderServerMarketTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Transaction ID"
+          },
+          "date": {
+            "type": "string",
+            "description": "Transaction date"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID if transaction status is \"ready\", null otherwise"
+          },
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address if transaction status is \"ready\", null otherwise"
+          },
+          "authorized_key": {
+            "type": "array",
+            "description": "Array with supplied public SSH keys",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Key name"
+                    },
+                    "fingerprint": {
+                      "type": "string",
+                      "description": "Key fingerprint"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Key type"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "description": "Key size"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "host_key": {
+            "type": "array",
+            "description": "Array with servers public host keys",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "object",
+                  "properties": {
+                    "fingerprint": {
+                      "type": "string",
+                      "description": "Key fingerprint"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Key type"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "description": "Key size"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "comment": {
+            "type": "string",
+            "description": "Supplied order comment"
+          },
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Product ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Product name"
+              },
+              "description": {
+                "type": "array",
+                "description": "Textual description",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "traffic": {
+                "type": "string",
+                "description": "Free traffic quota"
+              },
+              "dist": {
+                "type": "string",
+                "description": "Ordered distribution"
+              },
+              "arch": {
+                "type": "integer",
+                "description": "Ordered distribution architecture"
+              },
+              "lang": {
+                "type": "string",
+                "description": "Ordered distribution language"
+              },
+              "location": {
+                "type": "string",
+                "description": "Ordered location"
+              }
+            }
+          },
+          "addons": {
+            "type": "array",
+            "description": "Array of Addon IDs",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ServerMarketTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Transaction ID"
+          },
+          "date": {
+            "type": "string",
+            "description": "Transaction date"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID if transaction status is \"ready\", null otherwise"
+          },
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address if transaction status is \"ready\", null otherwise"
+          },
+          "authorized_key": {
+            "type": "array",
+            "description": "Array with supplied public SSH keys",
+            "items": {
+              "$ref": "#/components/schemas/AuthorizedKey"
+            }
+          },
+          "host_key": {
+            "type": "array",
+            "description": "Array with servers public host keys",
+            "items": {
+              "$ref": "#/components/schemas/HostKey"
+            }
+          },
+          "comment": {
+            "$ref": "#/components/schemas/OrderComment"
+          },
+          "product": {
+            "$ref": "#/components/schemas/OrderedServerProduct"
+          },
+          "addons": {
+            "type": "array",
+            "description": "Array of Addon IDs",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AddonProductPrice": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "Location"
+          },
+          "price": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "Monthly price in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "Monthly price in euros with VAT"
+              },
+              "hourly_net": {
+                "type": "string",
+                "description": "Hourly price in euros, if the product is billed hourly"
+              },
+              "hourly_gross": {
+                "type": "string",
+                "description": "Hourly price in euros with VAT, if the product is billed hourly"
+              }
+            }
+          },
+          "price_setup": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "One time fee in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "One time fee in euros with VAT"
+              }
+            }
+          }
+        }
+      },
+      "ServerAddonProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "type": {
+            "type": "string",
+            "description": "Product type"
+          },
+          "price": {
+            "$ref": "#/components/schemas/AddonProductPrice"
+          }
+        }
+      },
+      "ServerAddonProductList": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ServerAddonProduct"
+        }
+      },
+      "ServerAddonTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Transaction ID"
+          },
+          "date": {
+            "type": "string",
+            "description": "Transaction date"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID"
+          },
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Product ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Product name"
+              },
+              "type": {
+                "type": "string",
+                "description": "Product type"
+              },
+              "price": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "Location"
+                  },
+                  "price": {
+                    "type": "object",
+                    "properties": {
+                      "net": {
+                        "type": "string",
+                        "description": "Monthly price in euros"
+                      },
+                      "gross": {
+                        "type": "string",
+                        "description": "Monthly price in euros with VAT"
+                      },
+                      "hourly_net": {
+                        "type": "string",
+                        "description": "Hourly price in euros, if the product is billed hourly"
+                      },
+                      "hourly_gross": {
+                        "type": "string",
+                        "description": "Hourly price in euros with VAT, if the product is billed hourly"
+                      }
+                    }
+                  },
+                  "price_setup": {
+                    "type": "object",
+                    "properties": {
+                      "net": {
+                        "type": "string",
+                        "description": "One time fee in euros"
+                      },
+                      "gross": {
+                        "type": "string",
+                        "description": "One time fee in euros with VAT"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "Type of resource"
+                },
+                "id": {
+                  "type": "string",
+                  "description": "Resource ID"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AddonOrderRequest": {
+        "required": [
+          "product_id",
+          "server_number",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "description": "Product ID",
+            "example": "additional_ipv4"
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID",
+            "example": 123
+          },
+          "reason": {
+            "type": "string",
+            "description": "RIPE reason: mandatory for addon types \"ip_ipv4\", \"subnet_ipv4\" and \"failover_subnet_ipv4\"",
+            "example": "VPS"
+          },
+          "gateway": {
+            "type": "string",
+            "description": "Routing target for subnets: usable for addon type \"subnet_ipv4\" (Optional: default is the server's primary IP address)"
+          },
+          "test": {
+            "type": "boolean",
+            "description": "The order will not be processed if set to \"true\" (optional)"
+          }
+        }
+      },
+      "AddonOrderResponse": {
+        "type": "object",
+        "properties": {
+          "transaction": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Transaction ID"
+              },
+              "date": {
+                "type": "string",
+                "description": "Transaction date"
+              },
+              "status": {
+                "type": "string",
+                "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+              },
+              "server_number": {
+                "type": "integer",
+                "description": "Server ID"
+              },
+              "product": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Product ID"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Product name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Product type"
+                  },
+                  "price": {
+                    "type": "object",
+                    "properties": {
+                      "location": {
+                        "type": "string",
+                        "description": "Location"
+                      },
+                      "price": {
+                        "type": "object",
+                        "properties": {
+                          "net": {
+                            "type": "string",
+                            "description": "Monthly price in euros"
+                          },
+                          "gross": {
+                            "type": "string",
+                            "description": "Monthly price in euros with VAT"
+                          },
+                          "hourly_net": {
+                            "type": "string",
+                            "description": "Hourly price in euros, if the product is billed hourly"
+                          },
+                          "hourly_gross": {
+                            "type": "string",
+                            "description": "Hourly price in euros with VAT, if the product is billed hourly"
+                          }
+                        }
+                      },
+                      "price_setup": {
+                        "type": "object",
+                        "properties": {
+                          "net": {
+                            "type": "string",
+                            "description": "One time fee in euros"
+                          },
+                          "gross": {
+                            "type": "string",
+                            "description": "One time fee in euros with VAT"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "resources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "Type of resource"
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Resource ID"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ServerAddonTransactionResponse": {
+        "type": "object",
+        "properties": {
+          "transaction": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Transaction ID"
+              },
+              "date": {
+                "type": "string",
+                "description": "Transaction date",
+                "format": "date-time"
+              },
+              "status": {
+                "enum": [
+                  "ready",
+                  "in process",
+                  "cancelled"
+                ],
+                "type": "string",
+                "description": "Transaction status"
+              },
+              "server_number": {
+                "type": "integer",
+                "description": "Server ID"
+              },
+              "product": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Product ID"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Product name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Product type"
+                  },
+                  "price": {
+                    "type": "object",
+                    "properties": {
+                      "location": {
+                        "type": "string",
+                        "description": "Location"
+                      },
+                      "price": {
+                        "type": "object",
+                        "properties": {
+                          "net": {
+                            "type": "string",
+                            "description": "Monthly price in euros"
+                          },
+                          "gross": {
+                            "type": "string",
+                            "description": "Monthly price in euros with VAT"
+                          },
+                          "hourly_net": {
+                            "type": "string",
+                            "description": "Hourly price in euros, if the product is billed hourly"
+                          },
+                          "hourly_gross": {
+                            "type": "string",
+                            "description": "Hourly price in euros with VAT, if the product is billed hourly"
+                          }
+                        }
+                      },
+                      "price_setup": {
+                        "type": "object",
+                        "properties": {
+                          "net": {
+                            "type": "string",
+                            "description": "One time fee in euros"
+                          },
+                          "gross": {
+                            "type": "string",
+                            "description": "One time fee in euros with VAT"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "resources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "Type of resource"
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Resource ID"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "ServerProductListResponse": {
+        "description": "A list of server products",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ServerProduct"
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      },
+      "OrderServerProductResponse": {
+        "description": "A specific server product details",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OrderServerProduct"
+            }
+          }
+        }
+      },
+      "OrderProductNotFoundError": {
+        "description": "Product not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      },
+      "TransactionListResponse": {
+        "description": "Overview of all server orders within the last 30 days",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/TransactionList"
+            }
+          }
+        }
+      },
+      "TransactionNotFoundResponse": {
+        "description": "No transactions found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      },
+      "OrderServerTransactionResponse": {
+        "description": "Successful order",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OrderServerTransaction"
+            }
+          }
+        }
+      },
+      "OrderTransactionResponse": {
+        "description": "A specific order transaction details",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OrderTransaction"
+            }
+          }
+        }
+      },
+      "OrderTransactionNotFoundError": {
+        "description": "Transaction not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      },
+      "ServerMarketProductListResponse": {
+        "description": "A list of server market products",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ServerMarketProduct"
+              }
+            }
+          }
+        }
+      },
+      "ServerMarketProductNotFoundError": {
+        "description": "No server market products found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      },
+      "ServerMarketProductDetailsResponse": {
+        "description": "A specific server market product details",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ServerMarketProductDetails"
+            }
+          }
+        }
+      },
+      "SpecificServerMarketProductNotFoundError": {
+        "description": "Product not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      },
+      "ServerTransactionListResponse": {
+        "description": "Overview of all server orders within the last 30 days",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ServerTransactionList"
+            }
+          }
+        }
+      },
+      "OrderServerMarketTransactionSuccess": {
+        "description": "Order a new server from the server market response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OrderServerMarketTransaction"
+            }
+          }
+        }
+      },
+      "OrderServerMarketTransactionInvalidInput": {
+        "description": "Invalid input parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormatInvalidInput"
+            }
+          }
+        }
+      },
+      "OrderServerMarketTransactionError": {
+        "description": "The transaction failed due to an internal error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      },
+      "ServerMarketTransactionResponse": {
+        "description": "Details of a specific order transaction",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ServerMarketTransaction"
+            }
+          }
+        }
+      },
+      "AddonProductListResponse": {
+        "description": "A list of available server addons for a server",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ServerAddonProductList"
+            }
+          }
+        }
+      },
+      "ServerAddonTransactionListResponse": {
+        "description": "Overview of all addon orders within the last 30 days",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ServerAddonTransaction"
+              }
+            }
+          }
+        }
+      },
+      "ServerAddonTransactionNotFoundError": {
+        "description": "No transactions found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      },
+      "AddonOrderInvalidInput": {
+        "description": "Invalid input parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormatInvalidInput"
+            }
+          }
+        }
+      },
+      "AddonOrderConflict": {
+        "description": "The transaction cannot be processed due to the reason mentioned in the error message",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      },
+      "AddonOrderError": {
+        "description": "The transaction failed due to an internal error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      },
+      "ServerAddonTransactionResponse": {
+        "description": "Successful response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ServerAddonTransactionResponse"
+            }
+          }
+        }
+      },
+      "NotFoundError": {
+        "description": "Transaction not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {},
+    "requestBodies": {
+      "OrderServerMarketTransaction": {
+        "description": "Order a new server from the server market. If the order is successful, the status code 201 CREATED is returned.",
+        "content": {
+          "application/x-www-form-urlencoded": {
+            "schema": {
+              "required": [
+                "product_id"
+              ],
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "description": "Product ID"
+                },
+                "authorized_key": {
+                  "type": "array",
+                  "description": "One or more SSH key fingerprints (Optional, you can use either parameter \"authorized_key\" or parameter \"password\")",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "password": {
+                  "type": "string",
+                  "description": "Root password (Optional: you can use either parameter \"authorized_key\" or parameter \"password\")"
+                },
+                "dist": {
+                  "type": "string",
+                  "description": "Distribution name which should be preinstalled (optional)"
+                },
+                "arch": {
+                  "type": "string",
+                  "description": "Architecture of preinstalled distribution (optional)",
+                  "deprecated": true
+                },
+                "lang": {
+                  "type": "string",
+                  "description": "Language of preinstalled distribution (optional)"
+                },
+                "comment": {
+                  "type": "string",
+                  "description": "Order comment (optional); Please note that if a comment is supplied, the order will be processed manually."
+                },
+                "addon": {
+                  "type": "array",
+                  "description": "Array of addon IDs (optional)",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "test": {
+                  "type": "boolean",
+                  "description": "The order will not be processed if set to \"true\" (optional)"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      }
+    },
+    "headers": {},
+    "securitySchemes": {
+      "BasicAuth": {
+        "scheme": "basic",
+        "type": "http"
+      }
+    },
+    "links": {},
+    "callbacks": {}
+  }
+}

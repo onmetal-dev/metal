@@ -1,0 +1,170 @@
+{
+  "components": {
+    "schemas": {
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Transaction ID"
+          },
+          "date": {
+            "type": "string",
+            "description": "Transaction date"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID if transaction status is \"ready\", null otherwise"
+          },
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address if transaction status is \"ready\", null otherwise"
+          },
+          "authorized_key": {
+            "type": "array",
+            "description": "Array with supplied public SSH keys",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Key name"
+                    },
+                    "fingerprint": {
+                      "type": "string",
+                      "description": "Key fingerprint"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Key type"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "description": "Key size"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "comment": {
+        "type": "string",
+        "description": "Supplied order comment"
+      },
+      "product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "array",
+            "description": "Textual description",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota"
+          },
+          "dist": {
+            "type": "string",
+            "description": "Ordered distribution"
+          },
+          "@deprecated arch": {
+            "type": "integer",
+            "description": "Ordered distribution architecture"
+          },
+          "lang": {
+            "type": "string",
+            "description": "Ordered distribution language"
+          },
+          "location": {
+            "type": "string",
+            "description": "Ordered location"
+          }
+        }
+      },
+      "addons": {
+        "type": "array",
+        "description": "Array of Addon IDs",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "TransactionListResponse": {
+        "description": "Overview of all server orders within the last 30 days",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/TransactionList"
+            }
+          }
+        }
+      },
+      "TransactionNotFoundResponse": {
+        "description": "No transactions found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/order/server/transaction": {
+      "get": {
+        "tags": [
+          "Order"
+        ],
+        "summary": "Overview of all server orders within the last 30 days",
+        "description": "Overview of all server orders within the last 30 days",
+        "operationId": "getServerOrderTransactions",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/TransactionListResponse"
+          },
+          "401": {
+            "$ref": "#/components/schemas/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/schemas/RateLimitError"
+          },
+          "404": {
+            "$ref": "#/components/responses/TransactionNotFoundResponse"
+          },
+          "503": {
+            "$ref": "#/components/schemas/MaintenanceError"
+          }
+        }
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 18745,
+      "completion_tokens": 656,
+      "total_tokens": 19401
+    }
+  }
+}
