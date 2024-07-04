@@ -54,8 +54,11 @@ export default function RootLayout({
           lexend.variable
         )}
         suppressHydrationWarning
+        style={{
+          height: "100%",
+        }}
       >
-        <body className="min-h-screen">
+        <body className="min-h-full h-full">
           <CommandItemsProvider>
             <CommandMenu />
             <ThemeProvider
