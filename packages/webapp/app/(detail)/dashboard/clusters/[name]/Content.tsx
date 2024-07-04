@@ -226,7 +226,7 @@ export default function Content({
               <section id="metrics" className="mb-14">
                 <div className="flex items-center w-full justify-end mb-4">
                   <Tooltip>
-                    <TooltipContent side="top">
+                    <TooltipContent side="bottom">
                       <div>
                         <span className="mr-2 text-xs">Change timeframe</span>
                         <KeySymbol disableTooltip={true} keyName="[" />
