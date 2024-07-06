@@ -59,7 +59,6 @@ export function Clusters({ clusters: initialClusters }: ClustersProps) {
 
   const [focusedClusterIdx, setFocusedClusterIdx] = useState<number>(0);
   const [focusMode, setFocusMode] = useState<"mouse" | "keyboard">("mouse");
-  const tableBodyRef = useRef<HTMLDivElement>(null);
   // have a ref that tracks whether cmd is pressed, so that we can distinguish cmd+k from just k
   const cmdPressed = useRef(false);
   useKeyPressEvent(
@@ -204,10 +203,7 @@ export function Clusters({ clusters: initialClusters }: ClustersProps) {
           </div>
         </div>
         {/* tbody */}
-        <div
-          ref={tableBodyRef}
-          className="bg-background rounded-b-[7px] shadow-2xl mb-10"
-        >
+        <div className="bg-background rounded-b-[7px] shadow-2xl mb-10">
           {/* trow */}
           {clusters.map((cluster, idx) => (
             <div
