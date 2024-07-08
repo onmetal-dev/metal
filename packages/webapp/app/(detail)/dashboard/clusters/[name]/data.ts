@@ -1,137 +1,19 @@
 // interface for interfacing with prometheus data in a cluster
 
 import { HetznerCluster } from "@/app/server/db/schema";
-import { Serie } from "@nivo/line";
-
-// https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
-interface PrometheusRangeQueryRequestParams {
-  query: string;
-  start: string | number; // RFC3339 (e.g. 2015-07-01T20:10:30.781Z) or Unix timestamp
-  end: string | number; // RFC3339 or Unix timestamp
-  step: string | number; // Duration format or float number of seconds
-  timeout?: string; // Optional duration
-}
-
-// define a type that users of this package can assume has Datum values that are Dates
-export type TimeSeries = Serie;
-
-interface PrometheusRangeQueryResponseBase<T> {
-  status: string;
-  errorType: string;
-  error: string;
-  data: {
-    resultType: string;
-    result: Array<{
-      metric: Record<string, any>;
-      values: T;
-    }>;
-  };
-}
-
-type PromValues = Array<[number, string]>;
-type PromDateValues = Array<[Date, string]>;
-
-type PrometheusRangeQueryResponseRaw =
-  PrometheusRangeQueryResponseBase<PromValues>;
-type PrometheusRangeQueryResponse =
-  PrometheusRangeQueryResponseBase<PromDateValues>;
-
-type PromRangeResult = {
-  metric: Record<string, any>;
-  values: PromDateValues;
-}[];
-
-function promResultToTimeSeries(result: PromRangeResult): TimeSeries[] {
-  return result.map(({ metric, values }, index) => {
-    let id = index.toString();
-    if (Object.keys(metric).length !== 0) {
-      id = JSON.stringify(metric);
-    }
-    return {
-      id,
-      data: values.map(([date, value]) => ({
-        x: date,
-        y: parseFloat(value),
-      })),
-    };
-  });
-}
-
-// define a class that takes in a cluster and when it constructs itself it creates a tmpfile with the kubeconfig for that cluster
-export class PrometheusClient {
-  private endpoint: string;
-  constructor(cluster: HetznerCluster) {
-    this.endpoint = `https://prometheus.${cluster.name}.up.onmetal.dev`;
-  }
-
-  // rangeQuery: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
-  async rangeQuery(
-    params: PrometheusRangeQueryRequestParams
-  ): Promise<PrometheusRangeQueryResponse> {
-    const queryString = new URLSearchParams(params as any).toString();
-    const response = await fetch(
-      `${this.endpoint}/api/v1/query_range?${queryString}`
-    );
-    const raw = (await response.json()) as PrometheusRangeQueryResponseRaw;
-    // convert unix timestamps to dates
-    const ret: PrometheusRangeQueryResponse = {
-      status: raw.status,
-      errorType: raw.errorType,
-      error: raw.error,
-      data: {
-        resultType: raw.data.resultType,
-        result: raw.data.result.map(({ metric, values }) => ({
-          metric,
-          values: values.map(([timestamp, value]) => [
-            new Date(timestamp * 1000),
-            value,
-          ]),
-        })),
-      },
-    };
-    return ret;
-  }
-}
-
-// stepForRange returns the most logical step value for a given time range
-// step can be either 1s, 60s, 5m, 10m, 30m, 1h, 3h, 6h, 12h, 1d
-// the logic starts with a 1s step and seeing how many steps fit into the range
-// if that number is greater than 1440, then we go to the next step size
-// we keep going until we get a step size that puts us under 1440 datapoints
-const steps = [
-  1,
-  60,
-  5 * 60,
-  10 * 60,
-  30 * 60,
-  60 * 60,
-  3 * 60 * 60,
-  6 * 60 * 60,
-  12 * 60 * 60,
-  24 * 60 * 60,
-];
-function stepForRange({
-  startDate,
-  endDate,
-}: {
-  startDate: Date;
-  endDate: Date;
-}): number {
-  const start = Math.floor(startDate.getTime() / 1000);
-  const end = Math.floor(endDate.getTime() / 1000);
-  const range = end - start;
-  for (const step of steps) {
-    if (range / step < 1440) {
-      return step;
-    }
-  }
-  return steps[steps.length - 1]!;
-}
+import {
+  PrometheusClient,
+  promResultToTimeSeries,
+  stepForRange,
+} from "@/lib/charts/prom";
+import { TimeSeries } from "@/lib/charts/types";
 
 export class ClusterData {
   private promClient: PrometheusClient;
   constructor(cluster: HetznerCluster) {
-    this.promClient = new PrometheusClient(cluster);
+    this.promClient = new PrometheusClient(
+      `https://prometheus.${cluster.name}.up.onmetal.dev`
+    );
   }
 
   async cpu({
@@ -140,7 +22,7 @@ export class ClusterData {
   }: {
     startDate: Date;
     endDate: Date;
-  }): Promise<Serie[]> {
+  }): Promise<TimeSeries[]> {
     const start = Math.floor(startDate.getTime() / 1000);
     const end = Math.floor(endDate.getTime() / 1000);
 
@@ -157,7 +39,7 @@ export class ClusterData {
         `prometheus error type=${response.errorType} error=${response.error}`
       );
     }
-    return promResultToTimeSeries(response.data.result);
+    return promResultToTimeSeries(response.data.result, ["cpu"]);
   }
 
   async mem({
@@ -166,7 +48,7 @@ export class ClusterData {
   }: {
     startDate: Date;
     endDate: Date;
-  }): Promise<Serie[]> {
+  }): Promise<TimeSeries[]> {
     const start = Math.floor(startDate.getTime() / 1000);
     const end = Math.floor(endDate.getTime() / 1000);
 
@@ -183,7 +65,7 @@ export class ClusterData {
         `prometheus error type=${response.errorType} error=${response.error}`
       );
     }
-    return promResultToTimeSeries(response.data.result);
+    return promResultToTimeSeries(response.data.result, ["mem"]);
   }
 
   async cpuRequests({
@@ -192,7 +74,7 @@ export class ClusterData {
   }: {
     startDate: Date;
     endDate: Date;
-  }): Promise<Serie[]> {
+  }): Promise<TimeSeries[]> {
     const start = Math.floor(startDate.getTime() / 1000);
     const end = Math.floor(endDate.getTime() / 1000);
 
@@ -200,8 +82,9 @@ export class ClusterData {
       `sum(kube_pod_container_resource_requests{resource="cpu"})`,
       `sum(kube_node_status_allocatable{resource="cpu"})`,
     ];
-    const series: Serie[] = await Promise.all(
-      queries.map(async (query): Promise<Serie> => {
+    const ids = ["requests", "allocatable"];
+    const series: TimeSeries[] = await Promise.all(
+      queries.map(async (query, index): Promise<TimeSeries> => {
         const response = await this.promClient.rangeQuery({
           query,
           start,
@@ -213,12 +96,10 @@ export class ClusterData {
             `prometheus error type=${response.errorType} error=${response.error}`
           );
         }
-        const s = promResultToTimeSeries(response.data.result);
+        const s = promResultToTimeSeries(response.data.result, [ids[index]!]);
         return s[0]!; // assumes the queries above are all single-series (e.g. a sum)
       })
     );
-    series[0]!.id = "requests";
-    series[1]!.id = "allocatable";
     return series;
   }
 
@@ -228,7 +109,7 @@ export class ClusterData {
   }: {
     startDate: Date;
     endDate: Date;
-  }): Promise<Serie[]> {
+  }): Promise<TimeSeries[]> {
     const start = Math.floor(startDate.getTime() / 1000);
     const end = Math.floor(endDate.getTime() / 1000);
 
@@ -236,8 +117,9 @@ export class ClusterData {
       `sum(kube_pod_container_resource_requests{resource="memory"})`,
       `sum(kube_node_status_allocatable{resource="memory"})`,
     ];
-    const series: Serie[] = await Promise.all(
-      queries.map(async (query) => {
+    const ids = ["requests", "allocatable"];
+    const series: TimeSeries[] = await Promise.all(
+      queries.map(async (query, index) => {
         const response = await this.promClient.rangeQuery({
           query,
           start,
@@ -249,12 +131,10 @@ export class ClusterData {
             `prometheus error type=${response.errorType} error=${response.error}`
           );
         }
-        const s = promResultToTimeSeries(response.data.result);
+        const s = promResultToTimeSeries(response.data.result, [ids[index]!]);
         return s[0]!; // assumes the queries above are all single-series (e.g. a sum)
       })
     );
-    series[0]!.id = "requests";
-    series[1]!.id = "allocatable";
     return series;
   }
 }

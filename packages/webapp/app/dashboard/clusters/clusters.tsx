@@ -83,7 +83,6 @@ export function Clusters({ clusters: initialClusters }: ClustersProps) {
     }
   });
   useKeyPressEvent("k", () => {
-    console.log("k", commandMenuOpen);
     if (commandMenuOpen) {
       return;
     }

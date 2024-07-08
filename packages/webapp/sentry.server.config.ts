@@ -16,6 +16,7 @@ import {
 } from "@sentry/opentelemetry";
 
 const sentryClient = Sentry.init({
+  enabled: process.env.NODE_ENV === "production",
   dsn: "https://72c022fba7a2a5476ad24a977157f49a@o4507506600181760.ingest.us.sentry.io/4507506602999808",
   skipOpenTelemetrySetup: true,
 
