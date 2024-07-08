@@ -1,10 +1,9 @@
 "use client";
-import LineChart from "@/components/charts/Line";
-import { Serie } from "@nivo/line";
+import { LineChart } from "@/components/charts/LineChart";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { fetchClusterMetrics } from "./actions";
-import { TimeSeries } from "./data";
+import { TimeSeries } from "@/lib/charts/types";
 import { useRouter } from "next/navigation";
 import { useKeyPressEvent } from "react-use";
 import prettyBytes from "pretty-bytes";
@@ -17,6 +16,7 @@ import {
 import { KeySymbol, ShortcutsProvider } from "@/components/ui/keyboard";
 import Help from "./Help";
 import { useCommandItems } from "@/components/CommandMenu";
+import { minMaxForTimeSeries, tooltipTimeFormat } from "@/lib/charts/time";
 
 const timeframes = [
   {
@@ -32,34 +32,6 @@ const timeframes = [
     seconds: 60 * 60 * 24 * 7,
   },
 ];
-
-// minMaxForTimeSeries returns the min and max values across a bunch of time series
-function minMaxForTimeSeries({
-  ts,
-  xOrY,
-  minMax,
-  maxMin,
-}: {
-  ts: TimeSeries[];
-  xOrY: "x" | "y";
-  maxMin: number;
-  minMax: number;
-}) {
-  let min = null;
-  let max = null;
-  for (const series of ts) {
-    for (const datum of series.data) {
-      const value = datum[xOrY] as number;
-      if (value != null) {
-        if (min === null || value < min) min = value;
-        if (max === null || value > max) max = value;
-      }
-    }
-  }
-  min = Math.min(min ?? 0, maxMin);
-  max = Math.max(max ?? 0, minMax);
-  return { min, max };
-}
 
 export default function Content({
   clusterName,
@@ -87,11 +59,12 @@ export default function Content({
           maxMin: 0,
           minMax: 100,
         }),
-        format: (value: any) => `${value}`,
-        legend: "%",
+        label: "%",
+        tickFormatter: (value: any) => `${value}`,
       },
       tooltip: {
-        yFormat: (value: any) => `${value.toFixed(1)}%`,
+        xFormatter: (value: Date) => tooltipTimeFormat(value),
+        yFormatter: (value: any) => `${value.toFixed(1)}%`,
       },
     },
     {
@@ -104,11 +77,12 @@ export default function Content({
           maxMin: 0,
           minMax: 100,
         }),
-        format: (value: any) => `${value}`,
-        legend: "%",
+        tickFormatter: (value: any) => `${value}`,
+        label: "%",
       },
       tooltip: {
-        yFormat: (value: any) => `${value.toFixed(1)}%`,
+        xFormatter: (value: Date) => tooltipTimeFormat(value),
+        yFormatter: (value: any) => `${value.toFixed(1)}%`,
       },
     },
     {
@@ -121,11 +95,12 @@ export default function Content({
           maxMin: 0,
           minMax: 10,
         }),
-        format: (value: any) => `${value}`,
-        legend: "",
+        tickFormatter: (value: any) => `${value}`,
+        label: "# cpu",
       },
       tooltip: {
-        yFormat: (value: any) => `${value.toFixed(2)}%`,
+        xFormatter: (value: Date) => tooltipTimeFormat(value),
+        yFormatter: (value: any) => `${value.toFixed(2)}`,
       },
     },
     {
@@ -138,11 +113,12 @@ export default function Content({
           maxMin: 0,
           minMax: 10,
         }),
-        format: (value: any) => prettyBytes(value),
-        legend: "",
+        tickFormatter: (value: any) => prettyBytes(value),
+        label: "",
       },
       tooltip: {
-        yFormat: (value: any) => prettyBytes(value),
+        xFormatter: (value: Date) => tooltipTimeFormat(value),
+        yFormatter: (value: any) => prettyBytes(value),
       },
     },
     // todo: network, disk
@@ -261,11 +237,11 @@ export default function Content({
                   {metricCharts.map(({ title, data, yAxis, tooltip }) => (
                     <div
                       key={title}
-                      className={`h-[300px] bg-background rounded-sm horizontal center flex flex-col pt-4 text-muted-foreground ${
+                      className={`h-[300px] bg-background rounded-sm horizontal center flex flex-col p-4 text-muted-foreground ${
                         timeframe.label !== dataTimeframe.label ? "blur-sm" : ""
                       }`}
                     >
-                      <h4 className="text-sm font-medium">{title}</h4>
+                      <h4 className="text-sm font-medium pb-4">{title}</h4>
                       <LineChart
                         data={data}
                         timeframeSeconds={dataTimeframe.seconds}
