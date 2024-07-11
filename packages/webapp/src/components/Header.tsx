@@ -93,7 +93,7 @@ function MobileNavigation() {
         >
           <Popover.Panel
             as="div"
-            className="absolute inset-x-0 flex flex-col p-4 mt-4 text-lg tracking-tight origin-top bg-background shadow-xl top-full rounded-2xl text-foreground"
+            className="absolute inset-x-0 flex flex-col p-4 mt-4 text-lg tracking-tight origin-top shadow-xl bg-background top-full rounded-2xl text-foreground"
           >
             {/* <MobileNavLink href="#features">Features</MobileNavLink> */}
             {/* <MobileNavLink href="#testimonials">Testimonials</MobileNavLink> */}
@@ -128,10 +128,13 @@ export function Header() {
               <div className="hidden md:block">
                 <Button
                   variant="outline"
-                  className="rounded-3xl cursor-pointer"
+                  className="cursor-pointer rounded-3xl"
                   asChild
                 >
-                  <SignInButton mode="redirect">
+                  <SignInButton
+                    mode="redirect"
+                    fallbackRedirectUrl={"/dashboard"}
+                  >
                     <span>Sign in</span>
                   </SignInButton>
                 </Button>

@@ -1,19 +1,11 @@
 "use client";
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import { useKeyPressEvent } from "react-use";
-import { useCommandItems } from "./CommandMenu";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Primitive } from "@radix-ui/react-primitive";
-
-// Context
+import { useHotkeys } from "react-hotkeys-hook";
+import { isHotkeyPressed } from "react-hotkeys-hook";
 interface FocusListContextValue<T> {
   data: T[];
   focusedDataIdx: number;
@@ -34,61 +26,60 @@ function useFocusListContext<T>() {
   }
   return context as FocusListContextValue<T>;
 }
-
-// Components
 export interface FocusListProps<T> {
   data: T[];
   getHref: (data: T) => string;
   children?: React.ReactNode;
   defaultFocusedIdx?: number;
+  onFocusListChange: (idx: number) => void;
 }
 
 export const FocusList = React.forwardRef<HTMLDivElement, FocusListProps<any>>(
-  ({ data, getHref, children, defaultFocusedIdx = 0 }, forwardedRef) => {
+  (
+    { data, getHref, children, defaultFocusedIdx = 0, onFocusListChange },
+    forwardedRef
+  ) => {
     const [focusedDataIdx, setFocusedDataIdx] =
       useState<number>(defaultFocusedIdx);
     const [focusMode, setFocusMode] = useState<"mouse" | "keyboard">("mouse");
     const router = useRouter();
-    const { open: commandMenuOpen } = useCommandItems();
 
-    const cmdPressed = useRef(false);
-    useKeyPressEvent(
-      "Meta",
+    // Call onFocusListChange when the focusedDataIdx changes
+    useEffect(() => {
+      onFocusListChange(focusedDataIdx);
+    }, [focusedDataIdx, onFocusListChange]);
+
+    const cmdPressed = isHotkeyPressed("meta");
+    useHotkeys(
+      "j",
       () => {
-        cmdPressed.current = true;
+        setFocusMode("keyboard");
+        if (focusedDataIdx + 1 < data.length)
+          setFocusedDataIdx(focusedDataIdx + 1);
       },
-      () => {
-        cmdPressed.current = false;
-      }
+      { description: "Move focus down" },
+      [setFocusMode, focusedDataIdx, data.length, setFocusedDataIdx]
     );
 
-    useKeyPressEvent("j", () => {
-      if (commandMenuOpen) return;
-      setFocusMode("keyboard");
-      if (focusedDataIdx + 1 < data.length)
-        setFocusedDataIdx(focusedDataIdx + 1);
-    });
+    useHotkeys(
+      "k",
+      () => {
+        if (cmdPressed) return;
+        setFocusMode("keyboard");
+        if (focusedDataIdx > 0) setFocusedDataIdx(focusedDataIdx - 1);
+      },
+      { description: "Move focus up" },
+      [setFocusMode, focusedDataIdx, setFocusedDataIdx]
+    );
 
-    useKeyPressEvent("k", () => {
-      if (commandMenuOpen || cmdPressed.current) return;
-      setFocusMode("keyboard");
-      if (focusedDataIdx > 0) setFocusedDataIdx(focusedDataIdx - 1);
-    });
-
-    const cmdMenuLastClosedTime = useRef<null | Date>(null);
-    useEffect(() => {
-      if (!commandMenuOpen) cmdMenuLastClosedTime.current = new Date();
-    }, [commandMenuOpen]);
-
-    useKeyPressEvent("Enter", () => {
-      if (
-        commandMenuOpen ||
-        (cmdMenuLastClosedTime.current &&
-          new Date().getTime() - cmdMenuLastClosedTime.current.getTime() < 500)
-      )
-        return;
-      router.push(getHref(data[focusedDataIdx]!));
-    });
+    useHotkeys(
+      "Enter",
+      () => {
+        router.push(getHref(data[focusedDataIdx]!));
+      },
+      { description: "Go to focused item", scopes: ["test"] },
+      [router, focusedDataIdx, getHref, data]
+    );
 
     const contextValue = {
       data,
@@ -192,7 +183,7 @@ export const FocusItem = React.forwardRef<HTMLDivElement, FocusItemProps<any>>(
       >
         <Link
           href={getHref(data![index]!)}
-          className="text-sm px-8 flex items-center h-full"
+          className="flex items-center h-full px-8 text-sm"
         >
           {children}
         </Link>
@@ -214,7 +205,6 @@ export const FocusItemCell = React.forwardRef<
 
 FocusItemCell.displayName = "FocusItemCell";
 
-// Types
 interface FocusListHeaderProps {
   children?: React.ReactNode;
   className?: string;
