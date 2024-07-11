@@ -32,7 +32,7 @@ export async function mustGetClerkActiveOrg(): Promise<ClerkOrganization> {
     throw new Error("Clerk auth() returned null unexpectedly");
   }
   const clerkOrg: ClerkOrganization | null =
-    await clerkClient.organizations.getOrganization({
+    await clerkClient().organizations.getOrganization({
       slug: clerkAuth.orgSlug,
     });
   if (!clerkOrg) {
@@ -48,9 +48,10 @@ export async function findCreateClerkOrganizationCreatedByUser({
   name: string;
   createdByClerkId: string;
 }): Promise<ClerkOrganization> {
-  const { data: orgs } = await clerkClient.users.getOrganizationMembershipList({
-    userId: createdByClerkId,
-  });
+  const { data: orgs } =
+    await clerkClient().users.getOrganizationMembershipList({
+      userId: createdByClerkId,
+    });
   for (const org of orgs) {
     if (
       org.organization.name === name &&
@@ -59,7 +60,7 @@ export async function findCreateClerkOrganizationCreatedByUser({
       return org.organization;
     }
   }
-  return await clerkClient.organizations.createOrganization({
+  return await clerkClient().organizations.createOrganization({
     name,
     createdBy: createdByClerkId,
   });

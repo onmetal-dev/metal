@@ -67,7 +67,7 @@ const ensureTeamForClerkOrg = async ({
 
   if (!team) {
     const { name: clerkOrgName } =
-      await clerkClient.organizations.getOrganization({
+      await clerkClient().organizations.getOrganization({
         organizationId: clerkOrgId,
       });
     await db.transaction(async (tx) => {
