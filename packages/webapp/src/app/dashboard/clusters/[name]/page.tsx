@@ -5,9 +5,9 @@ import { eq } from "drizzle-orm";
 import { mustGetActiveTeam } from "@/app/server/user";
 import Content from "./Content";
 import { fetchClusterMetrics } from "./actions";
-import { inngest } from "@/lib/inngest";
+import { ContentLayout } from "@/components/dashboard/ContentLayout";
 
-export default async function AsyncClusterDetail({
+export default async function ClusterDetail({
   params,
 }: {
   params: { name: string };
@@ -28,9 +28,8 @@ export default async function AsyncClusterDetail({
     clusterName: cluster.name,
   });
   return (
-    <>
-      <Topbar cluster={cluster} />
+    <ContentLayout title={cluster.name}>
       <Content clusterName={cluster.name} initialData={initialData} />
-    </>
+    </ContentLayout>
   );
 }

@@ -137,7 +137,7 @@ export function NewClusterForm() {
         <input type="hidden" name="clusterSize" value={clusterSize} />
         <Stepper
           orientation="vertical"
-          initialStep={0}
+          initialStep={-1}
           steps={steps}
           expandVerticalSteps
         >

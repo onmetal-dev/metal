@@ -5,7 +5,6 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -51,7 +50,9 @@ export const UserButton = () => {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="cursor-pointer"
-                onClick={() => signOut(() => router.push("/"))}
+                onClick={() =>
+                  signOut(() => router.push("/"), { redirectUrl: "/" })
+                }
               >
                 Sign Out
               </DropdownMenuItem>

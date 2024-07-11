@@ -1,23 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, Lexend } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
 import "./globals.css";
-import { ThemeProvider } from "@/components/ThemeProvider";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { ClerkProvider } from "@clerk/nextjs";
-import clsx from "clsx";
 import { dark } from "@clerk/themes";
-import { CommandItemsProvider, CommandMenu } from "@/components/CommandMenu";
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-inter",
-});
-const lexend = Lexend({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-lexend",
-});
+import { CommandStoreProvider } from "@/providers/CommandStoreProvider";
 
 export const metadata: Metadata = {
   title: "Metal",
@@ -46,30 +34,13 @@ export default function RootLayout({
         },
       }}
     >
-      <html
-        lang="en"
-        className={clsx(
-          "scroll-smooth antialiased",
-          inter.variable,
-          lexend.variable
-        )}
-        suppressHydrationWarning
-        style={{
-          height: "100%",
-        }}
-      >
-        <body className="min-h-full h-full">
-          <CommandItemsProvider>
-            <CommandMenu />
-            <ThemeProvider
-              attribute="class"
-              forcedTheme="dark"
-              defaultTheme="dark"
-              disableTransitionOnChange
-            >
+      <html lang="en" suppressHydrationWarning>
+        <body className={GeistSans.className}>
+          <CommandStoreProvider>
+            <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
               {children}
             </ThemeProvider>
-          </CommandItemsProvider>
+          </CommandStoreProvider>
           <Toaster />
         </body>
       </html>

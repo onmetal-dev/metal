@@ -5,6 +5,14 @@ import { NoClusters } from "./no-clusters";
 import { fetchProjectAndClusters } from "./actions";
 import { instrumentUserServerSide, mustGetUser } from "@/app/server/user";
 import { InstrumentUserClientSide } from "@/components/Instrumentation";
+import { ContentLayout } from "@/components/dashboard/ContentLayout";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 export default async function Page() {
   const userInstrumentation = await instrumentUserServerSide(
@@ -12,16 +20,27 @@ export default async function Page() {
   );
   const { project, clusters } = await fetchProjectAndClusters();
   return (
-    <InstrumentUserClientSide user={userInstrumentation}>
-      {project ? (
-        clusters.length > 0 ? (
-          <Clusters clusters={clusters} />
+    <ContentLayout title="Clusters">
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>Dashboard</BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Clusters</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+      <InstrumentUserClientSide user={userInstrumentation}>
+        {project ? (
+          clusters.length > 0 ? (
+            <Clusters clusters={clusters} />
+          ) : (
+            <NoClusters />
+          )
         ) : (
-          <NoClusters />
-        )
-      ) : (
-        <Onboarding />
-      )}
-    </InstrumentUserClientSide>
+          <Onboarding />
+        )}
+      </InstrumentUserClientSide>
+    </ContentLayout>
   );
 }

@@ -1,6 +1,12 @@
 // adapted from https://stackblitz.com/edit/stackblitz-starters-dlsw2v?file=components%2Fui%2Fkeyboard.tsx
 
-import { HTMLProps, ReactNode, createContext, useContext } from "react";
+import {
+  Fragment,
+  HTMLProps,
+  ReactNode,
+  createContext,
+  useContext,
+} from "react";
 import { cn } from "@/lib/utils";
 import { defaultsDeep } from "lodash";
 import {
@@ -209,12 +215,22 @@ export const KeySymbol = ({
   const symbol = keyData?.symbols?.[os] ?? keyData?.symbols?.default ?? keyName;
   const label = keyData?.label ?? keyName;
 
-  return (
+  return disableTooltip ? (
+    <div
+      className={cn(
+        "center h-5 min-w-[1.25rem] px-1 w-fit border border-foreground/20 text-foreground/50 text-xs rounded-sm flex flex-row justify-center",
+        className
+      )}
+      {...otherProps}
+    >
+      <span>{symbol}</span>
+    </div>
+  ) : (
     <Tooltip delayDuration={300}>
       <TooltipTrigger>
         <div
           className={cn(
-            "center h-5 min-w-[1.25rem] px-1 w-fit border border-foreground/20 text-foreground/50 text-xs rounded-md",
+            "center h-5 min-w-[1.25rem] px-1 w-fit border border-foreground/20 text-foreground/50 text-xs rounded-sm flex flex-row justify-center",
             className
           )}
           {...otherProps}
@@ -222,9 +238,36 @@ export const KeySymbol = ({
           <span>{symbol}</span>
         </div>
       </TooltipTrigger>
-      {!disableTooltip && label !== symbol && (
+      {label !== symbol && (
         <TooltipContent className="px-2 py-1">{label}</TooltipContent>
       )}
     </Tooltip>
   );
 };
+
+interface HotkeysDisplayProps {
+  keys?: string | string[];
+  className?: string;
+}
+
+export function HotkeysDisplay({ keys, className }: HotkeysDisplayProps) {
+  if (!keys) {
+    return null;
+  }
+  return (
+    <div className={cn("flex flex-row", className)}>
+      {Array.isArray(keys) ? (
+        keys.map((key, index) => (
+          <Fragment key={index}>
+            <KeySymbol disableTooltip={true} keyName={key} className="ml-2" />
+            {index < keys.length - 1 && (
+              <span className="ml-1 text-foreground/50 text-xs">+</span>
+            )}
+          </Fragment>
+        ))
+      ) : (
+        <KeySymbol disableTooltip={true} keyName={keys} className="ml-2" />
+      )}
+    </div>
+  );
+}
