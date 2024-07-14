@@ -1,0 +1,295 @@
+{
+  "components": {
+    "schemas": {
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "array",
+            "description": "Textual description",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota"
+          },
+          "dist": {
+            "type": "array",
+            "description": "Available distributions",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arch": {
+            "type": "array",
+            "description": "Available distribution architectures",
+            "deprecated": true,
+            "items": {
+              "type": "integer"
+            }
+          },
+          "lang": {
+            "type": "array",
+            "description": "Available distribution languages",
+            "items": {
+              "type": "string"
+            }
+          },
+          "location": {
+            "type": "array",
+            "description": "Available locations",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductPrice"
+            }
+          },
+          "orderable_addons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductAddon"
+            }
+          }
+        }
+      },
+      "ProductPrice": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "Location"
+          },
+          "price": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "Monthly price in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "Monthly price in euros with VAT"
+              },
+              "hourly_net": {
+                "type": "string",
+                "description": "Hourly price in euros, if the product is billed hourly"
+              },
+              "hourly_gross": {
+                "type": "string",
+                "description": "Hourly price in euros with VAT, if the product is billed hourly"
+              }
+            }
+          },
+          "price_setup": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "One time fee in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "One time fee in euros with VAT"
+              }
+            }
+          }
+        }
+      },
+      "ProductAddon": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Addon ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Addon name"
+          },
+          "min": {
+            "type": "integer",
+            "description": "Minimum orderable amount"
+          },
+          "max": {
+            "type": "integer",
+            "description": "Maximum orderable amount"
+          },
+          "prices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductAddonPrice"
+            }
+          }
+        }
+      },
+      "ProductAddonPrice": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "Location"
+          },
+          "price": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "Monthly price in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "Monthly price in euros with VAT"
+              },
+              "hourly_net": {
+                "type": "string",
+                "description": "Hourly price in euros, if the product is billed hourly"
+              },
+              "hourly_gross": {
+                "type": "string",
+                "description": "Hourly price in euros with VAT, if the product is billed hourly"
+              }
+            }
+          },
+          "price_setup": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "One time fee in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "One time fee in euros with VAT"
+              }
+            }
+          }
+        }
+      },
+      "ServerProduct": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          }
+        }
+      }
+    },
+    "responses": {
+      "ServerProductListResponse": {
+        "description": "A list of server products",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ServerProduct"
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/order/server/product": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Get a list of server products",
+        "description": "Product overview of currently offered standard server products",
+        "externalDocs": {
+          "description": "Find more info here",
+          "url": "https://robot-ws.your-server.de/docs"
+        },
+        "operationId": "getServerProducts",
+        "parameters": [
+          {
+            "name": "min_price",
+            "in": "query",
+            "description": "Minimum monthly price",
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "name": "max_price",
+            "in": "query",
+            "description": "Maximum monthly price",
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "name": "min_price_setup",
+            "in": "query",
+            "description": "Minimum one time fee",
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "name": "max_price_setup",
+            "in": "query",
+            "description": "Maximum one time fee",
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "description": "The desired location",
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerProductListResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 17274,
+      "completion_tokens": 879,
+      "total_tokens": 18153
+    }
+  }
+}

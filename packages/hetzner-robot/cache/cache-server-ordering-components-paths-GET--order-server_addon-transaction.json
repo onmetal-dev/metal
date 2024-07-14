@@ -1,0 +1,160 @@
+{
+  "components": {
+    "schemas": {
+      "ServerAddonTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Transaction ID"
+          },
+          "date": {
+            "type": "string",
+            "description": "Transaction date"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID"
+          },
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Product ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Product name"
+              },
+              "type": {
+                "type": "string",
+                "description": "Product type"
+              },
+              "price": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "Location"
+                  },
+                  "price": {
+                    "type": "object",
+                    "properties": {
+                      "net": {
+                        "type": "string",
+                        "description": "Monthly price in euros"
+                      },
+                      "gross": {
+                        "type": "string",
+                        "description": "Monthly price in euros with VAT"
+                      },
+                      "hourly_net": {
+                        "type": "string",
+                        "description": "Hourly price in euros, if the product is billed hourly"
+                      },
+                      "hourly_gross": {
+                        "type": "string",
+                        "description": "Hourly price in euros with VAT, if the product is billed hourly"
+                      }
+                    }
+                  },
+                  "price_setup": {
+                    "type": "object",
+                    "properties": {
+                      "net": {
+                        "type": "string",
+                        "description": "One time fee in euros"
+                      },
+                      "gross": {
+                        "type": "string",
+                        "description": "One time fee in euros with VAT"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "Type of resource"
+                },
+                "id": {
+                  "type": "string",
+                  "description": "Resource ID"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "ServerAddonTransactionListResponse": {
+        "description": "Overview of all addon orders within the last 30 days",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ServerAddonTransaction"
+              }
+            }
+          }
+        }
+      },
+      "ServerAddonTransactionNotFoundError": {
+        "description": "No transactions found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/order/server_addon/transaction": {
+      "get": {
+        "tags": [
+          "Server Addon Transactions"
+        ],
+        "summary": "Overview of all addon orders within the last 30 days",
+        "description": "Retrieve a list of all addon orders within the last 30 days",
+        "operationId": "getServerAddonTransactions",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerAddonTransactionListResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ServerAddonTransactionNotFoundError"
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 22242,
+      "completion_tokens": 514,
+      "total_tokens": 22756
+    }
+  }
+}

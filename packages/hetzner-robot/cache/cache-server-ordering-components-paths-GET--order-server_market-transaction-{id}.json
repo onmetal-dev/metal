@@ -1,0 +1,109 @@
+{
+  "components": {
+    "schemas": {
+      "ServerMarketTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Transaction ID"
+          },
+          "date": {
+            "type": "string",
+            "description": "Transaction date"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID if transaction status is \"ready\", null otherwise"
+          },
+          "server_ip": {
+            "type": "string",
+            "description": "Server main IP address if transaction status is \"ready\", null otherwise"
+          },
+          "authorized_key": {
+            "type": "array",
+            "description": "Array with supplied public SSH keys",
+            "items": {
+              "$ref": "#/components/schemas/AuthorizedKey"
+            }
+          },
+          "host_key": {
+            "type": "array",
+            "description": "Array with servers public host keys",
+            "items": {
+              "$ref": "#/components/schemas/HostKey"
+            }
+          },
+          "comment": {
+            "$ref": "#/components/schemas/OrderComment"
+          },
+          "product": {
+            "$ref": "#/components/schemas/OrderedServerProduct"
+          },
+          "addons": {
+            "type": "array",
+            "description": "Array of Addon IDs",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "ServerMarketTransactionResponse": {
+        "description": "Details of a specific order transaction",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ServerMarketTransaction"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/order/server_market/transaction/{id}": {
+      "get": {
+        "tags": [
+          "Server Market Transactions"
+        ],
+        "summary": "Query a specific order transaction",
+        "description": "Query a specific order transaction by ID",
+        "operationId": "getServerMarketTransactionById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Transaction ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerMarketTransactionResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ServerTransactionNotFoundResponse"
+          }
+        }
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 21584,
+      "completion_tokens": 372,
+      "total_tokens": 21956
+    }
+  }
+}

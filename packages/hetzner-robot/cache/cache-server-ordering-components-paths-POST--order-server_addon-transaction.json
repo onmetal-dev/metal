@@ -1,0 +1,223 @@
+{
+  "components": {
+    "schemas": {
+      "AddonOrderRequest": {
+        "required": [
+          "product_id",
+          "server_number",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "description": "Product ID",
+            "example": "additional_ipv4"
+          },
+          "server_number": {
+            "type": "integer",
+            "description": "Server ID",
+            "example": 123
+          },
+          "reason": {
+            "type": "string",
+            "description": "RIPE reason: mandatory for addon types \"ip_ipv4\", \"subnet_ipv4\" and \"failover_subnet_ipv4\"",
+            "example": "VPS"
+          },
+          "gateway": {
+            "type": "string",
+            "description": "Routing target for subnets: usable for addon type \"subnet_ipv4\" (Optional: default is the server's primary IP address)"
+          },
+          "test": {
+            "type": "boolean",
+            "description": "The order will not be processed if set to \"true\" (optional)"
+          }
+        }
+      },
+      "AddonOrderResponse": {
+        "type": "object",
+        "properties": {
+          "transaction": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Transaction ID"
+              },
+              "date": {
+                "type": "string",
+                "description": "Transaction date"
+              },
+              "status": {
+                "type": "string",
+                "description": "Transaction status, \"ready\", \"in process\" or \"cancelled\""
+              },
+              "server_number": {
+                "type": "integer",
+                "description": "Server ID"
+              },
+              "product": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Product ID"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Product name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Product type"
+                  },
+                  "price": {
+                    "type": "object",
+                    "properties": {
+                      "location": {
+                        "type": "string",
+                        "description": "Location"
+                      },
+                      "price": {
+                        "type": "object",
+                        "properties": {
+                          "net": {
+                            "type": "string",
+                            "description": "Monthly price in euros"
+                          },
+                          "gross": {
+                            "type": "string",
+                            "description": "Monthly price in euros with VAT"
+                          },
+                          "hourly_net": {
+                            "type": "string",
+                            "description": "Hourly price in euros, if the product is billed hourly"
+                          },
+                          "hourly_gross": {
+                            "type": "string",
+                            "description": "Hourly price in euros with VAT, if the product is billed hourly"
+                          }
+                        }
+                      },
+                      "price_setup": {
+                        "type": "object",
+                        "properties": {
+                          "net": {
+                            "type": "string",
+                            "description": "One time fee in euros"
+                          },
+                          "gross": {
+                            "type": "string",
+                            "description": "One time fee in euros with VAT"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "resources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "Type of resource"
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Resource ID"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "AddonOrderInvalidInput": {
+        "description": "Invalid input parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormatInvalidInput"
+            }
+          }
+        }
+      },
+      "AddonOrderConflict": {
+        "description": "The transaction cannot be processed due to the reason mentioned in the error message",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      },
+      "AddonOrderError": {
+        "description": "The transaction failed due to an internal error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/order/server_addon/transaction": {
+      "post": {
+        "tags": [
+          "Server Addon"
+        ],
+        "summary": "Order an addon for a server.",
+        "description": "Order an addon for a server. If the order is successful, the status code 201 CREATED will be returned.",
+        "operationId": "orderAddonForServer",
+        "requestBody": {
+          "description": "Order a new addon for the server.",
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/AddonOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddonOrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/AddonOrderInvalidInput"
+          },
+          "409": {
+            "$ref": "#/components/responses/AddonOrderConflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/AddonOrderError"
+          }
+        }
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 23038,
+      "completion_tokens": 767,
+      "total_tokens": 23805
+    }
+  }
+}

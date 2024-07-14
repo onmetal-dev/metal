@@ -1,0 +1,126 @@
+{
+  "components": {
+    "schemas": {
+      "AddonProductPrice": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "Location"
+          },
+          "price": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "Monthly price in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "Monthly price in euros with VAT"
+              },
+              "hourly_net": {
+                "type": "string",
+                "description": "Hourly price in euros, if the product is billed hourly"
+              },
+              "hourly_gross": {
+                "type": "string",
+                "description": "Hourly price in euros with VAT, if the product is billed hourly"
+              }
+            }
+          },
+          "price_setup": {
+            "type": "object",
+            "properties": {
+              "net": {
+                "type": "string",
+                "description": "One time fee in euros"
+              },
+              "gross": {
+                "type": "string",
+                "description": "One time fee in euros with VAT"
+              }
+            }
+          }
+        }
+      },
+      "ServerAddonProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "type": {
+            "type": "string",
+            "description": "Product type"
+          },
+          "price": {
+            "$ref": "#/components/schemas/AddonProductPrice"
+          }
+        }
+      },
+      "ServerAddonProductList": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ServerAddonProduct"
+        }
+      }
+    },
+    "responses": {
+      "AddonProductListResponse": {
+        "description": "A list of available server addons for a server",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ServerAddonProductList"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/order/server_addon/{server-number}/product": {
+      "get": {
+        "tags": [
+          "Server Addon"
+        ],
+        "summary": "Retrieve available server addons",
+        "description": "Product overview of available server addons for a specific server",
+        "operationId": "getServerAddonProducts",
+        "parameters": [
+          {
+            "name": "server-number",
+            "in": "path",
+            "description": "The server number",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AddonProductListResponse"
+          },
+          "404": {
+            "$ref": "#/components/schemas/ErrorFormat"
+          }
+        }
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 21860,
+      "completion_tokens": 395,
+      "total_tokens": 22255
+    }
+  }
+}

@@ -1,0 +1,191 @@
+{
+  "components": {
+    "schemas": {
+      "ServerMarketProductDetails": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Product ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "array",
+            "description": "Textual description",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traffic": {
+            "type": "string",
+            "description": "Free traffic quota"
+          },
+          "dist": {
+            "type": "array",
+            "description": "Available distributions",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arch": {
+            "type": "array",
+            "description": "Available distribution architectures",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "lang": {
+            "type": "array",
+            "description": "Available distribution languages",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cpu": {
+            "type": "string",
+            "description": "CPU model name"
+          },
+          "cpu_benchmark": {
+            "type": "integer",
+            "description": "CPU benchmark value"
+          },
+          "memory_size": {
+            "type": "integer",
+            "description": "Main memory size in GB"
+          },
+          "hdd_size": {
+            "type": "integer",
+            "description": "Drive size in GB"
+          },
+          "hdd_text": {
+            "type": "string",
+            "description": "Drive special tags"
+          },
+          "hdd_count": {
+            "type": "integer",
+            "description": "Drive count"
+          },
+          "datacenter": {
+            "type": "string",
+            "description": "Data center"
+          },
+          "network_speed": {
+            "type": "string",
+            "description": "Server network speed"
+          },
+          "price": {
+            "type": "string",
+            "description": "Monthly price in euros"
+          },
+          "price_hourly": {
+            "type": "string",
+            "description": "Hourly price in euros, if the product is billed hourly, null otherwise"
+          },
+          "price_setup": {
+            "type": "string",
+            "description": "One time fee in euros"
+          },
+          "price_vat": {
+            "type": "string",
+            "description": "Monthly price in euros with VAT"
+          },
+          "price_hourly_vat": {
+            "type": "string",
+            "description": "Hourly price in euros with VAT, if the product is billed hourly, null otherwise"
+          },
+          "price_setup_vat": {
+            "type": "string",
+            "description": "One time fee in euros with VAT"
+          },
+          "fixed_price": {
+            "type": "boolean",
+            "description": "Set to \"true\" if product has a fixed price"
+          },
+          "next_reduce": {
+            "type": "integer",
+            "description": "Countdown until next price reduction in seconds"
+          },
+          "next_reduce_date": {
+            "type": "string",
+            "description": "Next price reduction date"
+          },
+          "orderable_addons": {
+            "type": "array",
+            "description": "Array of orderable addons",
+            "items": {
+              "$ref": "#/components/schemas/ProductAddon"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "ServerMarketProductDetailsResponse": {
+        "description": "A specific server market product details",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ServerMarketProductDetails"
+            }
+          }
+        }
+      },
+      "SpecificServerMarketProductNotFoundError": {
+        "description": "Product not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorFormat"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/order/server_market/product/{product-id}": {
+      "get": {
+        "tags": [
+          "ServerMarketProduct"
+        ],
+        "summary": "Query a specific server market product",
+        "description": "Query a specific server market product",
+        "externalDocs": {
+          "description": "Learn more about server market products provided by this API.",
+          "url": "http://api.example.com/docs/server-market-products/"
+        },
+        "operationId": "getServerMarketProductById",
+        "parameters": [
+          {
+            "name": "product-id",
+            "in": "path",
+            "description": "Product ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ServerMarketProductDetailsResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/SpecificServerMarketProductNotFoundError"
+          }
+        }
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 20252,
+      "completion_tokens": 675,
+      "total_tokens": 20927
+    }
+  }
+}

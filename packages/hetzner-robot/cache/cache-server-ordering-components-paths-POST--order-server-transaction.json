@@ -1,0 +1,248 @@
+{
+  "components": {
+    "schemas": {
+      "OrderServerTransaction": {
+        "type": "object",
+        "properties": {
+          "transaction": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Transaction ID"
+              },
+              "date": {
+                "type": "string",
+                "description": "Transaction date"
+              },
+              "status": {
+                "type": "string",
+                "description": "Transaction status, 'ready', 'in process' or 'cancelled'"
+              },
+              "server_number": {
+                "type": "integer",
+                "description": "Server ID if transaction status is 'ready', null otherwise",
+                "nullable": true
+              },
+              "server_ip": {
+                "type": "string",
+                "description": "Server main IP address if transaction status is 'ready', null otherwise",
+                "nullable": true
+              },
+              "authorized_key": {
+                "type": "array",
+                "description": "Array with supplied public SSH keys",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "fingerprint": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "size": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "comment": {
+                "type": "string",
+                "description": "Supplied order comment",
+                "nullable": true
+              },
+              "product": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Product ID"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Product name"
+                  },
+                  "description": {
+                    "type": "array",
+                    "description": "Textual description",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "traffic": {
+                    "type": "string",
+                    "description": "Free traffic quota"
+                  },
+                  "dist": {
+                    "type": "string",
+                    "description": "Ordered distribution"
+                  },
+                  "arch": {
+                    "type": "string",
+                    "description": "Ordered distribution architecture"
+                  },
+                  "lang": {
+                    "type": "string",
+                    "description": "Ordered distribution language"
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "Ordered location"
+                  }
+                }
+              },
+              "addons": {
+                "type": "array",
+                "description": "Array of Addon IDs",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "OrderServerTransactionResponse": {
+        "description": "Successful order",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OrderServerTransaction"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/order/server/transaction": {
+      "post": {
+        "tags": [
+          "Server Ordering"
+        ],
+        "summary": "Order a new server",
+        "description": "Order a new server. If the order is successful, the status code 201 CREATED is returned.",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "required": [
+                  "product_id"
+                ],
+                "type": "object",
+                "properties": {
+                  "product_id": {
+                    "type": "string",
+                    "description": "Product ID"
+                  },
+                  "authorized_key": {
+                    "type": "array",
+                    "description": "One or more SSH key fingerprints (Optional, you can use either parameter 'authorized_key' or parameter 'password')",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Root password (Optional: you can use either parameter 'authorized_key' or parameter 'password')"
+                  },
+                  "location": {
+                    "type": "string",
+                    "description": "The desired location"
+                  },
+                  "dist": {
+                    "type": "string",
+                    "description": "Distribution name which should be preinstalled (optional)"
+                  },
+                  "arch": {
+                    "type": "string",
+                    "description": "Architecture of preinstalled distribution (optional)"
+                  },
+                  "lang": {
+                    "type": "string",
+                    "description": "Language of preinstalled distribution (optional)"
+                  },
+                  "comment": {
+                    "type": "string",
+                    "description": "Order comment (optional); Please note that if a comment is supplied, the order will be processed manually."
+                  },
+                  "addon": {
+                    "type": "array",
+                    "description": "Array of addon IDs (optional)",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "test": {
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "type": "string",
+                    "description": "The order will not be processed if set to 'true' (optional)"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderServerTransaction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormatInvalidInput"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorFormat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "_meta": {
+    "usage": {
+      "prompt_tokens": 29628,
+      "completion_tokens": 1721,
+      "total_tokens": 31349
+    }
+  }
+}
