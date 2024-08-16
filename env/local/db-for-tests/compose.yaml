@@ -1,0 +1,11 @@
+services:
+  db:
+    image: quay.io/tembo/pg16-pgmq:latest
+    container_name: local_postgres_for_tests
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: metal_test
+    ports:
+      # different host port so that we can run tests while also running the main app
+      - "5433:5432"

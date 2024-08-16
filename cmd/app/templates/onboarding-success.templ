@@ -1,0 +1,15 @@
+package templates
+
+templ OnboardingSuccess(nonce string, teamId string) {
+	<div class="flex flex-col items-center justify-start max-w-md gap-4 mx-auto">
+		<h1>all set!</h1>
+		<p>Congratulations! Your payment method has been successfully added. You can now proceed to your <a href={ templ.URL("/dashboard/" + teamId) } class="link text-primary">dashboard</a>.</p>
+		<script nonce={ nonce }>
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        </script>
+	</div>
+}

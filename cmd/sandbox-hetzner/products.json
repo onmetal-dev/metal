@@ -1,0 +1,1216 @@
+[
+  {
+    "ID": "AX41-NVMe",
+    "Name": "Dedicated Server AX41-NVMe",
+    "Description": [
+      "AMD Ryzen 5 3600 Hexa-Core \"Matisse\" (Zen2)",
+      "64 GB DDR4 RAM",
+      "2 x 512 GB NVMe SSD (Software-RAID 1)",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system",
+      "AlmaLinux 8 base",
+      "AlmaLinux 9 base",
+      "Arch Linux latest minimal",
+      "CentOS Stream 9 base",
+      "Debian 11 base",
+      "Debian 12 base",
+      "Rocky Linux 8 base",
+      "Rocky Linux 9 base",
+      "Ubuntu 20.04 (HWE) LTS minimal",
+      "Ubuntu 20.04 LTS base",
+      "Ubuntu 22.04.2 LTS base",
+      "Ubuntu 22.04.2 LTS Nextcloud",
+      "Ubuntu 24.04 LTS base"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "NBG1",
+      "FSN1",
+      "HEL1"
+    ],
+    "Prices": [
+      {
+        "Location": "NBG1",
+        "Price": {
+          "Net": "41.1000",
+          "Gross": "41.1"
+        },
+        "PriceSetup": {
+          "Net": "0.0000",
+          "Gross": "0"
+        }
+      },
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "41.1000",
+          "Gross": "41.1"
+        },
+        "PriceSetup": {
+          "Net": "0.0000",
+          "Gross": "0"
+        }
+      },
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "35.6000",
+          "Gross": "35.6"
+        },
+        "PriceSetup": {
+          "Net": "0.0000",
+          "Gross": "0"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "NBG1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "AX52",
+    "Name": "Dedicated Server AX52",
+    "Description": [
+      "AMD Ryzen 7 7700 Octa-Core \"Raphael\" (Zen4)",
+      "64 GB DDR5 RAM",
+      "2 x 1 TB NVMe SSD (Gen4, Software-RAID 1)",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system",
+      "AlmaLinux 8 base",
+      "Arch Linux latest minimal",
+      "Debian 11 base",
+      "Debian 12 base",
+      "Rocky Linux 8 base",
+      "Ubuntu 20.04 (HWE) LTS minimal",
+      "Ubuntu 22.04.2 LTS base",
+      "Ubuntu 22.04.2 LTS Nextcloud",
+      "Ubuntu 24.04 LTS base"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "HEL1",
+      "FSN1"
+    ],
+    "Prices": [
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "57.3000",
+          "Gross": "57.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      },
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "62.3000",
+          "Gross": "62.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "EX101",
+    "Name": "Dedicated Server EX101",
+    "Description": [
+      "Intel® Core™ i9-13900 24 Core \"Raptor Lake-S\"",
+      "64 GB DDR5 ECC RAM",
+      "2 x 1.92 TB NVMe SSD Datacenter Edition (Gen4, Software RAID 1)",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system",
+      "AlmaLinux 8 base",
+      "Arch Linux latest minimal",
+      "Debian 11 base",
+      "Debian 12 base",
+      "Rocky Linux 8 base",
+      "Ubuntu 20.04 (HWE) LTS minimal",
+      "Ubuntu 22.04.2 LTS base",
+      "Ubuntu 22.04.2 LTS Nextcloud",
+      "Ubuntu 24.04 LTS base"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "HEL1",
+      "FSN1"
+    ],
+    "Prices": [
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "82.3000",
+          "Gross": "82.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      },
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "87.3000",
+          "Gross": "87.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "AX102",
+    "Name": "Dedicated Server AX102",
+    "Description": [
+      "AMD Ryzen 9 7950X3D 16-Core \"Raphael\" (Zen 4)",
+      "128 GB DDR5 ECC RAM",
+      "2 x 1.92 TB NVMe SSD Datacenter Edition (Gen 4, Software RAID 1)",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system",
+      "AlmaLinux 8 base",
+      "Arch Linux latest minimal",
+      "Debian 11 base",
+      "Debian 12 base",
+      "Rocky Linux 8 base",
+      "Ubuntu 20.04 (HWE) LTS minimal",
+      "Ubuntu 22.04.2 LTS base",
+      "Ubuntu 22.04.2 LTS Nextcloud",
+      "Ubuntu 24.04 LTS base"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "HEL1",
+      "FSN1",
+      "NBG1"
+    ],
+    "Prices": [
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "102.3000",
+          "Gross": "102.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      },
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "107.3000",
+          "Gross": "107.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      },
+      {
+        "Location": "NBG1",
+        "Price": {
+          "Net": "107.3000",
+          "Gross": "107.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "NBG1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "EX44",
+    "Name": "Dedicated Server EX44",
+    "Description": [
+      "Intel® Core™ i5-13500 14 Core \"Raptor Lake-S\"",
+      "64 GB DDR4 RAM",
+      "2 x 512 GB NVMe SSD (Gen 4, Software RAID 1)",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system",
+      "AlmaLinux 8 base",
+      "Arch Linux latest minimal",
+      "Debian 11 base",
+      "Debian 12 base",
+      "Rocky Linux 8 base",
+      "Ubuntu 20.04 (HWE) LTS minimal",
+      "Ubuntu 22.04.2 LTS base",
+      "Ubuntu 22.04.2 LTS Nextcloud",
+      "Ubuntu 24.04 LTS base"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "FSN1",
+      "HEL1"
+    ],
+    "Prices": [
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "42.3000",
+          "Gross": "42.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      },
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "37.3000",
+          "Gross": "37.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "EX130-R",
+    "Name": "Dedicated Server EX130-R",
+    "Description": [
+      "Intel® Xeon® Gold 5412U 24-Core \"Sapphire Rapids SP\"",
+      "256 GB DDR5 ECC RAM",
+      "2 x 1.92 TB NVMe SSD Datacenter Edition (Gen 4, Software RAID 1)",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system",
+      "AlmaLinux 8 base",
+      "Arch Linux latest minimal",
+      "Debian 11 base",
+      "Debian 12 base",
+      "Rocky Linux 8 base",
+      "Ubuntu 20.04 (HWE) LTS minimal",
+      "Ubuntu 22.04.2 LTS base",
+      "Ubuntu 22.04.2 LTS Nextcloud",
+      "Ubuntu 24.04 LTS base"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "FSN1",
+      "HEL1"
+    ],
+    "Prices": [
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "137.3000",
+          "Gross": "137.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      },
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "132.3000",
+          "Gross": "132.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "EX130-S",
+    "Name": "Dedicated Server EX130-S",
+    "Description": [
+      "Intel® Xeon® Gold 5412U 24-Core \"Sapphire Rapids SP\"",
+      "128 GB DDR5 ECC RAM",
+      "2 x 3.84 TB NVMe SSD Datacenter Edition (Gen 4, Software RAID 1)",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system",
+      "AlmaLinux 8 base",
+      "Arch Linux latest minimal",
+      "Debian 11 base",
+      "Debian 12 base",
+      "Rocky Linux 8 base",
+      "Ubuntu 20.04 (HWE) LTS minimal",
+      "Ubuntu 22.04.2 LTS base",
+      "Ubuntu 22.04.2 LTS Nextcloud",
+      "Ubuntu 24.04 LTS base"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "FSN1",
+      "HEL1"
+    ],
+    "Prices": [
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "137.3000",
+          "Gross": "137.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      },
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "132.3000",
+          "Gross": "132.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "AX162-S",
+    "Name": "Dedicated Server AX162-S",
+    "Description": [
+      "AMD EPYC™ 9454P 48-Core \"Genoa\" (Zen4)",
+      "128 GB DDR5 ECC reg. RAM",
+      "2 x 3.84 TB NVMe SSD Datacenter Edition (Gen 4, Software RAID 1)",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system",
+      "AlmaLinux 8 base",
+      "Arch Linux latest minimal",
+      "Debian 11 base",
+      "Debian 12 base",
+      "Rocky Linux 8 base",
+      "Ubuntu 20.04 (HWE) LTS minimal",
+      "Ubuntu 22.04.2 LTS base",
+      "Ubuntu 22.04.2 LTS Nextcloud",
+      "Ubuntu 24.04 LTS base"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "FSN1",
+      "HEL1"
+    ],
+    "Prices": [
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "207.3000",
+          "Gross": "207.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      },
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "197.3000",
+          "Gross": "197.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "AX162-R",
+    "Name": "Dedicated Server AX162-R",
+    "Description": [
+      "AMD EPYC™ 9454P 48-Core \"Genoa\" (Zen4)",
+      "256 GB DDR5 ECC reg. RAM",
+      "2 x 1.92 TB NVMe SSD Datacenter Edition (Gen 4, Software RAID 1)",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system",
+      "AlmaLinux 8 base",
+      "Arch Linux latest minimal",
+      "Debian 11 base",
+      "Debian 12 base",
+      "Rocky Linux 8 base",
+      "Ubuntu 20.04 (HWE) LTS minimal",
+      "Ubuntu 22.04.2 LTS base",
+      "Ubuntu 22.04.2 LTS Nextcloud",
+      "Ubuntu 24.04 LTS base"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "FSN1",
+      "HEL1"
+    ],
+    "Prices": [
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "207.3000",
+          "Gross": "207.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      },
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "197.3000",
+          "Gross": "197.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "AX42",
+    "Name": "Dedicated Server AX42",
+    "Description": [
+      "AMD Ryzen™ 7 PRO 8700GE Octa-Core \"Phoenix 1\" (Zen4)",
+      "64 GB DDR5 ECC RAM",
+      "2 x 512 GB NVMe SSD (Gen 4, Software RAID 1)",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system",
+      "AlmaLinux 8 base",
+      "Arch Linux latest minimal",
+      "Debian 11 base",
+      "Debian 12 base",
+      "Rocky Linux 8 base",
+      "Ubuntu 20.04 (HWE) LTS minimal",
+      "Ubuntu 20.04 LTS base",
+      "Ubuntu 22.04.2 LTS base",
+      "Ubuntu 22.04.2 LTS Nextcloud",
+      "Ubuntu 24.04 LTS base"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "FSN1",
+      "HEL1"
+    ],
+    "Prices": [
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "47.3000",
+          "Gross": "47.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      },
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "44.3000",
+          "Gross": "44.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "SX65",
+    "Name": "Dedicated Server SX65",
+    "Description": [
+      "AMD AMD Ryzen™ 7 3700X \"Matisse\" (Zen2)",
+      "64 GB DDR4 ECC RAM",
+      "2 x 1 TB NVMe SSD (Gen 3)",
+      "4 x 22 TB SATA HDD",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "FSN1",
+      "HEL1"
+    ],
+    "Prices": [
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "107.3000",
+          "Gross": "107.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      },
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "102.3000",
+          "Gross": "102.3"
+        },
+        "PriceSetup": {
+          "Net": "39.0000",
+          "Gross": "39"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "SX135",
+    "Name": "Dedicated Server SX135",
+    "Description": [
+      "AMD Ryzen™ 9 3900 12-Core \"Matisse\" (Zen2)",
+      "128 GB DDR4 ECC RAM",
+      "2 x 1.92 TB NVMe SSD Datacenter Edition (Gen 3)",
+      "8 x 22 TB SATA HDD",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "FSN1",
+      "HEL1"
+    ],
+    "Prices": [
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "207.3000",
+          "Gross": "207.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      },
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "202.3000",
+          "Gross": "202.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "ID": "SX295",
+    "Name": "Dedicated Server SX295",
+    "Description": [
+      "AMD EPYC™ 7502P 32-Core \"Rome\" (Zen2)",
+      "256 GB DDR4 ECC reg. RAM",
+      "2 x 7.68 TB (Gen4) NVMe SSD",
+      "14 x 22 TB SATA HDD",
+      "1 Gbit/s bandwidth"
+    ],
+    "Traffic": "unlimited",
+    "Dist": [
+      "Rescue system"
+    ],
+    "Arch": null,
+    "Lang": [
+      "en"
+    ],
+    "Location": [
+      "FSN1",
+      "HEL1"
+    ],
+    "Prices": [
+      {
+        "Location": "FSN1",
+        "Price": {
+          "Net": "397.3000",
+          "Gross": "397.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      },
+      {
+        "Location": "HEL1",
+        "Price": {
+          "Net": "382.3000",
+          "Gross": "382.3"
+        },
+        "PriceSetup": {
+          "Net": "79.0000",
+          "Gross": "79"
+        }
+      }
+    ],
+    "OrderableAddons": [
+      {
+        "ID": "primary_ipv4",
+        "Name": "Primary IPv4",
+        "Min": 0,
+        "Max": 1,
+        "Prices": [
+          {
+            "location": "FSN1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          },
+          {
+            "location": "HEL1",
+            "price": {
+              "gross": "1.7",
+              "hourly_gross": "0.0027",
+              "hourly_net": "0.0027",
+              "net": "1.7000"
+            },
+            "price_setup": {
+              "gross": "0",
+              "net": "0.0000"
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,126 @@
+package templates
+
+templ WaitlistSuccess() {
+	<h1>you're on the list. very nice</h1>
+}
+
+templ WaitlistError(err string) {
+	<p>{ err }</p>
+}
+
+templ Index() {
+	<div>
+		<div class="hero">
+			<div class="text-center hero-content">
+				<div class="flex flex-col items-center max-w-md">
+					<h1 class="text-5xl font-bold">orchestrate your cloud exit</h1>
+					<p class="py-6">metal is the fastest way to start using compute on bare metal servers</p>
+					<div class="join" hx-ext="response-targets">
+						<form
+							hx-post="/waitlist"
+							hx-trigger="submit"
+							hx-target-400="#waitlist-error"
+							hx-swap="outerHTML"
+						>
+							<div id="waitlist-error"></div>
+							<input
+								class="text-xs input input-sm input-bordered"
+								placeholder="🤘@lfg.com"
+								type="email"
+								name="email"
+								id="email"
+							/>
+							<button class="btn btn-sm btn-primary">waitlist</button>
+						</form>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="pt-10 divider">cut that bill by 80%</div>
+		<div>
+			<table class="table max-w-[1000px] mx-auto">
+				<thead>
+					<tr>
+						<th></th>
+						<th class="w-48">
+							<div class="flex flex-row items-center">
+								<img src="/static/images/hetzner.svg" width="100"/>
+							</div>
+						</th>
+						<th class="w-48">
+							<div class="flex flex-row items-center">
+								<img src="/static/images/aws-ec2.svg" width="20"/>
+								<span class="pl-1">AWS EC2</span>
+							</div>
+						</th>
+						<th class="w-48">
+							<div class="flex flex-row items-center">
+								<img src="/static/images/aws-fargate.svg" width="20"/>
+								<span class="pl-1">AWS Fargate</span>
+							</div>
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<th class="text-xs">16 cpu / 128 GB; price per month<sup><a href="https://docs.google.com/spreadsheets/d/1CVfpt1q62_4-rtAQGgXptamJloYO4Yj0VIGWLaBlJ90/edit?usp=sharing" class="underline" target="_blank">*</a></sup></th>
+						<td>$115</td>
+						<td>$688</td>
+						<td>$888</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<div class="py-10 divider">features</div>
+		<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+			<div class="w-full shadow-xl card card-compact bg-base-200">
+				<div class="card-body">
+					<h2 class="mx-auto text-center card-title md:mx-0">provision</h2>
+					<div>
+						<p class="pb-2"></p>
+						<ul>
+							<li>• No need to set up a Hetzner, OVH, etc. account</li>
+							<li>• Provision servers with a few clicks or an API call</li>
+							<li>• Metal stays on top of the best offerings from all the main providers, so you don't have to</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+			<div class="w-full shadow-xl card card-compact bg-base-200">
+				<div class="card-body">
+					<h2 class="mx-auto text-center card-title md:mx-0">deploy</h2>
+					<div>
+						<p>Give us a docker image and we'll deploy it</p>
+						<ul>
+							<li>• Deployment environments to separate dev/prod/etc.</li>
+							<li>• Progressive rollouts across regions</li>
+							<li>• Control deployment promotion or rollback via CLI or Slack</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+			<div class="w-full shadow-xl card card-compact bg-base-200">
+				<div class="card-body">
+					<h2 class="mx-auto text-center card-title md:mx-0">monitor</h2>
+					<div>
+						<ul>
+							<li>• Basic logging, metrics, and alerts provided</li>
+							<li>• Forward logs, metrics, etc. to your existing monitoring stack if you want</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="py-10 divider">pricing</div>
+		<div class="flex flex-row justify-center mx-auto">
+			<div class="shadow-xl card card-compact bg-base-200 w-96">
+				<div class="card-body">
+					<h2 class="mx-auto text-center card-title">10%</h2>
+					<div>
+						<p class="pb-2">We take a 10% cut of your bill at the underlying server providers you choose.</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}

@@ -1,0 +1,115 @@
+package templates
+
+import "fmt"
+
+templ OnboardingPayment(nonce string, teamId string, stripeCustomerSessionClientSecret string) {
+	<div class="flex flex-col items-center justify-start max-w-md gap-4 mx-auto">
+		<form id="payment-form" class="flex flex-col items-center justify-center gap-4">
+			<div id="address-element" class="w-full skeleton h-80"></div>
+			<div id="payment-element" class="w-full skeleton h-80"></div>
+			<button id="submit" class="btn btn-primary" disabled>add payment method</button>
+			<div id="error-message" class="text-error"></div>
+		</form>
+		@templ.JSONScript("scriptData", map[string]string{
+			"customerSessionClientSecret": stripeCustomerSessionClientSecret,
+			"key":                         "pk_test_51PLTflDAkR0SeGPZBoKim1zPKLPdCrrlsh8LG2sKcIHN66Ro55qIPFvG3Mx1mZYoMTW8FfQOu5dcIoB0QCskX1Qc00sEZJby2F",
+			"urlPath":                     fmt.Sprintf("/onboarding/%s/payment", teamId),
+		}).WithNonceFromString(nonce)
+		<script nonce={ nonce }>
+            const scriptData = JSON.parse(document.getElementById('scriptData').textContent);
+            const stripe = Stripe(scriptData.key);
+            const appearance = {
+                theme: "night",
+                variables: {
+                    fontFamily: "ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace",
+                    colorPrimary: "#9FE88D",
+                    colorSuccess: "#62efbd",
+                    colorWarning: "#efd057",
+                    colorText: "#B2CCD6",
+                    colorDanger: "#ffae9b",
+                    colorBackground: "#2A303C",
+                    borderRadius: '0px',
+                },
+            };
+
+            const elements = stripe.elements({
+                mode: 'setup',
+                currency: 'usd',
+                setupFutureUsage: 'off_session',
+                appearance: appearance,
+                customerSessionClientSecret: scriptData.customerSessionClientSecret,
+            });
+
+            const paymentElement = elements.create('payment');
+            paymentElement.on('ready', () => {
+                document.getElementById('payment-element').classList.remove('skeleton', 'h-80');
+                document.getElementById('submit').disabled = false;
+            })
+            paymentElement.mount('#payment-element');
+
+            const addressElement = elements.create('address', {
+                mode: 'billing',
+            });
+            addressElement.on('ready', () => {
+                document.getElementById('address-element').classList.remove('skeleton', 'h-80');
+            })
+            addressElement.mount('#address-element');
+
+            // see https://docs.stripe.com/payments/accept-a-payment-deferred?platform=web&type=setup&client=html#submit-the-setup
+            const form = document.getElementById('payment-form');
+            const submitBtn = document.getElementById('submit');
+
+            const handleError = (error) => {
+                const messageContainer = document.querySelector('#error-message');
+                messageContainer.textContent = error.message;
+                submitBtn.disabled = false;
+            };
+
+            form.addEventListener('submit', async (event) => {
+                // We don't want to let default form submission happen here,
+                // which would refresh the page.
+                event.preventDefault();
+                // Prevent multiple form submissions
+                if (submitBtn.disabled) {
+                    return;
+                }
+                // Disable form submission while loading
+                submitBtn.disabled = true;
+
+                // Trigger form validation and wallet collection
+                const {error: submitError} = await elements.submit();
+                if (submitError) {
+                    handleError(submitError);
+                    return;
+                }
+
+                // Create the SetupIntent and obtain clientSecret
+                const res = await fetch(scriptData.urlPath, {
+                    method: "POST",
+                });
+
+                const {client_secret: clientSecret} = await res.json();
+
+                // Confirm the SetupIntent using the details collected by the Payment Element
+                const {error} = await stripe.confirmSetup({
+                    elements,
+                    clientSecret,
+                    confirmParams: {
+                        return_url: `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}${scriptData.urlPath}/confirm`,
+                    },
+                });
+
+                if (error) {
+                    // This point is only reached if there's an immediate error when
+                    // confirming the setup. Show the error to your customer (for example, payment details incomplete)
+                    handleError(error);
+                } else {
+                    // Your customer is redirected to your `return_url`. For some payment
+                    // methods like iDEAL, your customer is redirected to an intermediate
+                    // site first to authorize the payment, then redirected to the `return_url`.
+                }
+            });
+
+        </script>
+	</div>
+}

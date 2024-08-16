@@ -1,0 +1,52 @@
+package templates
+
+templ Login(next string) {
+	<div hx-ext="response-targets" class="max-w-md mx-auto">
+		<form
+			hx-post="/login"
+			hx-trigger="submit"
+			hx-target-401="#login-error"
+			class="flex flex-col gap-4"
+		>
+			<div id="login-error" class="text-error"></div>
+			<div class="flex flex-col gap-2">
+				<label for="email">email</label>
+				if next != "" {
+					<input type="hidden" name="next" value={ next }/>
+				}
+				<input
+					class="input input-bordered input-primary"
+					type="email"
+					name="email"
+					id="email"
+					placeholder="name@company.com"
+					required=""
+					autocomplete="email"
+				/>
+			</div>
+			<div class="flex flex-col gap-2">
+				<label for="password">password</label>
+				<input
+					class="input input-bordered input-primary"
+					type="password"
+					name="password"
+					id="password"
+					placeholder="••••••••"
+					required=""
+					autocomplete="current-password"
+				/>
+			</div>
+			<button type="submit" class="btn btn-primary">
+				sign in
+			</button>
+			<p>
+				don’t have an account yet?
+				<a href="/signup" class="link">sign up</a>
+			</p>
+		</form>
+	</div>
+}
+
+templ LoginError() {
+	<p>Invalid email or password</p>
+}

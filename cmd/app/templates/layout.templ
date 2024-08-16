@@ -1,0 +1,112 @@
+package templates
+
+import (
+	"github.com/onmetal-dev/metal/cmd/app/middleware"
+	"github.com/onmetal-dev/metal/lib/store"
+	"os"
+)
+
+type ScriptTag struct {
+	Src string
+}
+
+templ header(title string, additionalScripts ...ScriptTag) {
+	<head>
+		<title>{ title }</title>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<meta name="description" content="Metal. The fastest and easiest way to run on bare metal."/>
+		<meta name="keywords" content="metal, cloud, infrastructure, bare metal, cloud computing, infrastructure as a service, iaas, paas"/>
+		<meta name="author" content="Metal"/>
+		<script src="/static/script/htmx.min.js" nonce={ middleware.GetHtmxNonce(ctx) }></script>
+		<script src="/static/script/response-targets.js" nonce={ middleware.GetResponseTargetsNonce(ctx) }></script>
+		for _, script := range additionalScripts {
+			<script src={ script.Src }></script>
+		}
+		<link rel="stylesheet" href="/static/css/daisy.full.min.css"/>
+		if os.Getenv("env") == "production" {
+			<link rel="stylesheet" href="/static/css/style.min.css" nonce={ middleware.GetTwNonce(ctx) }/>
+		} else {
+			<link rel="stylesheet" href="/static/css/style.css" nonce={ middleware.GetTwNonce(ctx) }/>
+		}
+	</head>
+}
+
+templ logo() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cloud-off"><path d="m2 2 20 20"></path><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"></path><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"></path></svg>
+}
+
+templ logoWithText() {
+	<a href="/" class="text-xl btn btn-ghost">
+		@logo()
+		<span class="pl-1">metal</span>
+	</a>
+}
+
+templ footer() {
+	<footer class="p-4">
+		<div class="container flex flex-row justify-between">
+			@logo()
+			<div>
+				<p class="text-xs">made with ❤️ in cincinnati, oh</p>
+			</div>
+			<div>
+				<p class="text-xs">
+					<a href="https://github.com/onmetal-dev/metal">github</a>
+				</p>
+			</div>
+		</div>
+	</footer>
+}
+
+templ nav(user *store.User) {
+	<nav class="container sticky top-0 z-50 backdrop-blur-sm">
+		<div class="p-0 navbar bg-base">
+			<div class="flex-1">
+				@logoWithText()
+			</div>
+			<div class="flex-none">
+				<ul class="px-1 menu menu-horizontal">
+					if user != nil {
+						<li>
+							<details>
+								<summary>{ user.Email }</summary>
+								<ul class="p-2 rounded-t-none bg-base-100">
+									<li><a>settings</a></li>
+									<li><a hx-target="body" hx-swap="innerHTML" hx-post="/logout">logout</a></li>
+								</ul>
+							</details>
+						</li>
+					} else {
+						<li>
+							<a href="/signup">sign up</a>
+						</li>
+						<li>
+							<a href="/login">login</a>
+						</li>
+					}
+				</ul>
+			</div>
+		</div>
+	</nav>
+}
+
+templ Layout(contents templ.Component, title string, additionalScripts ...ScriptTag) {
+	@header(title, additionalScripts...)
+	<body class="flex flex-col h-full" data-theme="dark" hx-boost="true">
+		@nav(middleware.GetUser(ctx))
+		<main class="container flex-1">
+			@contents
+		</main>
+		@footer()
+	</body>
+}
+
+templ LayoutBare(contents templ.Component, title string) {
+	@header(title)
+	<body class="flex flex-col h-full" data-theme="dark" hx-boost="true">
+		<main class="container flex-1">
+			@contents
+		</main>
+	</body>
+}

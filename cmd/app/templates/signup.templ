@@ -1,0 +1,60 @@
+package templates
+
+templ SignUpPage(allowed bool) {
+	<div hx-ext="response-targets" class="max-w-md mx-auto">
+		if allowed {
+			<form
+				hx-post="/signup"
+				hx-trigger="submit"
+				hx-target-401="#signup-error"
+				hx-swap="outerHTML"
+				class="flex flex-col gap-4"
+			>
+				<div id="signup-error"></div>
+				<div class="flex flex-col gap-2">
+					<label for="email">email</label>
+					<input
+						class="input input-bordered input-primary"
+						type="email"
+						name="email"
+						id="email"
+						placeholder="name@company.com"
+						required=""
+					/>
+				</div>
+				<div class="flex flex-col gap-2">
+					<label for="password">password</label>
+					<input
+						class="input input-bordered input-primary"
+						type="password"
+						name="password"
+						id="password"
+						placeholder="••••••••"
+						required=""
+					/>
+				</div>
+				<button type="submit" class="btn btn-primary">
+					sign up
+				</button>
+				<p>
+					already have an account?
+					<a href="/login" class="link">login</a>
+				</p>
+			</form>
+		} else {
+			<p>we're still working on some things... in the meantime, feel free to <a href="/" class="link">join the waitlist</a> to get early access</p>
+		}
+	</div>
+}
+
+templ SignUpSuccess() {
+	<h1>Sign up successful</h1>
+	<p>Go to <a class="link" href="login">login</a></p>
+}
+
+templ SignUpError() {
+	<div>
+		<h1>Sign up failed</h1>
+		<p>There was an error registering your account</p>
+	</div>
+}

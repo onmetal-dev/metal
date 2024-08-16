@@ -1,0 +1,97 @@
+package templates
+
+templ CreateServerCheckout(nonce string, stripePublishableKey string, stripeCheckoutSessionClientSecret string) {
+	<div class="flex flex-col items-center justify-start max-w-md gap-4 mx-auto">
+		<div id="checkout" class="w-full skeleton h-80"></div>
+		@templ.JSONScript("scriptData", map[string]string{
+			"stripeCheckoutSessionClientSecret": stripeCheckoutSessionClientSecret,
+			"stripePublishableKey":              stripePublishableKey,
+		}).WithNonceFromString(nonce)
+		// see https://docs.stripe.com/checkout/embedded/quickstart
+		<script nonce={ nonce }>
+            const scriptData = JSON.parse(document.getElementById('scriptData').textContent);
+            const stripe = Stripe(scriptData.stripePublishableKey);
+            initialize();
+            async function initialize() {
+                const fetchClientSecret = async () => {
+                    return scriptData.stripeCheckoutSessionClientSecret;
+                }
+                const checkout = await stripe.initEmbeddedCheckout({
+                    fetchClientSecret,
+                });
+                // make sure the checkout iframe is correctly enclosed in the div
+                document.getElementById('checkout').classList.remove('skeleton', 'h-80');
+                document.getElementById('checkout').classList.add('h-fit');
+                checkout.mount('#checkout');
+            }
+        </script>
+	</div>
+}
+
+// templ CreateServerCheckout(nonce string, stripePublishableKey string, stripeSubscriptionPaymentIntentClientSecret string, returnUrl string) {
+// 	<div class="flex flex-col items-center justify-start max-w-md gap-4 mx-auto">
+// 		<form id="payment-form" class="flex flex-col items-center justify-center gap-4">
+// 			<div id="payment-element" class="w-full skeleton h-80"></div>
+// 			<button id="submit" class="btn btn-primary" disabled>pay</button>
+// 			<div id="error-message" class="text-error"></div>
+// 		</form>
+// 		@templ.JSONScript("scriptData", map[string]string{
+// 			"stripeSubscriptionPaymentIntentClientSecret": stripeSubscriptionPaymentIntentClientSecret,
+// 			"stripePublishableKey":                        stripePublishableKey,
+// 			"returnUrl":                                   returnUrl,
+// 		})
+// 		// see https://docs.stripe.com/checkout/embedded/quickstart
+// 		<script nonce={ nonce }>
+//             const scriptData = JSON.parse(document.getElementById('scriptData').textContent);
+//             const stripe = Stripe(scriptData.stripePublishableKey);
+//             const appearance = {
+//                 theme: "night",
+//                 variables: {
+//                     fontFamily: "ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace",
+//                     colorPrimary: "#9FE88D",
+//                     colorSuccess: "#62efbd",
+//                     colorWarning: "#efd057",
+//                     colorText: "#B2CCD6",
+//                     colorDanger: "#ffae9b",
+//                     colorBackground: "#2A303C",
+//                     borderRadius: '0px',
+//                 },
+//             };
+//             const elements = stripe.elements({
+//                 clientSecret: scriptData.stripeSubscriptionPaymentIntentClientSecret,
+//                 appearance: appearance,
+//             });
+//             const paymentElement = elements.create('payment');
+//             paymentElement.on('ready', () => {
+//                 document.getElementById('payment-element').classList.remove('skeleton', 'h-80');
+//                 document.getElementById('submit').disabled = false;
+//             })
+//             paymentElement.mount('#payment-element');
+
+//             const form = document.getElementById('payment-form');
+//             form.addEventListener('submit', async (event) => {
+//                 event.preventDefault();
+
+//                 const {error} = await stripe.confirmPayment({
+//                     //`Elements` instance that was used to create the Payment Element
+//                     elements,
+//                     confirmParams: {
+//                         return_url: scriptData.returnUrl,
+//                     }
+//                 });
+
+//                 if (error) {
+//                     // This point will only be reached if there is an immediate error when
+//                     // confirming the payment. Show error to your customer (for example, payment
+//                     // details incomplete)
+//                     const messageContainer = document.querySelector('#error-message');
+//                     messageContainer.textContent = error.message;
+//                 } else {
+//                     // Your customer will be redirected to your `return_url`. For some payment
+//                     // methods like iDEAL, your customer will be redirected to an intermediate
+//                     // site first to authorize the payment, then redirected to the `return_url`.
+//                 }
+//             });
+//         </script>
+// 	</div>
+// }

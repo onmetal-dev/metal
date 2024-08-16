@@ -1,0 +1,152 @@
+package templates
+
+import (
+	"fmt"
+	"github.com/onmetal-dev/metal/lib/store"
+)
+
+type GeekbenchScore struct {
+	SingleCore int
+	MultiCore  int
+}
+
+const (
+	GeekbenchSingleCoreDenominator = 4000
+	GeekbenchMultiCoreDenominator  = 30000
+)
+
+var GeekbenchScores = map[string]GeekbenchScore{
+	// https://browser.geekbench.com/processors/amd-ryzen-9-7950x3d
+	"AMD Ryzen 9 7950X3D": {
+		SingleCore: 2918,
+		MultiCore:  19608,
+	},
+	// https://browser.geekbench.com/v6/cpu/7031254
+	"AMD EPYC 4344P": {
+		SingleCore: 2923,
+		MultiCore:  14822,
+	},
+	// https://browser.geekbench.com/processors/amd-ryzen-5-3600
+	"AMD Ryzen 5 3600": {
+		SingleCore: 1614,
+		MultiCore:  6915,
+	},
+}
+
+func progressColorClass(percent float64) string {
+	if percent < 0.33 {
+		return "progress-error"
+	} else if percent < 0.66 {
+		return "progress-warning"
+	}
+	return "progress-success"
+}
+
+templ geekbenchProgress(score int, denominator int, className string) {
+	<progress
+		class={ "progress " + progressColorClass(float64(score)/float64(denominator)) + " " + className }
+		value={ "" + fmt.Sprintf("%d", score) }
+		max={ "" + fmt.Sprintf("%d", denominator) }
+	></progress>
+}
+
+func humanizeGB(gb int) string {
+	if gb < 1000 {
+		return fmt.Sprintf("%d GB", gb)
+	}
+	return fmt.Sprintf("%.1fTB", float64(gb)/1000)
+}
+
+func humanizePrice(price float64, currency store.Currency) string {
+	currencySymbol := ""
+	switch currency {
+	case store.CurrencyEUR:
+		currencySymbol = "€"
+	case store.CurrencyUSD:
+		currencySymbol = "$"
+	}
+	return fmt.Sprintf("%.2f %s", price, currencySymbol)
+}
+
+templ CreateServer(teamId string, serverOfferings []store.ServerOffering) {
+	<div class="flex flex-col gap-4">
+		<div class="flex flex-col items-center ">
+			<ul class="steps">
+				<li class="w-48 step step-primary">select</li>
+				<li class="w-48 step">review</li>
+				<li class="w-48 step">confirm</li>
+			</ul>
+		</div>
+		<table class="table">
+			<!-- head -->
+			<thead>
+				<tr>
+					<th>provider</th>
+					<th>type</th>
+					<th>location</th>
+					<th>cpu</th>
+					<th>memory</th>
+					<th>storage</th>
+					<th>bandwidth</th>
+					<th>price/month</th>
+					<th>setup fee</th>
+					<th></th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, offering := range serverOfferings {
+					for _, location := range offering.Locations {
+						<tr>
+							<th>
+								{ string(offering.ProviderSlug) }
+							</th>
+							<th>
+								{ string(offering.Type) }
+							</th>
+							<td>
+								<div class="flex flex-col justify-start">
+									<div class="font-bold">{ location.City }</div>
+									<div class="text-sm opacity-50">{ location.Country }</div>
+								</div>
+							</td>
+							<td>
+								<div class="flex flex-col justify-start">
+									<div class="font-bold">{ fmt.Sprintf("%d", offering.Cpu.Cores) } cores / { fmt.Sprintf("%d", offering.Cpu.Threads) } threads</div>
+									<div class="text-sm opacity-50">{ offering.Cpu.Name }</div>
+									<div class="flex flex-col justify-start tooltip tooltip-right" data-tip={ fmt.Sprintf("geekbench scores (single/multicore): %d / %d", GeekbenchScores[offering.Cpu.Name].SingleCore, GeekbenchScores[offering.Cpu.Name].MultiCore) }>
+										@geekbenchProgress(GeekbenchScores[offering.Cpu.Name].SingleCore, GeekbenchSingleCoreDenominator, "w-48")
+										@geekbenchProgress(GeekbenchScores[offering.Cpu.Name].MultiCore, GeekbenchMultiCoreDenominator, "w-48")
+									</div>
+								</div>
+							</td>
+							<td>{ humanizeGB(offering.MemoryGB) }</td>
+							<td>{ humanizeGB(offering.TotalStorageGB) }</td>
+							<td>
+								<div class="flex flex-col justify-start">
+									<div class="font-bold">{ fmt.Sprintf("%d", offering.Bandwidth.SpeedGbps) } Gbps</div>
+									if offering.Bandwidth.Unlimited {
+										<div class="text-sm opacity-50">unlimited</div>
+									}
+								</div>
+							</td>
+							<td>{ humanizePrice(findPrice(location.Id, offering.Prices).Monthly, findPrice(location.Id, offering.Prices).Currency) }</td>
+							<td>{ humanizePrice(findPrice(location.Id, offering.Prices).Setup, findPrice(location.Id, offering.Prices).Currency) }</td>
+							<th>
+								<a hx-boost="false" role="button" class="btn btn-primary" href={ templ.SafeURL(fmt.Sprintf("/dashboard/%s/servers/checkout?offeringId=%s&locationId=%s", teamId, offering.Id, location.Id)) }>select</a>
+							</th>
+						</tr>
+					}
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+func findPrice(locationId string, prices []store.Price) store.Price {
+	for _, price := range prices {
+		if price.LocationId == locationId {
+			return price
+		}
+	}
+	return store.Price{}
+}
