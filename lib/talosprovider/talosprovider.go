@@ -1,3 +1,5 @@
+// package talosprovider contains logic for installing talos on a server, which can vary by server provider
+// The end result of installing is talos running in maintenance mode, ready to be added to a cluster.
 package talosprovider
 
 import (

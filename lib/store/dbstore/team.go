@@ -1,6 +1,7 @@
 package dbstore
 
 import (
+	"filippo.io/age"
 	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/stripe/stripe-go/v79"
 	"github.com/stripe/stripe-go/v79/customer"
@@ -29,10 +30,18 @@ func NewTeamStore(params NewTeamStoreParams) *TeamStore {
 
 func (s TeamStore) CreateTeam(name string, description string) (*store.Team, error) {
 	tid, _ := typeid.WithPrefix("team")
+	identity, err := age.GenerateX25519Identity()
+	if err != nil {
+		return nil, err
+	}
 	team := store.Team{
-		ID:          tid.String(),
-		Name:        name,
-		Description: description,
+		Id:             tid.String(),
+		Name:           name,
+		Description:    description,
+		AgePublicKey:   identity.Recipient().String(),
+		AgePrivateKey:  identity.String(),
+		Members:        []store.TeamMember{},
+		InvitedMembers: []store.TeamMemberInvite{},
 	}
 	if err := s.db.Create(&team).Error; err != nil {
 		return nil, err
@@ -42,7 +51,7 @@ func (s TeamStore) CreateTeam(name string, description string) (*store.Team, err
 
 func (s TeamStore) GetTeam(id string) (*store.Team, error) {
 	var team store.Team
-	err := s.db.Where("id = ?", id).Preload("Members").Preload("InvitedMembers").Preload("PaymentMethods").First(&team).Error
+	err := s.db.Where("id = ?", id).Preload("Members").Preload("InvitedMembers").Preload("PaymentMethods").Preload("Cells").First(&team).Error
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +60,8 @@ func (s TeamStore) GetTeam(id string) (*store.Team, error) {
 
 func (s TeamStore) AddUserToTeam(userId string, teamId string) error {
 	return s.db.Create(&store.TeamMember{
-		UserID: userId,
-		TeamID: teamId,
+		UserId: userId,
+		TeamId: teamId,
 		Role:   store.TeamRoleMember,
 	}).Error
 }
@@ -63,7 +72,7 @@ func (s TeamStore) RemoveUserFromTeam(userId string, teamId string) error {
 
 func (s TeamStore) CreateTeamInvite(email string, teamId string) error {
 	return s.db.Create(&store.TeamMemberInvite{
-		TeamID: teamId,
+		TeamId: teamId,
 		Email:  email,
 		Role:   store.TeamRoleMember,
 	}).Error
@@ -94,14 +103,14 @@ func (s TeamStore) CreateStripeCustomer(teamId string, billingEmail string) erro
 		return err
 	}
 
-	team.StripeCustomerID = cust.ID
+	team.StripeCustomerId = cust.ID
 	return s.db.Save(team).Error
 }
 
 func (s TeamStore) AddPaymentMethod(teamId string, paymentMethodData store.PaymentMethod) error {
 	tid, _ := typeid.WithPrefix("pm")
-	paymentMethodData.ID = tid.String()
-	paymentMethodData.TeamID = teamId
+	paymentMethodData.Id = tid.String()
+	paymentMethodData.TeamId = teamId
 	if err := s.db.Create(&paymentMethodData).Error; err != nil {
 		if err == gorm.ErrDuplicatedKey {
 			// we're ok with this, the payment method already exists
@@ -115,9 +124,9 @@ func (s TeamStore) AddPaymentMethod(teamId string, paymentMethodData store.Payme
 		return err
 	}
 	if paymentMethodData.Default {
-		if _, err := s.stripeCustomer.Update(team.StripeCustomerID, &stripe.CustomerParams{
+		if _, err := s.stripeCustomer.Update(team.StripeCustomerId, &stripe.CustomerParams{
 			InvoiceSettings: &stripe.CustomerInvoiceSettingsParams{
-				DefaultPaymentMethod: stripe.String(paymentMethodData.StripePaymentMethodID),
+				DefaultPaymentMethod: stripe.String(paymentMethodData.StripePaymentMethodId),
 			},
 		}); err != nil {
 			return err

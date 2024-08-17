@@ -30,6 +30,8 @@ func MustOpen(host, user, password, dbname string, port int) *gorm.DB {
 		&store.TeamMemberInvite{},
 		&store.PaymentMethod{},
 		&store.Server{},
+		&store.Cell{},
+		&store.TalosCellData{},
 	)
 	if err != nil {
 		panic(err)

@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cloudflare/cloudflare-go"
 	"github.com/floshodan/hrobot-go/hrobot"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -21,6 +22,8 @@ import (
 	"github.com/onmetal-dev/metal/cmd/app/hash/passwordhash"
 	m "github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/lib/background"
+	"github.com/onmetal-dev/metal/lib/cellprovider"
+	"github.com/onmetal-dev/metal/lib/dnsprovider"
 	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/serverprovider"
 	database "github.com/onmetal-dev/metal/lib/store/db"
@@ -169,6 +172,11 @@ func main() {
 			//DB: db,
 		},
 	)
+	cellStore := dbstore.NewCellStore(
+		dbstore.NewCellStoreParams{
+			DB: db,
+		},
+	)
 
 	// api clients
 	hrobotClient := hrobot.NewClient(hrobot.WithToken(fmt.Sprintf("%s:%s", c.HetznerRobotUsername, c.HetznerRobotPassword)))
@@ -193,6 +201,31 @@ func main() {
 		os.Exit(1)
 	}
 
+	// dnsprovider
+	cfApi, err := cloudflare.NewWithAPIToken(c.CloudflareApiToken)
+	if err != nil {
+		slogger.Error("Failed to create cloudflare api", slog.Any("err", err))
+		os.Exit(1)
+	}
+	cfDnsProvider, err := dnsprovider.NewCloudflareDNSProvider(dnsprovider.WithApi(cfApi), dnsprovider.WithZoneId(c.CloudflareOnmetalDotRunZoneId))
+	if err != nil {
+		slogger.Error("Failed to create cloudflare dns provider", slog.Any("err", err))
+		os.Exit(1)
+	}
+
+	// cellprovider
+	talosCellProvider, err := cellprovider.NewTalosClusterCellProvider(
+		cellprovider.WithDnsProvider(cfDnsProvider),
+		cellprovider.WithCellStore(cellStore),
+		cellprovider.WithServerStore(serverStore),
+		cellprovider.WithTmpDirRoot(c.TmpDirRoot),
+		cellprovider.WithLogger(slog.Default()),
+	)
+	if err != nil {
+		slogger.Error("Failed to create talos cell provider", slog.Any("err", err))
+		os.Exit(1)
+	}
+
 	// background workers
 	connString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", c.DatabaseUser, c.DatabasePassword, c.DatabaseHost, c.DatabasePort, c.DatabaseName)
 	queueName := "fulfillment"
@@ -204,9 +237,11 @@ func main() {
 		background.WithUserStore(userStore),
 		background.WithServerStore(serverStore),
 		background.WithServerOfferingStore(serverOfferingStore),
+		background.WithCellStore(cellStore),
 		background.WithStripeCheckoutSession(stripeCheckoutSession),
 		background.WithServerProviderHetzner(serverProviderHetzner),
 		background.WithTalosProviderHetzner(talosProviderHetzner),
+		background.WithTalosCellProvider(talosCellProvider),
 		background.WithSshKeyBase64(c.SshKeyBase64),
 		background.WithSshKeyPassword(c.SshKeyPassword),
 		background.WithSshKeyFingerprint(c.SshKeyFingerprint),

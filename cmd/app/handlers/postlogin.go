@@ -78,13 +78,13 @@ func (h *PostLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(user.TeamMemberships) == 1 {
 		logger.FromContext(r.Context()).Info("user has one team membership", "user", user)
 		// check for incomplete onboarding
-		team, err := h.teamStore.GetTeam(user.TeamMemberships[0].TeamID)
+		team, err := h.teamStore.GetTeam(user.TeamMemberships[0].TeamId)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if len(team.PaymentMethods) == 0 {
-			w.Header().Set("HX-Redirect", fmt.Sprintf("/onboarding/%s/payment", team.ID))
+			w.Header().Set("HX-Redirect", fmt.Sprintf("/onboarding/%s/payment", team.Id))
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -98,12 +98,12 @@ func (h *PostLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if len(invites) > 0 {
 			// auto accept the invites and redirect to /dashboard/{first teamId}
 			for _, invite := range invites {
-				if err := h.teamStore.AddUserToTeam(invite.TeamID, user.ID); err != nil {
+				if err := h.teamStore.AddUserToTeam(invite.TeamId, user.Id); err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
 			}
-			firstTeamId := invites[0].TeamID
+			firstTeamId := invites[0].TeamId
 			w.Header().Set("HX-Redirect", "/dashboard/"+firstTeamId)
 			w.WriteHeader(http.StatusOK)
 			return
@@ -120,7 +120,7 @@ func (h *PostLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if next != "" {
 		w.Header().Set("HX-Redirect", next)
 	} else {
-		w.Header().Set("HX-Redirect", "/dashboard/"+user.TeamMemberships[0].TeamID)
+		w.Header().Set("HX-Redirect", "/dashboard/"+user.TeamMemberships[0].TeamId)
 	}
 	w.WriteHeader(http.StatusOK)
 }

@@ -57,16 +57,16 @@ func (h *PostOnboardingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		http.Error(w, fmt.Sprintf("error creating team: %v", err), http.StatusInternalServerError)
 		return
 	}
-	if err := h.teamStore.AddUserToTeam(user.ID, team.ID); err != nil {
+	if err := h.teamStore.AddUserToTeam(user.Id, team.Id); err != nil {
 		http.Error(w, fmt.Sprintf("error adding user to team: %v", err), http.StatusInternalServerError)
 		return
 	}
-	if err := h.teamStore.CreateStripeCustomer(team.ID, user.Email); err != nil {
+	if err := h.teamStore.CreateStripeCustomer(team.Id, user.Email); err != nil {
 		http.Error(w, fmt.Sprintf("error creating stripe customer: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("HX-Redirect", fmt.Sprintf("/onboarding/%s/payment", team.ID))
+	w.Header().Set("HX-Redirect", fmt.Sprintf("/onboarding/%s/payment", team.Id))
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -97,7 +97,7 @@ func (h *GetOnboardingPaymentHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	}
 	// see https://docs.stripe.com/api/customer_sessions/create#create_customer_session-components-payment_element-features
 	csParams := &stripe.CustomerSessionParams{
-		Customer:   stripe.String(team.StripeCustomerID),
+		Customer:   stripe.String(team.StripeCustomerId),
 		Components: &stripe.CustomerSessionComponentsParams{},
 	}
 	csParams.AddExtra("components[payment_element][enabled]", "true")
@@ -127,7 +127,7 @@ func (h *GetOnboardingPaymentHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	}
 	w.Header().Set("Content-Security-Policy", strings.Join(csp, "; "))
 
-	if err := templates.Layout(templates.OnboardingPayment(nonce, team.ID, customerSession.ClientSecret), "metal | onboarding", templates.ScriptTag{Src: "https://js.stripe.com/v3/"}).Render(r.Context(), w); err != nil {
+	if err := templates.Layout(templates.OnboardingPayment(nonce, team.Id, customerSession.ClientSecret), "metal | onboarding", templates.ScriptTag{Src: "https://js.stripe.com/v3/"}).Render(r.Context(), w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }
@@ -154,7 +154,7 @@ func (h *PostOnboardingPaymentHandler) ServeHTTP(w http.ResponseWriter, r *http.
 	// see https://docs.stripe.com/payments/accept-a-payment-deferred?platform=web&type=setup&client=html#create-intent
 	params := &stripe.SetupIntentParams{
 		// To allow saving and retrieving payment methods, provide the Customer ID.
-		Customer: stripe.String(team.StripeCustomerID),
+		Customer: stripe.String(team.StripeCustomerId),
 		AutomaticPaymentMethods: &stripe.SetupIntentAutomaticPaymentMethodsParams{
 			Enabled: stripe.Bool(true),
 		},
@@ -203,13 +203,13 @@ func (h *GetOnboardingPaymentConfirmHandler) ServeHTTP(w http.ResponseWriter, r 
 		http.Error(w, "error payment method is nil", http.StatusInternalServerError)
 		return
 	}
-	pm, err := h.stripeCustomer.RetrievePaymentMethod(si.PaymentMethod.ID, &stripe.CustomerRetrievePaymentMethodParams{Customer: stripe.String(team.StripeCustomerID)})
+	pm, err := h.stripeCustomer.RetrievePaymentMethod(si.PaymentMethod.ID, &stripe.CustomerRetrievePaymentMethodParams{Customer: stripe.String(team.StripeCustomerId)})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error getting payment method: %v", err), http.StatusInternalServerError)
 		return
 	}
 	if err := h.teamStore.AddPaymentMethod(teamId, store.PaymentMethod{
-		StripePaymentMethodID: pm.ID,
+		StripePaymentMethodId: pm.ID,
 		Default:               true, // this is the first pm they've set up, so make it default
 		Type:                  string(pm.Card.Brand),
 		Last4:                 pm.Card.Last4,

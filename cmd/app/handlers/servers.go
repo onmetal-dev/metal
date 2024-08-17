@@ -38,7 +38,7 @@ func NewGetServersNewHandler(teamStore store.TeamStore, serverOfferingStore stor
 // this should probably be middleware or something... potentially cached (but that might be a headache to manage cache invalidation)
 func validateAndFetchTeams(teamStore store.TeamStore, w http.ResponseWriter, teamId string, user *store.User) (*store.Team, []store.Team) {
 	if !lo.ContainsBy(user.TeamMemberships, func(m store.TeamMember) bool {
-		return m.TeamID == teamId
+		return m.TeamId == teamId
 	}) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return nil, nil
@@ -55,7 +55,7 @@ func validateAndFetchTeams(teamStore store.TeamStore, w http.ResponseWriter, tea
 
 	userTeams := make([]store.Team, len(user.TeamMemberships))
 	for i, m := range user.TeamMemberships {
-		team, err := teamStore.GetTeam(m.TeamID)
+		team, err := teamStore.GetTeam(m.TeamId)
 		if err != nil || team == nil {
 			http.Error(w, "error fetching team", http.StatusInternalServerError)
 			return nil, nil
@@ -310,7 +310,7 @@ func (h *GetServersCheckoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		UIMode:    stripe.String("embedded"),
 		ReturnURL: stripe.String(fmt.Sprintf("%s?session_id={CHECKOUT_SESSION_ID}", returnUrl)),
 		LineItems: lineItems,
-		Customer:  stripe.String(team.StripeCustomerID),
+		Customer:  stripe.String(team.StripeCustomerId),
 		CustomerUpdate: &stripe.CheckoutSessionCustomerUpdateParams{
 			Address: stripe.String("auto"),
 		},
@@ -404,7 +404,7 @@ func (h *GetServersCheckoutReturnHandler) ServeHTTP(w http.ResponseWriter, r *ht
 
 	if err := h.serverFulfillmentQueue.Send(context.Background(), background.ServerFulfillment{
 		TeamId:                  teamId,
-		UserId:                  user.ID,
+		UserId:                  user.Id,
 		OfferingId:              offeringId,
 		LocationId:              locationId,
 		StripeCheckoutSessionId: checkoutSessionId,

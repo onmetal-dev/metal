@@ -27,7 +27,7 @@ type InviteStore interface {
 }
 
 type User struct {
-	ID              string       `gorm:"primaryKey" json:"id"`
+	Id              string       `gorm:"primaryKey" json:"id"`
 	Email           string       `json:"email"`
 	Password        string       `json:"-"`
 	TeamMemberships []TeamMember `json:"team_memberships"`
@@ -45,10 +45,12 @@ type UserStore interface {
 }
 
 type Team struct {
-	ID               string             `gorm:"primaryKey" json:"id"`
+	Id               string             `gorm:"primaryKey" json:"id"`
 	Name             string             `json:"name"`
 	Description      string             `json:"description"`
-	StripeCustomerID string             `json:"stripe_customer_id"`
+	StripeCustomerId string             `json:"stripe_customer_id"`
+	AgePublicKey     string             `json:"age_public_key"`
+	AgePrivateKey    string             `json:"-"`
 	InvitedMembers   []TeamMemberInvite `json:"invited_members"`
 	Members          []TeamMember       `json:"members"`
 	PaymentMethods   []PaymentMethod    `json:"payment_methods"`
@@ -57,12 +59,13 @@ type Team struct {
 
 	// relations
 	Servers []Server `gorm:"foreignKey:TeamId"`
+	Cells   []Cell   `gorm:"foreignKey:TeamId"`
 }
 
 type PaymentMethod struct {
-	ID                    string    `gorm:"primaryKey" json:"id"`
-	TeamID                string    `json:"team_id" gorm:"uniqueIndex:idx_team_payment_method"`
-	StripePaymentMethodID string    `json:"stripe_payment_method_id" gorm:"uniqueIndex:idx_team_payment_method"`
+	Id                    string    `gorm:"primaryKey" json:"id"`
+	TeamId                string    `json:"team_id" gorm:"uniqueIndex:idx_team_payment_method"`
+	StripePaymentMethodId string    `json:"stripe_payment_method_id" gorm:"uniqueIndex:idx_team_payment_method"`
 	Default               bool      `json:"default"`
 	Type                  string    `json:"type"` // e.g., "card", "bank_account"
 	Last4                 string    `json:"last4"`
@@ -80,15 +83,15 @@ const (
 )
 
 type TeamMemberInvite struct {
-	TeamID    string
+	TeamId    string
 	Email     string    `json:"email" gorm:"index"`
 	Role      TeamRole  `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 type TeamMember struct {
-	UserID    string    `gorm:"primaryKey" json:"user_id"`
-	TeamID    string    `gorm:"primaryKey" json:"team_id"`
+	UserId    string    `gorm:"primaryKey" json:"user_id"`
+	TeamId    string    `gorm:"primaryKey" json:"team_id"`
 	Role      TeamRole  `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -215,12 +218,15 @@ type Server struct {
 	// Status is the current status of the server
 	Status ServerStatus
 
-	// Hostname is the hostname of the server
-	Hostname string
-	// ProviderId is the provider's unique ID
-	ProviderId string
+	// ProviderSlug is the provider name, e.g. hetzner
+	ProviderSlug string
+	// ProviderId is the id within the provider
+	ProviderId *string
 	// PublicIpv4 is the public IP of the server
-	PublicIpv4 string
+	PublicIpv4 *string
+
+	// CellId is the id of the cell that this server belongs to
+	CellId *string `gorm:"constraint:OnDelete:SET NULL"`
 
 	// BillingStripeHourlyUsage keeps track of hourly billing for the server (nullabe in case of different billing schemes in the future)
 	BillingStripeUsageBasedHourly *ServerBillingStripeUsageBasedHourly
@@ -241,7 +247,38 @@ type ServerBillingStripeUsageBasedHourly struct {
 
 type ServerStore interface {
 	Create(s Server) (Server, error)
+	Get(id string) (Server, error)
 	UpdateServerStatus(serverId string, status ServerStatus) error
 	UpdateServerPublicIpv4(serverId string, publicIpv4 string) error
+	UpdateProviderId(serverId string, providerId string) error
 	GetServersForTeam(teamId string) ([]Server, error)
+}
+
+// Cell is a group of servers, primarily used as to separate workloads from any combination of environments / teams / etc.
+type Cell struct {
+	Id          string `gorm:"primaryKey"`
+	Name        string
+	TeamId      string
+	Description string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+
+	// relations
+	Servers       []Server
+	TalosCellData *TalosCellData `gorm:"foreignKey:CellId;references:Id"`
+}
+
+type TalosCellData struct {
+	CellId      string `gorm:"primaryKey"`
+	Talosconfig string
+	Kubecfg     string
+	Config      []byte
+}
+
+type CellStore interface {
+	Create(c Cell) (Cell, error)
+	Get(id string) (Cell, error)
+	GetForTeam(teamId string) ([]Cell, error)
+	UpdateTalosCellData(cellId string, talosCellData TalosCellData) error
+	AddServer(cellId string, server Server) error
 }

@@ -23,11 +23,18 @@ func TestDB(t *testing.T) {
 	teamStore := dbstore.NewTeamStore(dbstore.NewTeamStoreParams{
 		DB: db,
 	})
-
-	testSuite := store.NewStoreTestSuite(store.TestStoresConfig{
-		UserStore: userStore,
-		TeamStore: teamStore,
+	serverStore := dbstore.NewServerStore(dbstore.NewServerStoreParams{
+		DB: db,
+	})
+	cellStore := dbstore.NewCellStore(dbstore.NewCellStoreParams{
+		DB: db,
 	})
 
+	testSuite := store.NewStoreTestSuite(store.TestStoresConfig{
+		UserStore:   userStore,
+		TeamStore:   teamStore,
+		ServerStore: serverStore,
+		CellStore:   cellStore,
+	})
 	testSuite(t)
 }

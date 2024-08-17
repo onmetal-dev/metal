@@ -118,7 +118,7 @@ func (c *QueueConsumer[T]) Start(ctx context.Context) {
 					}
 				}
 				cancel()
-				_, err = c.q.Delete(context.Background(), c.queueName, msg.MsgID)
+				_, err = c.q.Archive(context.Background(), c.queueName, msg.MsgID)
 				if err != nil {
 					c.logger.Error("error deleting message", slog.Any("error", err))
 				}

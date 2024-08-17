@@ -3172,6 +3172,10 @@ input.tab:checked + .tab-content,
   display: none;
 }
 
+.h-3 {
+  height: 0.75rem;
+}
+
 .h-80 {
   height: 20rem;
 }
@@ -3183,6 +3187,10 @@ input.tab:checked + .tab-content,
 
 .h-full {
   height: 100%;
+}
+
+.w-3 {
+  width: 0.75rem;
 }
 
 .w-48 {
@@ -3239,6 +3247,10 @@ input.tab:checked + .tab-content,
 
 .justify-between {
   justify-content: space-between;
+}
+
+.gap-1 {
+  gap: 0.25rem;
 }
 
 .gap-2 {
@@ -3367,6 +3379,17 @@ input.tab:checked + .tab-content,
   --tw-backdrop-blur: blur(4px);
   -webkit-backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);
   backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);
+}
+
+.before\:text-xs::before {
+  content: var(--tw-content);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.before\:content-\[attr\(data-tip\)\]::before {
+  --tw-content: attr(data-tip);
+  content: var(--tw-content);
 }
 
 @media (min-width: 768px) {

@@ -34,7 +34,7 @@ func (s *UserStore) CreateUser(email string, password string) error {
 
 	tid, _ := typeid.WithPrefix("user")
 	return s.db.Create(&store.User{
-		ID:       tid.String(),
+		Id:       tid.String(),
 		Email:    email,
 		Password: hashedPassword,
 	}).Error

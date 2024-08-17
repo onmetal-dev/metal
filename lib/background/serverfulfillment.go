@@ -10,6 +10,7 @@ import (
 
 	"log/slog"
 
+	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/serverprovider"
 	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/onmetal-dev/metal/lib/talosprovider"
@@ -31,6 +32,11 @@ type ServerFulfillment struct {
 	OfferingId              string
 	LocationId              string
 	StripeCheckoutSessionId string
+	// in the future these might be configurable on a per-fulfillment basis
+	// e.g. to put a new server into an existing cell
+	// or to create a new cell that has custom dns
+	CellName  string // defaults to default cell
+	DnsZoneId string
 
 	StepServerId              string
 	StepPaymentReceived       bool
@@ -39,6 +45,7 @@ type ServerFulfillment struct {
 	StepServerOnline          bool
 	StepServerInstalled       bool
 	StepTalosOnline           bool
+	StepServerAddedToCell     bool
 }
 
 // StepBuyServer buys the server and fills out the transaction ID
@@ -54,9 +61,11 @@ type ServerFulfillmentHandler struct {
 	userStore             store.UserStore
 	serverStore           store.ServerStore
 	serverOfferingStore   store.ServerOfferingStore
+	cellStore             store.CellStore
 	stripeCheckoutSession *session.Client
 	serverProviderHetzner serverprovider.ServerProvider
 	talosProviderHetzner  talosprovider.TalosProvider
+	talosCellProvider     cellprovider.CellProvider
 	sshKeyBase64          string
 	sshKeyPassword        string
 	sshKeyFingerprint     string
@@ -115,6 +124,16 @@ func WithServerOfferingStore(serverOfferingStore store.ServerOfferingStore) Serv
 	}
 }
 
+func WithCellStore(cellStore store.CellStore) ServerFulfillmentHandlerOption {
+	return func(h *ServerFulfillmentHandler) error {
+		if cellStore == nil {
+			return errors.New("cell store cannot be nil")
+		}
+		h.cellStore = cellStore
+		return nil
+	}
+}
+
 func WithStripeCheckoutSession(stripeCheckoutSession *session.Client) ServerFulfillmentHandlerOption {
 	return func(h *ServerFulfillmentHandler) error {
 		if stripeCheckoutSession == nil {
@@ -141,6 +160,16 @@ func WithTalosProviderHetzner(talosProviderHetzner *talosprovider.HetznerProvide
 			return errors.New("talos provider hetzner cannot be nil")
 		}
 		h.talosProviderHetzner = talosProviderHetzner
+		return nil
+	}
+}
+
+func WithTalosCellProvider(talosCellProvider *cellprovider.TalosClusterCellProvider) ServerFulfillmentHandlerOption {
+	return func(h *ServerFulfillmentHandler) error {
+		if talosCellProvider == nil {
+			return errors.New("talos cell provider cannot be nil")
+		}
+		h.talosCellProvider = talosCellProvider
 		return nil
 	}
 }
@@ -208,6 +237,9 @@ func NewServerFulfillmentHandler(opts ...ServerFulfillmentHandlerOption) (*Serve
 	if h.serverOfferingStore == nil {
 		errs = append(errs, "server offering store is required")
 	}
+	if h.cellStore == nil {
+		errs = append(errs, "cell store is required")
+	}
 	if h.stripeCheckoutSession == nil {
 		errs = append(errs, "stripe checkout session is required")
 	}
@@ -216,6 +248,9 @@ func NewServerFulfillmentHandler(opts ...ServerFulfillmentHandlerOption) (*Serve
 	}
 	if h.talosProviderHetzner == nil {
 		errs = append(errs, "talos provider hetzner is required")
+	}
+	if h.talosCellProvider == nil {
+		errs = append(errs, "talos cell provider is required")
 	}
 	if h.sshKeyBase64 == "" {
 		errs = append(errs, "ssh key base64 is required")
@@ -253,13 +288,27 @@ func (h ServerFulfillmentHandler) Handle(ctx context.Context, s ServerFulfillmen
 	}
 	if s.StepServerId == "" {
 		logger.Info("Creating server in database")
+		// sometimes we send the same fulfillment message after payment has cleared
+		// but we want to re-create the server object in the db
+		status := store.ServerStatusPendingPayment
+		if s.StepPaymentReceived {
+			status = store.ServerStatusPendingProvider
+		}
+		// sometimes we re-send the same fulfillment message w/ a server already
+		// created for the user, in which case we should populate the provider
+		// server id now
+		var providerId *string
+		if s.StepProviderServerId != "" {
+			providerId = &s.StepProviderServerId
+		}
 		server, err := h.serverStore.Create(store.Server{
-			TeamId:     s.TeamId,
-			UserId:     s.UserId,
-			ProviderId: string(offering.ProviderSlug),
-			OfferingId: s.OfferingId,
-			LocationId: s.LocationId,
-			Status:     store.ServerStatusPendingPayment,
+			TeamId:       s.TeamId,
+			UserId:       s.UserId,
+			ProviderSlug: string(offering.ProviderSlug),
+			OfferingId:   s.OfferingId,
+			LocationId:   s.LocationId,
+			Status:       status,
+			ProviderId:   providerId,
 		})
 		if err != nil {
 			logger.Error("Failed to create server", "error", err)
@@ -319,6 +368,10 @@ func (h ServerFulfillmentHandler) Handle(ctx context.Context, s ServerFulfillmen
 		}
 		if tx.ServerId != "" {
 			s.StepProviderServerId = tx.ServerId
+			if err := h.serverStore.UpdateProviderId(s.StepServerId, tx.ServerId); err != nil {
+				logger.Error("Failed to update server provider ID", "error", err)
+				return err
+			}
 		} else {
 			logger.Info("Server doesn't have a provider ID yet, re-queueing")
 			return h.ReQueue(ctx, s)
@@ -389,8 +442,61 @@ func (h ServerFulfillmentHandler) Handle(ctx context.Context, s ServerFulfillmen
 			logger.Info("Talos not yet online, re-queueing", slog.String("error", err.Error()))
 			return h.ReQueue(ctx, s)
 		}
-		h.serverStore.UpdateServerStatus(s.StepServerId, store.ServerStatusRunning)
 		s.StepTalosOnline = true
+	}
+
+	if !s.StepServerAddedToCell {
+		logger.Info("Adding server to cell")
+		var c *store.Cell
+		if cells, err := h.cellStore.GetForTeam(s.TeamId); err != nil {
+			return err
+		} else if len(cells) > 0 {
+			for _, cell := range cells {
+				if s.CellName != "" && cell.Name == s.CellName {
+					c = &cell
+					break
+				} else if s.CellName == "" && cell.Name == "default" {
+					c = &cell
+				}
+			}
+		} else {
+			created, err := h.cellStore.Create(store.Cell{
+				Name:   "default",
+				TeamId: s.TeamId,
+			})
+			if err != nil {
+				return err
+			}
+			c = &created
+		}
+
+		// TODO: at this point we either have a
+		// 1. freshly minted default cell that needs to be set up with talos
+		// 2. a cell that already exists and is set up with talos
+		// 3. (future) a cell that already exists and is not a talos cell
+		if c.TalosCellData != nil {
+			return fmt.Errorf("cell already has talos installed, TODO: add server to existing talos cluster")
+		} else {
+			// use taloscellprovider to create a new single-node talos cluster with this server
+			team, err := h.teamStore.GetTeam(s.TeamId)
+			if err != nil {
+				return err
+			}
+			server, err := h.serverStore.Get(s.StepServerId)
+			if err != nil {
+				return err
+			}
+			if _, err := h.talosCellProvider.CreateCell(ctx, cellprovider.CreateCellOptions{
+				Name:              c.Name,
+				TeamId:            team.Id,
+				TeamName:          team.Name,
+				TeamAgePrivateKey: team.AgePrivateKey,
+				DnsZoneId:         s.DnsZoneId,
+				FirstServer:       server,
+			}); err != nil {
+				return err
+			}
+		}
 	}
 
 	logger.Info("Server fulfillment completed successfully")
