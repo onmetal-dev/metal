@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -416,41 +415,41 @@ func archiveRepository(sourceDir, destZip string) error {
 	return nil
 }
 
-func unarchiveRepository(sourceZip, destDir string) error {
-	in, err := os.Open(sourceZip)
-	if err != nil {
-		return fmt.Errorf("error opening zip file: %v", err)
-	}
-	defer in.Close()
+// func unarchiveRepository(sourceZip, destDir string) error {
+// 	in, err := os.Open(sourceZip)
+// 	if err != nil {
+// 		return fmt.Errorf("error opening zip file: %v", err)
+// 	}
+// 	defer in.Close()
 
-	format := archiver.CompressedArchive{
-		Compression: archiver.Gz{},
-		Archival:    archiver.Tar{},
-	}
-	err = format.Extract(context.Background(), in, nil, func(ctx context.Context, f archiver.File) error {
-		filePath := filepath.Join(destDir, f.NameInArchive)
-		if f.FileInfo.IsDir() {
-			return os.MkdirAll(filePath, os.ModePerm)
-		}
+// 	format := archiver.CompressedArchive{
+// 		Compression: archiver.Gz{},
+// 		Archival:    archiver.Tar{},
+// 	}
+// 	err = format.Extract(context.Background(), in, nil, func(ctx context.Context, f archiver.File) error {
+// 		filePath := filepath.Join(destDir, f.NameInArchive)
+// 		if f.FileInfo.IsDir() {
+// 			return os.MkdirAll(filePath, os.ModePerm)
+// 		}
 
-		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.FileInfo.Mode())
-		if err != nil {
-			return err
-		}
-		defer destFile.Close()
+// 		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.FileInfo.Mode())
+// 		if err != nil {
+// 			return err
+// 		}
+// 		defer destFile.Close()
 
-		srcFile, err := f.Open()
-		if err != nil {
-			return err
-		}
-		defer srcFile.Close()
+// 		srcFile, err := f.Open()
+// 		if err != nil {
+// 			return err
+// 		}
+// 		defer srcFile.Close()
 
-		_, err = io.Copy(destFile, srcFile)
-		return err
-	})
-	if err != nil {
-		return fmt.Errorf("error extracting files: %v", err)
-	}
+// 		_, err = io.Copy(destFile, srcFile)
+// 		return err
+// 	})
+// 	if err != nil {
+// 		return fmt.Errorf("error extracting files: %v", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
