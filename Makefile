@@ -3,27 +3,24 @@ SHELL := /bin/bash
 LDFLAGS ?= -ldflags "-X main.Environment=dev"
 
 .PHONY: templ-generate templ-watch
-templ-generate:
+templ-generate: templ
 	templ generate
-templ-watch:
+templ-watch: templ
 	templ generate --watch
 
 
 .PHONY: tailwind-build tailwind-watch
-bin/tailwindcss:
-	mkdir -p bin/
-	curl -s https://api.github.com/repos/tailwindlabs/tailwindcss/releases/latest | jq -r '.assets[] | select(.name | test("tailwindcss-macos-arm64")) | .browser_download_url' | xargs curl -L -o bin/tailwindcss
-	chmod +x bin/tailwindcss
 TAILWINDCLI := bunx tailwindcss
-tailwind-watch: bin/tailwindcss
+tailwind-watch: bun
 	$(TAILWINDCLI) -i ./cmd/app/static/css/input.css -o ./cmd/app/static/css/style.css --watch
-tailwind-build: bin/tailwindcss
+tailwind-build: bun
 	$(TAILWINDCLI) -c ./cmd/app/tailwind.config.js -i ./cmd/app/static/css/input.css -o ./cmd/app/static/css/style.min.css --minify
 	$(TAILWINDCLI) -c ./cmd/app/tailwind.config.js -i ./cmd/app/static/css/input.css -o ./cmd/app/static/css/style.css
 
 
 .PHONY: install_deps templ bun docker
-install_deps: templ bun
+install_deps: templ bun staticcheck
+	bun install
 templ:
 	@if ! command -v templ &> /dev/null; then \
 		go install github.com/a-h/templ/cmd/templ@latest; \
@@ -31,6 +28,10 @@ templ:
 bun:
 	@if ! command -v bun &> /dev/null; then \
 		curl -fsSL https://bun.sh/install | bash; \
+	fi
+staticcheck:
+	@if ! command -v staticcheck &> /dev/null; then \
+		go install honnef.co/go/tools/cmd/staticcheck@latest; \
 	fi
 docker:
 	@if ! command -v docker &> /dev/null; then \
@@ -64,9 +65,9 @@ dev-talhelper-sandbox:
 
 
 .PHONY: vet staticheck test
-vet:
+test-vet:
 	go vet ./...
-staticcheck:
+test-staticcheck: staticcheck
 	staticcheck ./...
 test-db:
 	cd env/local/db-for-tests && docker compose up
