@@ -1,0 +1,17 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "env/prod/app/Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "bin/app",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 5,
+    "numReplicas": 1,
+    "region": "us-east4",
+    "restartPolicyType": "ALWAYS",
+    "restartPolicyMaxRetries": 3,
+    "runtime": "V2"
+  }
+}

@@ -51,7 +51,7 @@ import (
 * Set to production at build time
 * used to determine what assets to load
  */
-var Environment = "dev"
+var Environment = "local"
 
 func init() {
 	os.Setenv("env", Environment)
@@ -134,7 +134,7 @@ func main() {
 		Key: c.StripeSecretKey,
 	}
 
-	db := database.MustOpen(c.DatabaseHost, c.DatabaseUser, c.DatabasePassword, c.DatabaseName, c.DatabasePort)
+	db := database.MustOpen(c.DatabaseHost, c.DatabaseUser, c.DatabasePassword, c.DatabaseName, c.DatabasePort, c.DatabaseSslMode)
 	passwordhash := passwordhash.NewHPasswordHash()
 
 	waitlistStore := dbstore.NewWaitlistStore(
@@ -227,7 +227,10 @@ func main() {
 	}
 
 	// background workers
-	connString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", c.DatabaseUser, c.DatabasePassword, c.DatabaseHost, c.DatabasePort, c.DatabaseName)
+	connString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", c.DatabaseUser, c.DatabasePassword, c.DatabaseHost, c.DatabasePort, c.DatabaseName)
+	if c.DatabaseSslMode != "" {
+		connString += fmt.Sprintf("?sslmode=%s", c.DatabaseSslMode)
+	}
 	queueName := "fulfillment"
 	producer := background.NewQueueProducer[background.ServerFulfillment](ctx, queueName, connString)
 	serverFulfillmentHandler, err := background.NewServerFulfillmentHandler(
@@ -286,6 +289,10 @@ func main() {
 
 		r.Get("/about", handlers.NewAboutHandler().ServeHTTP)
 
+		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
 		r.Post("/waitlist", handlers.NewPostWaitlistHandler(handlers.PostWaitlistHandlerParams{
 			WaitlistStore: waitlistStore,
 		}).ServeHTTP)
@@ -318,7 +325,7 @@ func main() {
 	signal.Notify(killSig, os.Interrupt, syscall.SIGTERM)
 
 	srv := &http.Server{
-		Addr:    c.Port,
+		Addr:    fmt.Sprintf(":%s", c.Port),
 		Handler: r,
 	}
 

@@ -8,15 +8,18 @@ import (
 	"gorm.io/gorm"
 )
 
-func open(host, user, password, dbname string, port int) (*gorm.DB, error) {
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", host, user, password, dbname, port)
+func open(host, user, password, dbname string, port int, sslmode string) (*gorm.DB, error) {
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d", host, user, password, dbname, port)
+	if sslmode != "" {
+		dsn += fmt.Sprintf(" sslmode=%s", sslmode)
+	}
 	return gorm.Open(postgres.Open(dsn), &gorm.Config{
 		TranslateError: true,
 	})
 }
 
-func MustOpen(host, user, password, dbname string, port int) *gorm.DB {
-	db, err := open(host, user, password, dbname, port)
+func MustOpen(host, user, password, dbname string, port int, sslmode string) *gorm.DB {
+	db, err := open(host, user, password, dbname, port, sslmode)
 	if err != nil {
 		panic(err)
 	}
