@@ -1,4 +1,4 @@
-name: build-test
+name: build-test-deploy
 
 on:
   push:
@@ -79,3 +79,20 @@ jobs:
 
       - name: vet and staticcheck
         run: make test-vet test-staticcheck
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: [test-vet-staticcheck, test-go, build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway cli
+        run: |
+          wget https://github.com/railwayapp/cli/releases/download/v3.12.2/railway-v3.12.2-amd64.deb
+          sudo dpkg -i railway-v3.12.2-amd64.deb
+
+      - name: Deploy
+        run: railway up --ci --service app --environment prod
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PROD }}

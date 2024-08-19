@@ -33,5 +33,8 @@ RUN set -x && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -
 COPY --from=builder /app/bin /app/bin
 COPY --from=builder /app/cmd/app/static /app/cmd/app/static
 
+# Set the working directory. So that relative paths work as expected.
+WORKDIR /app
+
 # Run the app on container startup.
-CMD ["/app/bin/app"]
+CMD ["bin/app"]
