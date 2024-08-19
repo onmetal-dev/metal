@@ -21,6 +21,10 @@ RUN LDFLAGS="-ldflags '-X main.Environment=prod'" make build
 # https://hub.docker.com/_/debian
 # https://docs.docker.com/develop/develop-images/multistage-build/#use-multi-stage-builds
 FROM debian:bookworm-slim
+LABEL org.opencontainers.image.source="https://github.com/onmetal-dev/metal"
+LABEL org.opencontainers.image.description="Metal PaaS"
+LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
+
 RUN set -x && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates && \
     rm -rf /var/lib/apt/lists/*
