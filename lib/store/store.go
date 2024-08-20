@@ -254,9 +254,16 @@ type ServerStore interface {
 	GetServersForTeam(teamId string) ([]Server, error)
 }
 
+type CellType string
+
+const (
+	CellTypeTalos CellType = "talos"
+)
+
 // Cell is a group of servers, primarily used as to separate workloads from any combination of environments / teams / etc.
 type Cell struct {
 	Id          string `gorm:"primaryKey"`
+	Type        CellType
 	Name        string
 	TeamId      string
 	Description string
