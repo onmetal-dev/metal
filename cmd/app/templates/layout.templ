@@ -68,11 +68,12 @@ templ nav(user *store.User) {
 			<div class="flex-none">
 				<ul class="px-1 menu menu-horizontal">
 					if user != nil {
+						<li><a href={ templ.SafeURL("/dashboard/" + user.TeamMemberships[0].TeamId) }>dashboard</a></li>
 						<li>
 							<details>
 								<summary>{ user.Email }</summary>
 								<ul class="p-2 rounded-t-none bg-base-100">
-									<li><a>settings</a></li>
+									<li><a href={ templ.SafeURL("/settings") }>settings</a></li>
 									<li><a hx-target="body" hx-swap="innerHTML" hx-post="/logout">logout</a></li>
 								</ul>
 							</details>

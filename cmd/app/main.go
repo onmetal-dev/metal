@@ -26,6 +26,7 @@ import (
 	"github.com/onmetal-dev/metal/lib/dnsprovider"
 	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/serverprovider"
+	"github.com/onmetal-dev/metal/lib/store"
 	database "github.com/onmetal-dev/metal/lib/store/db"
 	"github.com/onmetal-dev/metal/lib/store/dbstore"
 	"github.com/onmetal-dev/metal/lib/talosprovider"
@@ -225,6 +226,14 @@ func main() {
 		slogger.Error("Failed to create talos cell provider", slog.Any("err", err))
 		os.Exit(1)
 	}
+	cellProviderForType := func(cellType store.CellType) cellprovider.CellProvider {
+		switch cellType {
+		case store.CellTypeTalos:
+			return talosCellProvider
+		default:
+			return nil
+		}
+	}
 
 	// background workers
 	connString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s", c.DatabaseUser, c.DatabasePassword, c.DatabaseHost, c.DatabasePort, c.DatabaseName)
@@ -313,7 +322,7 @@ func main() {
 			r.Get("/onboarding/{teamId}/payment", handlers.NewGetOnboardingPaymentHandler(teamStore, stripeCustomerSession).ServeHTTP)
 			r.Post("/onboarding/{teamId}/payment", handlers.NewPostOnboardingPaymentHandler(teamStore, stripeSetupIntent).ServeHTTP)
 			r.Get("/onboarding/{teamId}/payment/confirm", handlers.NewGetOnboardingPaymentConfirmHandler(teamStore, stripeSetupIntent, stripeCustomer).ServeHTTP)
-			r.Get("/dashboard/{teamId}", handlers.NewDashboardHandler(userStore, teamStore, serverStore).ServeHTTP)
+			r.Get("/dashboard/{teamId}", handlers.NewDashboardHandler(userStore, teamStore, serverStore, cellStore, cellProviderForType).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/new", handlers.NewGetServersNewHandler(teamStore, serverOfferingStore).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout", handlers.NewGetServersCheckoutHandler(teamStore, serverOfferingStore, stripeCheckoutSession, stripeProduct, stripePrice, stripeMeter, c.StripePublishableKey).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout-return-url", handlers.NewGetServersCheckoutReturnHandler(teamStore, serverOfferingStore, stripeCheckoutSession, producer).ServeHTTP)

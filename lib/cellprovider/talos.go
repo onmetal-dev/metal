@@ -28,6 +28,7 @@ import (
 	"github.com/go-yaml/yaml"
 	"github.com/mholt/archiver/v4"
 	"github.com/samber/lo"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/onmetal-dev/metal/lib/dnsprovider"
 	"github.com/onmetal-dev/metal/lib/store"
@@ -35,6 +36,7 @@ import (
 	"github.com/siderolabs/talos/pkg/machinery/api/machine"
 	"github.com/siderolabs/talos/pkg/machinery/api/storage"
 	"github.com/siderolabs/talos/pkg/machinery/client"
+	clientconfig "github.com/siderolabs/talos/pkg/machinery/client/config"
 	"github.com/siderolabs/talos/pkg/machinery/config"
 	"github.com/siderolabs/talos/pkg/machinery/config/generate/secrets"
 )
@@ -333,6 +335,7 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 	}
 	cell, err := p.cellStore.Create(store.Cell{
 		Name:    opts.Name,
+		Type:    store.CellTypeTalos,
 		TeamId:  opts.TeamId,
 		Servers: []store.Server{opts.FirstServer},
 		TalosCellData: &store.TalosCellData{
@@ -344,6 +347,65 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 		return nil, fmt.Errorf("error creating cell: %v", err)
 	}
 	return &cell, nil
+}
+
+func (p *TalosClusterCellProvider) ServerStats(ctx context.Context, cellId string) ([]ServerStats, error) {
+	cell, err := p.cellStore.Get(cellId)
+	if err != nil {
+		return nil, fmt.Errorf("error getting cell: %v", err)
+	}
+
+	clientConfig, err := clientconfig.FromString(cell.TalosCellData.Talosconfig)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing talosconfig: %v", err)
+	}
+
+	c, err := client.New(ctx,
+		client.WithConfig(clientConfig),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create talos client from config: %w", err)
+	}
+
+	resp, err := c.MachineClient.SystemStat(ctx, &emptypb.Empty{})
+	if err != nil {
+		return nil, fmt.Errorf("error getting system stats: %v", err)
+	}
+
+	result := make([]ServerStats, len(resp.GetMessages()))
+	for i, msg := range resp.GetMessages() {
+		// heavily borrowed from https://github.com/siderolabs/talos/blob/36f83eea9f6baba358c1d98223a330b2cb26e988/internal/pkg/dashboard/apidata/node.go#L52
+		stat := msg.CpuTotal
+		idle := stat.Idle + stat.Iowait
+		nonIdle := stat.User + stat.Nice + stat.System + stat.Irq + stat.Steal + stat.SoftIrq
+		total := idle + nonIdle
+		cpuUtil := 0.0
+		if total > 0 {
+			cpuUtil = (total - idle) / total
+		}
+		// TODO: for some reason this is blank
+		//hostname := msg.GetMetadata().GetHostname()
+		result[i] = ServerStats{
+			CpuUtilization: cpuUtil,
+		}
+	}
+
+	respMem, err := c.MachineClient.Memory(ctx, &emptypb.Empty{})
+	if err != nil {
+		return nil, fmt.Errorf("error getting memory stats: %v", err)
+	}
+	for i, msg := range respMem.GetMessages() {
+		memInfo := msg.GetMeminfo()
+		memTotal := memInfo.GetMemtotal()
+		memUsed := memInfo.GetMemtotal() - memInfo.GetMemfree() - memInfo.GetCached() - memInfo.GetBuffers()
+
+		memUtil := 0.0
+		if memTotal > 0 {
+			memUtil = float64(memUsed) / float64(memTotal)
+		}
+		result[i].MemoryUtilization = memUtil
+	}
+	return result, nil
 }
 
 func encryptYaml(data string, identity string) (string, error) {

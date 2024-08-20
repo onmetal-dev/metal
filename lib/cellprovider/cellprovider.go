@@ -16,6 +16,12 @@ type CreateCellOptions struct {
 	FirstServer       store.Server `valid:"required"`
 }
 
+type ServerStats struct {
+	CpuUtilization    float64
+	MemoryUtilization float64
+}
+
 type CellProvider interface {
 	CreateCell(ctx context.Context, opts CreateCellOptions) (*store.Cell, error)
+	ServerStats(ctx context.Context, cellId string) ([]ServerStats, error)
 }
