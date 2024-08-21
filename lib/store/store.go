@@ -286,6 +286,6 @@ type CellStore interface {
 	Create(c Cell) (Cell, error)
 	Get(id string) (Cell, error)
 	GetForTeam(teamId string) ([]Cell, error)
-	UpdateTalosCellData(cellId string, talosCellData TalosCellData) error
+	UpdateTalosCellData(talosCellData *TalosCellData) error
 	AddServer(cellId string, server Server) error
 }

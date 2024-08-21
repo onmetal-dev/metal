@@ -152,6 +152,16 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			require.Equal("test", getCell.TalosCellData.Talosconfig, "Expected cell talos config to be %s, got %s", "test", getCell.TalosCellData.Talosconfig)
 			require.Equal([]byte("test"), getCell.TalosCellData.Config, "Expected cell talos config to be %s, got %s", []byte("test"), getCell.TalosCellData.Config)
 
+			err = stores.CellStore.UpdateTalosCellData(&TalosCellData{
+				CellId:      getCell.Id,
+				Talosconfig: "test2",
+			})
+			require.NoError(err, "Failed to update cell")
+
+			getCell, err = stores.CellStore.Get(cell.Id)
+			require.NoError(err, "Failed to get cell")
+			require.Equal("test2", getCell.TalosCellData.Talosconfig, "Expected cell talos config to be %s, got %s", "test2", getCell.TalosCellData.Talosconfig)
+
 		})
 
 	}
