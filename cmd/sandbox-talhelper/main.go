@@ -1,40 +1,40 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/cloudflare/cloudflare-go"
-	"github.com/davecgh/go-spew/spew"
-	git "github.com/go-git/go-git/v5"
+	thconfig "github.com/budimanjojo/talhelper/v3/pkg/config"
+	"github.com/budimanjojo/talhelper/v3/pkg/generate"
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/mholt/archiver/v4"
-
+	"github.com/go-yaml/yaml"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/onmetal-dev/metal/lib/cellprovider"
-	"github.com/onmetal-dev/metal/lib/dnsprovider"
+	"github.com/mholt/archiver/v4"
 	"github.com/onmetal-dev/metal/lib/store"
+	database "github.com/onmetal-dev/metal/lib/store/db"
+	"github.com/onmetal-dev/metal/lib/store/dbstore"
+	"github.com/siderolabs/talos/cmd/talosctl/pkg/talos/helpers"
+	"github.com/siderolabs/talos/pkg/machinery/api/machine"
+	"github.com/siderolabs/talos/pkg/machinery/client"
 )
 
 type Config struct {
-	TmpDirRoot                    string `envconfig:"TMP_DIR_ROOT" required:"true"`
-	HetznerToken                  string `envconfig:"HETZNER_TOKEN" required:"true"`
-	SshKeyBase64                  string `envconfig:"SSH_KEY_BASE64" required:"true"`
-	SshKeyPassword                string `envconfig:"SSH_KEY_PASSWORD" required:"true"`
-	SshKeyFingerprint             string `envconfig:"SSH_KEY_FINGERPRINT" required:"true"`
-	CloudflareApiToken            string `envconfig:"CLOUDFLARE_API_TOKEN" required:"true"`
-	CloudflareOnmetalDotRunZoneId string `envconfig:"CLOUDFLARE_ONMETAL_DOT_RUN_ZONE_ID" required:"true"`
-	TeamName                      string `envconfig:"TEAM_NAME" required:"true"`
-	TeamAgeSecretKey              string `envconfig:"TEAM_AGE_SECRET_KEY" required:"true"`
-	ServerProviderSlug            string `envconfig:"SERVER_PROVIDER_SLUG" required:"true"`
-	ServerProviderId              string `envconfig:"SERVER_PROVIDER_ID" required:"true"`
-	ServerId                      string `envconfig:"SERVER_ID" required:"true"`
-	ServerIp                      string `envconfig:"SERVER_IP" required:"true"`
+	DatabaseHost     string `envconfig:"DATABASE_HOST" default:"localhost" required:"true"`
+	DatabasePort     int    `envconfig:"DATABASE_PORT" default:"5432" required:"true"`
+	DatabaseUser     string `envconfig:"DATABASE_USER" default:"postgres" required:"true"`
+	DatabasePassword string `envconfig:"DATABASE_PASSWORD" default:"postgres" required:"true"`
+	DatabaseName     string `envconfig:"DATABASE_NAME" default:"metal" required:"true"`
+	DatabaseSslMode  string `envconfig:"DATABASE_SSL_MODE" default:"disable" required:"true"`
+	TmpDirRoot       string `envconfig:"TMP_DIR_ROOT" required:"true"`
+	ServerId         string `envconfig:"SERVER_ID" required:"true"`
+	CellId           string `envconfig:"CELL_ID" required:"true"`
 }
 
 func loadConfig() (*Config, error) {
@@ -54,94 +54,131 @@ func MustLoadConfig() *Config {
 	return cfg
 }
 
+// WithEnv should eventually be factored out into a global lib w/ a global mutex for env vars
+func WithEnv(m map[string]string, f func() error) error {
+	for k, v := range m {
+		os.Setenv(k, v)
+	}
+	defer func() {
+		for k := range m {
+			os.Unsetenv(k)
+		}
+	}()
+	return f()
+}
+
 func run(ctx context.Context) error {
 	c := MustLoadConfig()
-	api, err := cloudflare.NewWithAPIToken(c.CloudflareApiToken)
+
+	db := database.MustOpen(c.DatabaseHost, c.DatabaseUser, c.DatabasePassword, c.DatabaseName, c.DatabasePort, c.DatabaseSslMode)
+	cellStore := dbstore.NewCellStore(
+		dbstore.NewCellStoreParams{
+			DB: db,
+		},
+	)
+	teamStore := dbstore.NewTeamStore(
+		dbstore.NewTeamStoreParams{
+			DB: db,
+		},
+	)
+	cell, err := cellStore.Get(c.CellId)
 	if err != nil {
-		return fmt.Errorf("error initializing Cloudflare API: %v", err)
-	}
-	dnsProvider, err := dnsprovider.NewCloudflareDNSProvider(dnsprovider.WithApi(api), dnsprovider.WithZoneId(c.CloudflareOnmetalDotRunZoneId))
-	if err != nil {
-		return fmt.Errorf("error in NewCloudflareDNSProvider: %v", err)
+		return fmt.Errorf("error getting cell: %v", err)
 	}
 
-	// hrobotClient := hrobot.NewClient(hrobot.WithToken(c.HetznerToken))
-	// // talosProvider, err := talosprovider.NewHetznerProvider(
-	// // 	talosprovider.WithClient(hrobotClient),
-	// // 	talosprovider.WithLogger(slog.Default()),
-	// // )
-	// if err != nil {
-	// 	return fmt.Errorf("error in NewHetznerProvider: %v", err)
-	// }
+	team, err := teamStore.GetTeam(cell.TeamId)
+	if err != nil {
+		return fmt.Errorf("error getting team: %v", err)
+	}
+	teamSopsKey := team.AgePrivateKey
 
-	cellProvider, err := cellprovider.NewTalosClusterCellProvider(
-		cellprovider.WithDnsProvider(dnsProvider),
-		//cellprovider.WithTalosProvider(talosProvider),
-		cellprovider.WithTmpDirRoot(c.TmpDirRoot),
-		cellprovider.WithLogger(slog.Default()),
+	// Unzip the repository to a new temporary directory
+	unzipDir, err := os.MkdirTemp(c.TmpDirRoot, "unarchived")
+	if err != nil {
+		return fmt.Errorf("error creating unzip directory: %v", err)
+	}
+	//defer os.RemoveAll(unzipDir)
+
+	if err := unarchiveRepository(cell.TalosCellData.Config, unzipDir); err != nil {
+		return fmt.Errorf("error unarchiving repository: %v", err)
+	}
+	secretFilePath := filepath.Join(unzipDir, "talsecret.sops.yaml")
+
+	configFilePath := filepath.Join(unzipDir, "talconfig.yaml")
+	thConfig, err := thconfig.LoadAndValidateFromFile(configFilePath, nil, false)
+	if err != nil {
+		return fmt.Errorf("error loading talconfig: %v", err)
+	}
+
+	newPatches := []string{}
+	kubeletPatch := `- op: add
+  path: /machine/kubelet/extraArgs
+  value:
+    rotate-server-certificates: "true"`
+	for _, p := range thConfig.Patches {
+		if p == kubeletPatch {
+			continue
+		}
+		newPatches = append(newPatches, p)
+	}
+	thConfig.Patches = append(newPatches, kubeletPatch)
+	thConfig.Nodes[0].NodeConfigs.NodeLabels["onmetal.dev/server"] = c.ServerId
+
+	// write the config back to disk
+	configData, err := yaml.Marshal(thConfig)
+	if err != nil {
+		return fmt.Errorf("error marshalling talconfig: %v", err)
+	}
+	if err := os.WriteFile(configFilePath, configData, 0644); err != nil {
+		return fmt.Errorf("error writing talconfig to disk: %v", err)
+	}
+
+	if err := WithEnv(map[string]string{
+		"SOPS_AGE_KEY": teamSopsKey,
+	}, func() error {
+		return generate.GenerateConfig(thConfig, false, filepath.Join(unzipDir, "clusterconfig"), secretFilePath, "metal", false)
+	}); err != nil {
+		return fmt.Errorf("error generating config: %v", err)
+	}
+
+	cpConfigFilePath := filepath.Join(unzipDir, "clusterconfig", fmt.Sprintf("%s-cp-1.yaml", thConfig.ClusterName))
+	cfgBytes, err := os.ReadFile(cpConfigFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read configuration from %s: %w", cpConfigFilePath, err)
+	} else if len(cfgBytes) < 1 {
+		return errors.New("no configuration data read")
+	}
+
+	talosClient, err := client.New(ctx,
+		client.WithConfigFromFile(filepath.Join(unzipDir, "clusterconfig", "talosconfig")),
+		client.WithContextName(thConfig.ClusterName),
 	)
 	if err != nil {
-		return fmt.Errorf("error in NewTalosClusterCellProvider: %v", err)
+		return fmt.Errorf("failed to create talos client from config: %w", err)
 	}
-
-	cell, err := cellProvider.CreateCell(ctx, cellprovider.CreateCellOptions{
-		Name:              "default",
-		TeamName:          c.TeamName,
-		TeamAgePrivateKey: c.TeamAgeSecretKey,
-		DnsZoneId:         c.CloudflareOnmetalDotRunZoneId,
-		// ReinstallServer: &store.Server{
-		// 	Id:                    c.ServerProviderId,
-		// 	Ip:                    c.ServerIp,
-		// 	Username:              "root",
-		// 	SshKeyPrivateBase64:   c.SshKeyBase64,
-		// 	SshKeyPrivatePassword: c.SshKeyPassword,
-		// 	SshKeyFingerprint:     c.SshKeyFingerprint,
-		// },
-		FirstServer: store.Server{
-			ProviderId:   &c.ServerId,
-			PublicIpv4:   &c.ServerIp,
-			ProviderSlug: c.ServerProviderSlug,
-		},
+	resp, err := talosClient.ApplyConfiguration(ctx, &machine.ApplyConfigurationRequest{
+		Data: cfgBytes,
 	})
 	if err != nil {
-		return fmt.Errorf("error in CreateCell: %v", err)
+		return fmt.Errorf("error applying new configuration: %s", err)
 	}
-	spew.Dump(cell)
 
-	os.Exit(0)
+	helpers.PrintApplyResults(resp)
 
-	// create a new git repo for the cluster
-	tempDir, err := os.MkdirTemp(c.TmpDirRoot, "cluster")
+	repo, err := git.PlainOpen(unzipDir)
 	if err != nil {
-		return fmt.Errorf("error creating temp directory: %v", err)
+		return fmt.Errorf("error opening git repository: %v", err)
 	}
-	//	defer os.RemoveAll(tempDir)
-
-	// Initialize a new Git repository
-	repo, err := git.PlainInit(tempDir, false)
-	if err != nil {
-		return fmt.Errorf("error initializing git repository: %v", err)
-	}
-
-	// Create a new file in the repository
-	filePath := filepath.Join(tempDir, "example.txt")
-	err = os.WriteFile(filePath, []byte("Hello, GitOps!"), 0644)
-	if err != nil {
-		return fmt.Errorf("error writing file: %v", err)
-	}
-
-	// Add the file to the repository
 	worktree, err := repo.Worktree()
 	if err != nil {
 		return fmt.Errorf("error getting worktree: %v", err)
 	}
-	_, err = worktree.Add("example.txt")
-	if err != nil {
-		return fmt.Errorf("error adding file to repository: %v", err)
+	if err := worktree.AddWithOptions(&git.AddOptions{
+		All: true,
+	}); err != nil {
+		return fmt.Errorf("error adding files to repository: %v", err)
 	}
-
-	// Commit the changes
-	_, err = worktree.Commit("Initial commit", &git.CommitOptions{
+	_, err = worktree.Commit("Update configuration", &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  "Metal",
 			Email: "automated@onmetal.dev",
@@ -152,33 +189,28 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("error committing changes: %v", err)
 	}
 
-	// Create a new temporary directory for the archive
-	archiveTempDir, err := os.MkdirTemp(c.TmpDirRoot, "archive")
-	if err != nil {
-		return fmt.Errorf("error creating archive temp directory: %v", err)
-	}
-	//defer os.RemoveAll(archiveTempDir)
-
-	// Archive the repository to a zip file in the new temp directory
-	zipFilePath := filepath.Join(archiveTempDir, "repository.zip")
-	err = archiveRepository(tempDir, zipFilePath)
+	// save archive to cell
+	archive, err := archiveRepository(unzipDir)
 	if err != nil {
 		return fmt.Errorf("error archiving repository: %v", err)
 	}
-
-	// Unzip the repository to a new temporary directory
-	unzipDir, err := os.MkdirTemp(c.TmpDirRoot, "unarchived")
+	talosConfig, err := os.ReadFile(filepath.Join(unzipDir, "clusterconfig", "talosconfig"))
 	if err != nil {
-		return fmt.Errorf("error creating unzip directory: %v", err)
+		return fmt.Errorf("error reading talosconfig file: %v", err)
 	}
-	//defer os.RemoveAll(unzipDir)
-
-	err = unarchiveRepository(zipFilePath, unzipDir)
+	kubecfg, err := talosClient.Kubeconfig(ctx)
 	if err != nil {
-		return fmt.Errorf("error unarchiving repository: %v", err)
+		return fmt.Errorf("error getting kubeconfig: %v", err)
 	}
 
-	fmt.Println("Repository archived and unarchived successfully.")
+	if err := cellStore.UpdateTalosCellData(&store.TalosCellData{
+		CellId:      cell.Id,
+		Talosconfig: string(talosConfig),
+		Config:      archive,
+		Kubecfg:     string(kubecfg),
+	}); err != nil {
+		return fmt.Errorf("error updating cell: %v", err)
+	}
 	return nil
 }
 
@@ -189,43 +221,35 @@ func main() {
 	}
 }
 
-func archiveRepository(sourceDir, destZip string) error {
+func archiveRepository(sourceDir string) ([]byte, error) {
 	files, err := archiver.FilesFromDisk(nil, map[string]string{
 		fmt.Sprintf("%s/", sourceDir): "",
 	})
 	if err != nil {
-		return fmt.Errorf("error gathering files: %v", err)
+		return nil, fmt.Errorf("error gathering files: %v", err)
 	}
 
-	out, err := os.Create(destZip)
-	if err != nil {
-		return fmt.Errorf("error creating zip file: %v", err)
-	}
-	defer out.Close()
+	var buf bytes.Buffer
 
 	format := archiver.CompressedArchive{
 		Compression: archiver.Gz{},
 		Archival:    archiver.Tar{},
 	}
-	err = format.Archive(context.Background(), out, files)
+	err = format.Archive(context.Background(), &buf, files)
 	if err != nil {
-		return fmt.Errorf("error archiving files: %v", err)
+		return nil, fmt.Errorf("error archiving files: %v", err)
 	}
-	return nil
+	return buf.Bytes(), nil
 }
 
-func unarchiveRepository(sourceZip, destDir string) error {
-	in, err := os.Open(sourceZip)
-	if err != nil {
-		return fmt.Errorf("error opening zip file: %v", err)
-	}
-	defer in.Close()
+func unarchiveRepository(sourceZip []byte, destDir string) error {
+	in := bytes.NewReader(sourceZip)
 
 	format := archiver.CompressedArchive{
 		Compression: archiver.Gz{},
 		Archival:    archiver.Tar{},
 	}
-	err = format.Extract(context.Background(), in, nil, func(ctx context.Context, f archiver.File) error {
+	err := format.Extract(context.Background(), in, nil, func(ctx context.Context, f archiver.File) error {
 		filePath := filepath.Join(destDir, f.NameInArchive)
 		if f.FileInfo.IsDir() {
 			return os.MkdirAll(filePath, os.ModePerm)

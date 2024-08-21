@@ -148,19 +148,25 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 
 	// craft the single-node talos config
 	thConfig := thconfig.TalhelperConfig{
-		ClusterName:              opts.Name,
-		TalosVersion:             talosVersion,
+		ClusterName:  opts.Name,
+		TalosVersion: talosVersion,
+		// todo: this works for single-node control plane setup, but once we're at > 1 node we'll need to use a setup like
+		// <cell id>.cp.onmetal.run with an A record for each control plane node
 		Endpoint:                 fmt.Sprintf("https://%s.%s:6443", opts.FirstServer.Id, domain),
 		AllowSchedulingOnMasters: true,
 		KubernetesVersion:        "v1.30.3",
 		Patches: []string{
 			`- op: add
   path: /cluster/discovery/enabled
-  value: true
-- op: replace
+  value: true`,
+			`- op: replace
   path: /machine/network/kubespan
   value:
     enabled: true`,
+			`- op: add
+  path: /machine/kubelet/extraArgs
+  value:
+    rotate-server-certificates: "true"`,
 		},
 		Nodes: []thconfig.Node{
 			{
@@ -170,6 +176,7 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 				InstallDisk:  systemDisk.DeviceName,
 				NodeConfigs: thconfig.NodeConfigs{
 					NodeLabels: map[string]string{
+						"onmetal.dev/server":   opts.FirstServer.Id,
 						"onmetal.dev/cell":     opts.Name,
 						"onmetal.dev/provider": opts.FirstServer.ProviderSlug,
 					},
@@ -216,7 +223,7 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 	if err != nil {
 		return nil, fmt.Errorf("error creating temp directory: %v", err)
 	}
-	//	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir)
 	repo, err := git.PlainInit(tempDir, false)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing git repository: %v", err)
@@ -333,6 +340,11 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 	if err != nil {
 		return nil, fmt.Errorf("error reading talosconfig file: %v", err)
 	}
+	kubecfg, err := c.Kubeconfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting kubeconfig: %v", err)
+	}
+
 	cell, err := p.cellStore.Create(store.Cell{
 		Name:    opts.Name,
 		Type:    store.CellTypeTalos,
@@ -340,6 +352,7 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 		Servers: []store.Server{opts.FirstServer},
 		TalosCellData: &store.TalosCellData{
 			Talosconfig: string(talosConfig),
+			Kubecfg:     string(kubecfg),
 			Config:      zipBytes,
 		},
 	})

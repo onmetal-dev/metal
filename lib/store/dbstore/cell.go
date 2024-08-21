@@ -41,8 +41,8 @@ func (s *CellStore) GetForTeam(teamId string) ([]store.Cell, error) {
 	return cells, s.db.Preload("Servers").Preload("TalosCellData").Where("team_id = ?", teamId).Find(&cells).Error
 }
 
-func (s *CellStore) UpdateTalosCellData(cellId string, talosCellData store.TalosCellData) error {
-	return s.db.Model(&store.Cell{}).Where("id = ?", cellId).Association("TalosCellData").Replace(&talosCellData)
+func (s *CellStore) UpdateTalosCellData(talosCellData *store.TalosCellData) error {
+	return s.db.Save(talosCellData).Error
 }
 
 func (s *CellStore) AddServer(cellId string, server store.Server) error {
