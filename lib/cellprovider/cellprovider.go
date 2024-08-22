@@ -17,6 +17,8 @@ type CreateCellOptions struct {
 }
 
 type ServerStats struct {
+	ServerId          string
+	ServerIpv4        string
 	CpuUtilization    float64
 	MemoryUtilization float64
 }

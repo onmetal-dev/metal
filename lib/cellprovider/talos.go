@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,11 +28,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-yaml/yaml"
 	"github.com/mholt/archiver/v4"
-	"github.com/samber/lo"
-	"google.golang.org/protobuf/types/known/emptypb"
-
 	"github.com/onmetal-dev/metal/lib/dnsprovider"
 	"github.com/onmetal-dev/metal/lib/store"
+	"github.com/samber/lo"
 	"github.com/siderolabs/talos/cmd/talosctl/pkg/talos/helpers"
 	"github.com/siderolabs/talos/pkg/machinery/api/machine"
 	"github.com/siderolabs/talos/pkg/machinery/api/storage"
@@ -39,6 +38,11 @@ import (
 	clientconfig "github.com/siderolabs/talos/pkg/machinery/client/config"
 	"github.com/siderolabs/talos/pkg/machinery/config"
 	"github.com/siderolabs/talos/pkg/machinery/config/generate/secrets"
+	"google.golang.org/protobuf/types/known/emptypb"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // TalosClusterCellProvider creates a talos k8s cluster using cloudflare for DNS
@@ -175,11 +179,11 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 				ControlPlane: true,
 				InstallDisk:  systemDisk.DeviceName,
 				NodeConfigs: thconfig.NodeConfigs{
-					NodeLabels: map[string]string{
-						"onmetal.dev/server":   opts.FirstServer.Id,
-						"onmetal.dev/cell":     opts.Name,
-						"onmetal.dev/provider": opts.FirstServer.ProviderSlug,
-					},
+					NodeLabels: generateNodeLabels(NodeLabelInfo{
+						ServerId:     opts.FirstServer.Id,
+						CellName:     opts.Name,
+						ProviderSlug: opts.FirstServer.ProviderSlug,
+					}),
 				},
 			},
 		},
@@ -368,26 +372,70 @@ func (p *TalosClusterCellProvider) ServerStats(ctx context.Context, cellId strin
 		return nil, fmt.Errorf("error getting cell: %v", err)
 	}
 
-	clientConfig, err := clientconfig.FromString(cell.TalosCellData.Talosconfig)
+	k8sClient, err := initializeK8sClient(cell.TalosCellData.Kubecfg)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing k8s client: %v", err)
+	}
+
+	talosClientConfig, err := clientconfig.FromString(cell.TalosCellData.Talosconfig)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing talosconfig: %v", err)
 	}
 
-	c, err := client.New(ctx,
-		client.WithConfig(clientConfig),
+	talosClient, err := client.New(ctx,
+		client.WithConfig(talosClientConfig),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create talos client from config: %w", err)
 	}
 
-	resp, err := c.MachineClient.SystemStat(ctx, &emptypb.Empty{})
-	if err != nil {
-		return nil, fmt.Errorf("error getting system stats: %v", err)
+	var wg sync.WaitGroup
+	var nodeInfo map[string]NodeInfo
+	var nodeInfoErr error
+	var systemStatsResp *machine.SystemStatResponse
+	var systemStatsErr error
+	var memoryResp *machine.MemoryResponse
+	var memoryErr error
+
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		nodeInfo, nodeInfoErr = getNodeIpv4ToLabels(k8sClient)
+	}()
+
+	go func() {
+		defer wg.Done()
+		systemStatsResp, systemStatsErr = talosClient.MachineClient.SystemStat(ctx, &emptypb.Empty{})
+	}()
+
+	go func() {
+		defer wg.Done()
+		memoryResp, memoryErr = talosClient.Memory(ctx)
+	}()
+
+	wg.Wait()
+
+	if nodeInfoErr != nil {
+		return nil, fmt.Errorf("error getting node info: %v", nodeInfoErr)
 	}
 
-	result := make([]ServerStats, len(resp.GetMessages()))
-	for i, msg := range resp.GetMessages() {
-		// heavily borrowed from https://github.com/siderolabs/talos/blob/36f83eea9f6baba358c1d98223a330b2cb26e988/internal/pkg/dashboard/apidata/node.go#L52
+	if systemStatsErr != nil {
+		return nil, fmt.Errorf("error getting system stats: %v", systemStatsErr)
+	}
+
+	if memoryErr != nil {
+		return nil, fmt.Errorf("error getting memory stats: %v", memoryErr)
+	}
+
+	nodeIps := talosClientConfig.Contexts[talosClientConfig.Context].Nodes
+	result := make([]ServerStats, len(nodeIps))
+	for i, nodeIp := range nodeIps {
+		result[i].ServerIpv4 = nodeIp
+		result[i].ServerId = nodeInfo[nodeIp].ServerId
+	}
+
+	for i, msg := range systemStatsResp.GetMessages() {
 		stat := msg.CpuTotal
 		idle := stat.Idle + stat.Iowait
 		nonIdle := stat.User + stat.Nice + stat.System + stat.Irq + stat.Steal + stat.SoftIrq
@@ -396,18 +444,10 @@ func (p *TalosClusterCellProvider) ServerStats(ctx context.Context, cellId strin
 		if total > 0 {
 			cpuUtil = (total - idle) / total
 		}
-		// TODO: for some reason this is blank
-		//hostname := msg.GetMetadata().GetHostname()
-		result[i] = ServerStats{
-			CpuUtilization: cpuUtil,
-		}
+		result[i].CpuUtilization = cpuUtil
 	}
 
-	respMem, err := c.MachineClient.Memory(ctx, &emptypb.Empty{})
-	if err != nil {
-		return nil, fmt.Errorf("error getting memory stats: %v", err)
-	}
-	for i, msg := range respMem.GetMessages() {
+	for i, msg := range memoryResp.GetMessages() {
 		memInfo := msg.GetMeminfo()
 		memTotal := memInfo.GetMemtotal()
 		memUsed := memInfo.GetMemtotal() - memInfo.GetMemfree() - memInfo.GetCached() - memInfo.GetBuffers()
@@ -528,3 +568,81 @@ func archiveRepository(sourceDir, destZip string) error {
 
 // 	return nil
 // }
+
+// initializeK8sClient initializes the Kubernetes client using the provided kubeconfig string.
+func initializeK8sClient(kubeconfig string) (*kubernetes.Clientset, error) {
+	config, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create REST config from kubeconfig: %w", err)
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
+	}
+	return clientset, nil
+}
+
+// NodeInfo represents the information of a node including its external IP and labels.
+type NodeInfo struct {
+	Ipv4 string
+	NodeLabelInfo
+}
+
+// getNodeIpv4ToLabels retrieves node labels and external IPs from the Kubernetes cluster.
+func getNodeIpv4ToLabels(clientset *kubernetes.Clientset) (map[string]NodeInfo, error) {
+	nodes, err := clientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list nodes: %w", err)
+	}
+	nodeInfo := make(map[string]NodeInfo)
+	for _, node := range nodes.Items {
+		labels := node.Labels
+		var ipv4 string
+		for _, addr := range node.Status.Addresses {
+			if addr.Type == corev1.NodeExternalIP || addr.Type == corev1.NodeInternalIP {
+				ip := addr.Address
+				if !strings.HasPrefix(ip, "192.") && !strings.HasPrefix(ip, "172.") && !strings.HasPrefix(ip, "10.") {
+					ipv4 = ip
+					break
+				}
+			}
+		}
+		parsedLabels, err := parseNodeLabels(labels)
+		if err != nil {
+			return nil, err
+		}
+		nodeInfo[ipv4] = NodeInfo{
+			Ipv4:          ipv4,
+			NodeLabelInfo: parsedLabels,
+		}
+	}
+	return nodeInfo, nil
+}
+
+type NodeLabelInfo struct {
+	ServerId     string
+	CellName     string
+	ProviderSlug string
+}
+
+func generateNodeLabels(info NodeLabelInfo) map[string]string {
+	return map[string]string{
+		"onmetal.dev/server":   info.ServerId,
+		"onmetal.dev/cell":     info.CellName,
+		"onmetal.dev/provider": info.ProviderSlug,
+	}
+}
+
+func parseNodeLabels(labels map[string]string) (NodeLabelInfo, error) {
+	info := NodeLabelInfo{
+		ServerId:     labels["onmetal.dev/server"],
+		CellName:     labels["onmetal.dev/cell"],
+		ProviderSlug: labels["onmetal.dev/provider"],
+	}
+
+	if info.ServerId == "" || info.CellName == "" || info.ProviderSlug == "" {
+		return NodeLabelInfo{}, fmt.Errorf("missing required node label fields")
+	}
+
+	return info, nil
+}
