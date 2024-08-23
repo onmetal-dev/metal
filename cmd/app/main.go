@@ -22,6 +22,8 @@ import (
 	"github.com/onmetal-dev/metal/cmd/app/hash/passwordhash"
 	m "github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/lib/background"
+	"github.com/onmetal-dev/metal/lib/background/serverbillinghourly"
+	"github.com/onmetal-dev/metal/lib/background/serverfulfillment"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/dnsprovider"
 	"github.com/onmetal-dev/metal/lib/logger"
@@ -33,6 +35,7 @@ import (
 	slogformatter "github.com/samber/slog-formatter"
 	"github.com/stripe/stripe-go/v79"
 	"github.com/stripe/stripe-go/v79/billing/meter"
+	"github.com/stripe/stripe-go/v79/billing/meterevent"
 	"github.com/stripe/stripe-go/v79/checkout/session"
 	"github.com/stripe/stripe-go/v79/customer"
 	"github.com/stripe/stripe-go/v79/customersession"
@@ -131,6 +134,10 @@ func main() {
 		Key: c.StripeSecretKey,
 	}
 	stripeMeter := &meter.Client{
+		B:   stripeBackend,
+		Key: c.StripeSecretKey,
+	}
+	stripeMeterEvent := &meterevent.Client{
 		B:   stripeBackend,
 		Key: c.StripeSecretKey,
 	}
@@ -240,31 +247,52 @@ func main() {
 	if c.DatabaseSslMode != "" {
 		connString += fmt.Sprintf("?sslmode=%s", c.DatabaseSslMode)
 	}
-	queueName := "fulfillment"
-	producer := background.NewQueueProducer[background.ServerFulfillment](ctx, queueName, connString)
-	serverFulfillmentHandler, err := background.NewServerFulfillmentHandler(
-		background.WithLogger(slogger),
-		background.WithQueueProducer(producer),
-		background.WithTeamStore(teamStore),
-		background.WithUserStore(userStore),
-		background.WithServerStore(serverStore),
-		background.WithServerOfferingStore(serverOfferingStore),
-		background.WithCellStore(cellStore),
-		background.WithStripeCheckoutSession(stripeCheckoutSession),
-		background.WithServerProviderHetzner(serverProviderHetzner),
-		background.WithTalosProviderHetzner(talosProviderHetzner),
-		background.WithTalosCellProvider(talosCellProvider),
-		background.WithSshKeyBase64(c.SshKeyBase64),
-		background.WithSshKeyPassword(c.SshKeyPassword),
-		background.WithSshKeyFingerprint(c.SshKeyFingerprint),
+	queueNameBilling := "server_billing_hourly"
+	producerBilling := background.NewQueueProducer[serverbillinghourly.Message](ctx, queueNameBilling, connString)
+	serverBillingHourlyHandler, err := serverbillinghourly.NewMessageHandler(
+		serverbillinghourly.WithLogger(slogger),
+		serverbillinghourly.WithQueueProducer(producerBilling),
+		serverbillinghourly.WithTeamStore(teamStore),
+		serverbillinghourly.WithServerStore(serverStore),
+		serverbillinghourly.WithServerOfferingStore(serverOfferingStore),
+		serverbillinghourly.WithStripeMeterEvent(stripeMeterEvent),
 	)
 	if err != nil {
 		slogger.Error("Failed to create server fulfillment handler", slog.Any("err", err))
 		os.Exit(1)
+	} else {
+		consumer := background.NewQueueConsumer[serverbillinghourly.Message](ctx, queueNameBilling, connString, 30, serverBillingHourlyHandler.Handle, slogger)
+		go consumer.Start(ctx)
+		defer consumer.Stop()
 	}
-	consumer := background.NewQueueConsumer[background.ServerFulfillment](ctx, queueName, connString, 180, serverFulfillmentHandler.Handle, slogger)
-	go consumer.Start(ctx)
-	defer consumer.Stop()
+
+	queueNameFulfillment := "fulfillment"
+	producerFulfillment := background.NewQueueProducer[serverfulfillment.Message](ctx, queueNameFulfillment, connString)
+	serverFulfillmentHandler, err := serverfulfillment.NewMessageHandler(
+		serverfulfillment.WithLogger(slogger),
+		serverfulfillment.WithQueueProducer(producerFulfillment),
+		serverfulfillment.WithServerBillingHourlyProducer(producerBilling),
+		serverfulfillment.WithTeamStore(teamStore),
+		serverfulfillment.WithUserStore(userStore),
+		serverfulfillment.WithServerStore(serverStore),
+		serverfulfillment.WithServerOfferingStore(serverOfferingStore),
+		serverfulfillment.WithCellStore(cellStore),
+		serverfulfillment.WithStripeCheckoutSession(stripeCheckoutSession),
+		serverfulfillment.WithServerProviderHetzner(serverProviderHetzner),
+		serverfulfillment.WithTalosProviderHetzner(talosProviderHetzner),
+		serverfulfillment.WithTalosCellProvider(talosCellProvider),
+		serverfulfillment.WithSshKeyBase64(c.SshKeyBase64),
+		serverfulfillment.WithSshKeyPassword(c.SshKeyPassword),
+		serverfulfillment.WithSshKeyFingerprint(c.SshKeyFingerprint),
+	)
+	if err != nil {
+		slogger.Error("Failed to create server fulfillment handler", slog.Any("err", err))
+		os.Exit(1)
+	} else {
+		consumer := background.NewQueueConsumer[serverfulfillment.Message](ctx, queueNameFulfillment, connString, 180, serverFulfillmentHandler.Handle, slogger)
+		go consumer.Start(ctx)
+		defer consumer.Stop()
+	}
 
 	// http router
 	r := chi.NewRouter()
@@ -325,7 +353,7 @@ func main() {
 			r.Get("/dashboard/{teamId}", handlers.NewDashboardHandler(userStore, teamStore, serverStore, cellStore, cellProviderForType).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/new", handlers.NewGetServersNewHandler(teamStore, serverOfferingStore).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout", handlers.NewGetServersCheckoutHandler(teamStore, serverOfferingStore, stripeCheckoutSession, stripeProduct, stripePrice, stripeMeter, c.StripePublishableKey).ServeHTTP)
-			r.Get("/dashboard/{teamId}/servers/checkout-return-url", handlers.NewGetServersCheckoutReturnHandler(teamStore, serverOfferingStore, stripeCheckoutSession, producer).ServeHTTP)
+			r.Get("/dashboard/{teamId}/servers/checkout-return-url", handlers.NewGetServersCheckoutReturnHandler(teamStore, serverOfferingStore, stripeCheckoutSession, producerFulfillment).ServeHTTP)
 		})
 	})
 

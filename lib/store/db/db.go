@@ -33,6 +33,7 @@ func MustOpen(host, user, password, dbname string, port int, sslmode string) *go
 		&store.TeamMemberInvite{},
 		&store.PaymentMethod{},
 		&store.Server{},
+		&store.ServerBillingStripeUsageBasedHourly{},
 		&store.Cell{},
 		&store.TalosCellData{},
 	)

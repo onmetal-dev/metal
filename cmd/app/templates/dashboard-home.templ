@@ -137,6 +137,15 @@ func cellById(cells []store.Cell, id string) *store.Cell {
 	return nil
 }
 
+func serverStatById(serverStats []cellprovider.ServerStats, id string) *cellprovider.ServerStats {
+	for _, stat := range serverStats {
+		if stat.ServerId == id {
+			return &stat
+		}
+	}
+	return nil
+}
+
 func colorNameForValue(colors []string, thresholds []float64, value float64) string {
 	if len(colors) == 0 || len(thresholds) == 0 || len(colors) != len(thresholds)+1 {
 		return ""
@@ -184,7 +193,7 @@ templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, s
 					</tr>
 				</thead>
 				<tbody>
-					for i, server := range servers {
+					for _, server := range servers {
 						<tr>
 							<td>{ server.Id }</td>
 							<td>
@@ -201,8 +210,8 @@ templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, s
 									(none)
 								}
 							</td>
-							<td class={ "text-bold", cssColorClassForUtilization(serverStats[i].CpuUtilization) }>{ humanizePercent(serverStats[i].CpuUtilization) }</td>
-							<td class={ "text-bold", cssColorClassForUtilization(serverStats[i].MemoryUtilization) }>{ humanizePercent(serverStats[i].MemoryUtilization) }</td>
+							<td class={ "text-bold", cssColorClassForUtilization(serverStatById(serverStats, server.Id).CpuUtilization) }>{ humanizePercent(serverStatById(serverStats, server.Id).CpuUtilization) }</td>
+							<td class={ "text-bold", cssColorClassForUtilization(serverStatById(serverStats, server.Id).MemoryUtilization) }>{ humanizePercent(serverStatById(serverStats, server.Id).MemoryUtilization) }</td>
 							if server.CellId != nil {
 								<td>{ cellById(cells, *server.CellId).Name }</td>
 							} else {

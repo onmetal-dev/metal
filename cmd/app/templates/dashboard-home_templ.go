@@ -422,6 +422,15 @@ func cellById(cells []store.Cell, id string) *store.Cell {
 	return nil
 }
 
+func serverStatById(serverStats []cellprovider.ServerStats, id string) *cellprovider.ServerStats {
+	for _, stat := range serverStats {
+		if stat.ServerId == id {
+			return &stat
+		}
+	}
+	return nil
+}
+
 func colorNameForValue(colors []string, thresholds []float64, value float64) string {
 	if len(colors) == 0 || len(thresholds) == 0 || len(colors) != len(thresholds)+1 {
 		return ""
@@ -475,7 +484,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs("/dashboard/" + teamId)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 164, Col: 144}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 173, Col: 144}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -493,7 +502,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		for i, server := range servers {
+		for _, server := range servers {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<tr><td>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -501,7 +510,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(server.Id)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 189, Col: 22}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 198, Col: 22}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -514,7 +523,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(server.ProviderSlug)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 191, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 200, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -527,7 +536,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(server.OfferingId)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 193, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 202, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -540,7 +549,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(server.LocationId)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 194, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 203, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
@@ -553,7 +562,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(string(server.Status))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 195, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 204, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -566,7 +575,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(server.CreatedAt.Format(time.RFC3339))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 196, Col: 50}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 205, Col: 50}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
@@ -580,7 +589,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 				var templ_7745c5c3_Var26 string
 				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(*server.PublicIpv4)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 199, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 208, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 				if templ_7745c5c3_Err != nil {
@@ -596,7 +605,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var27 = []any{"text-bold", cssColorClassForUtilization(serverStats[i].CpuUtilization)}
+			var templ_7745c5c3_Var27 = []any{"text-bold", cssColorClassForUtilization(serverStatById(serverStats, server.Id).CpuUtilization)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var27...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -619,9 +628,9 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var29 string
-			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(humanizePercent(serverStats[i].CpuUtilization))
+			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(humanizePercent(serverStatById(serverStats, server.Id).CpuUtilization))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 204, Col: 141}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 213, Col: 189}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
@@ -631,7 +640,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var30 = []any{"text-bold", cssColorClassForUtilization(serverStats[i].MemoryUtilization)}
+			var templ_7745c5c3_Var30 = []any{"text-bold", cssColorClassForUtilization(serverStatById(serverStats, server.Id).MemoryUtilization)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var30...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -654,9 +663,9 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var32 string
-			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(humanizePercent(serverStats[i].MemoryUtilization))
+			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(humanizePercent(serverStatById(serverStats, server.Id).MemoryUtilization))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 205, Col: 147}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 214, Col: 195}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 			if templ_7745c5c3_Err != nil {
@@ -674,7 +683,7 @@ func DashboardHome(teamId string, servers []store.Server, cells []store.Cell, se
 				var templ_7745c5c3_Var33 string
 				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(cellById(cells, *server.CellId).Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 207, Col: 50}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-home.templ`, Line: 216, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 				if templ_7745c5c3_Err != nil {

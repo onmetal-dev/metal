@@ -11,6 +11,8 @@ import (
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/cmd/app/templates"
 	"github.com/onmetal-dev/metal/lib/background"
+	"github.com/onmetal-dev/metal/lib/background/serverfulfillment"
+	"github.com/onmetal-dev/metal/lib/billing"
 	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/samber/lo"
 	"github.com/stripe/stripe-go/v79"
@@ -113,7 +115,7 @@ func NewGetServersCheckoutHandler(teamStore store.TeamStore, serverOfferingStore
 
 func findOrCreateHourlyMeterForOffering(offering store.ServerOffering, locationId string, stripeMeter *meter.Client) (*stripe.BillingMeter, error) {
 	// there is currently no search functionality in this api, so gotta list 'em all
-	eventName := strings.ToLower(fmt.Sprintf("%s-%s-%s-usage-hour", offering.ProviderSlug, offering.Id, locationId))
+	eventName := billing.UsageHourMeterEventName(offering, locationId)
 	meters := stripeMeter.List(nil)
 	for meters.Next() {
 		meter := meters.BillingMeter()
@@ -359,10 +361,10 @@ type GetServersCheckoutReturnHandler struct {
 	teamStore              store.TeamStore
 	serverOfferingStore    store.ServerOfferingStore
 	stripeCheckoutSession  *session.Client
-	serverFulfillmentQueue *background.QueueProducer[background.ServerFulfillment]
+	serverFulfillmentQueue *background.QueueProducer[serverfulfillment.Message]
 }
 
-func NewGetServersCheckoutReturnHandler(teamStore store.TeamStore, serverOfferingStore store.ServerOfferingStore, stripeCheckoutSession *session.Client, serverFulfillmentQueue *background.QueueProducer[background.ServerFulfillment]) *GetServersCheckoutReturnHandler {
+func NewGetServersCheckoutReturnHandler(teamStore store.TeamStore, serverOfferingStore store.ServerOfferingStore, stripeCheckoutSession *session.Client, serverFulfillmentQueue *background.QueueProducer[serverfulfillment.Message]) *GetServersCheckoutReturnHandler {
 	return &GetServersCheckoutReturnHandler{
 		teamStore:              teamStore,
 		serverOfferingStore:    serverOfferingStore,
@@ -402,7 +404,7 @@ func (h *GetServersCheckoutReturnHandler) ServeHTTP(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := h.serverFulfillmentQueue.Send(context.Background(), background.ServerFulfillment{
+	if err := h.serverFulfillmentQueue.Send(context.Background(), serverfulfillment.Message{
 		TeamId:                  teamId,
 		UserId:                  user.Id,
 		OfferingId:              offeringId,

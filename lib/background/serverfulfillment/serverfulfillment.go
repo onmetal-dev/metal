@@ -1,4 +1,4 @@
-package background
+package serverfulfillment
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 
 	"log/slog"
 
+	"github.com/onmetal-dev/metal/lib/background"
+	"github.com/onmetal-dev/metal/lib/background/serverbillinghourly"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/serverprovider"
 	"github.com/onmetal-dev/metal/lib/store"
@@ -19,14 +21,14 @@ import (
 	"github.com/stripe/stripe-go/v79/checkout/session"
 )
 
-// ServerFulfillment message is sent as soon as a server is purchased. It takes care of the following:
+// Message is sent as soon as a server is purchased. It takes care of the following:
 // - creating the server object in the db
 // - waiting for payment to be confirmed
 // - ordering the server
 // - waiting for the server to come online
 // - setting up the server (installing Talos)
 // If any of these steps involve waiting, then the logic will re-queue the message with a delay of 30s to check again later.
-type ServerFulfillment struct {
+type Message struct {
 	TeamId                  string
 	UserId                  string
 	OfferingId              string
@@ -55,8 +57,9 @@ type StepBuyServer struct {
 
 const ServerFulfillmentCheckInterval = 30 * time.Second
 
-type ServerFulfillmentHandler struct {
-	q                     *QueueProducer[ServerFulfillment]
+type MessageHandler struct {
+	q                     *background.QueueProducer[Message]
+	qServerBillingHourly  *background.QueueProducer[serverbillinghourly.Message]
 	teamStore             store.TeamStore
 	userStore             store.UserStore
 	serverStore           store.ServerStore
@@ -72,10 +75,10 @@ type ServerFulfillmentHandler struct {
 	logger                *slog.Logger
 }
 
-type ServerFulfillmentHandlerOption func(*ServerFulfillmentHandler) error
+type MessageHandlerOption func(*MessageHandler) error
 
-func WithQueueProducer(q *QueueProducer[ServerFulfillment]) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithQueueProducer(q *background.QueueProducer[Message]) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if q == nil {
 			return errors.New("queue producer cannot be nil")
 		}
@@ -84,8 +87,18 @@ func WithQueueProducer(q *QueueProducer[ServerFulfillment]) ServerFulfillmentHan
 	}
 }
 
-func WithTeamStore(teamStore store.TeamStore) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithServerBillingHourlyProducer(q *background.QueueProducer[serverbillinghourly.Message]) MessageHandlerOption {
+	return func(h *MessageHandler) error {
+		if q == nil {
+			return errors.New("queue producer cannot be nil")
+		}
+		h.qServerBillingHourly = q
+		return nil
+	}
+}
+
+func WithTeamStore(teamStore store.TeamStore) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if teamStore == nil {
 			return errors.New("team store cannot be nil")
 		}
@@ -94,8 +107,8 @@ func WithTeamStore(teamStore store.TeamStore) ServerFulfillmentHandlerOption {
 	}
 }
 
-func WithUserStore(userStore store.UserStore) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithUserStore(userStore store.UserStore) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if userStore == nil {
 			return errors.New("user store cannot be nil")
 		}
@@ -104,8 +117,8 @@ func WithUserStore(userStore store.UserStore) ServerFulfillmentHandlerOption {
 	}
 }
 
-func WithServerStore(serverStore store.ServerStore) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithServerStore(serverStore store.ServerStore) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if serverStore == nil {
 			return errors.New("server store cannot be nil")
 		}
@@ -114,8 +127,8 @@ func WithServerStore(serverStore store.ServerStore) ServerFulfillmentHandlerOpti
 	}
 }
 
-func WithServerOfferingStore(serverOfferingStore store.ServerOfferingStore) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithServerOfferingStore(serverOfferingStore store.ServerOfferingStore) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if serverOfferingStore == nil {
 			return errors.New("server offering store cannot be nil")
 		}
@@ -124,8 +137,8 @@ func WithServerOfferingStore(serverOfferingStore store.ServerOfferingStore) Serv
 	}
 }
 
-func WithCellStore(cellStore store.CellStore) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithCellStore(cellStore store.CellStore) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if cellStore == nil {
 			return errors.New("cell store cannot be nil")
 		}
@@ -134,8 +147,8 @@ func WithCellStore(cellStore store.CellStore) ServerFulfillmentHandlerOption {
 	}
 }
 
-func WithStripeCheckoutSession(stripeCheckoutSession *session.Client) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithStripeCheckoutSession(stripeCheckoutSession *session.Client) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if stripeCheckoutSession == nil {
 			return errors.New("stripe checkout session cannot be nil")
 		}
@@ -144,8 +157,8 @@ func WithStripeCheckoutSession(stripeCheckoutSession *session.Client) ServerFulf
 	}
 }
 
-func WithServerProviderHetzner(serverProviderHetzner serverprovider.ServerProvider) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithServerProviderHetzner(serverProviderHetzner serverprovider.ServerProvider) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if serverProviderHetzner == nil {
 			return errors.New("server provider hetzner cannot be nil")
 		}
@@ -154,8 +167,8 @@ func WithServerProviderHetzner(serverProviderHetzner serverprovider.ServerProvid
 	}
 }
 
-func WithTalosProviderHetzner(talosProviderHetzner *talosprovider.HetznerProvider) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithTalosProviderHetzner(talosProviderHetzner *talosprovider.HetznerProvider) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if talosProviderHetzner == nil {
 			return errors.New("talos provider hetzner cannot be nil")
 		}
@@ -164,8 +177,8 @@ func WithTalosProviderHetzner(talosProviderHetzner *talosprovider.HetznerProvide
 	}
 }
 
-func WithTalosCellProvider(talosCellProvider *cellprovider.TalosClusterCellProvider) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithTalosCellProvider(talosCellProvider *cellprovider.TalosClusterCellProvider) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if talosCellProvider == nil {
 			return errors.New("talos cell provider cannot be nil")
 		}
@@ -174,8 +187,8 @@ func WithTalosCellProvider(talosCellProvider *cellprovider.TalosClusterCellProvi
 	}
 }
 
-func WithSshKeyBase64(sshKeyBase64 string) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithSshKeyBase64(sshKeyBase64 string) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if sshKeyBase64 == "" {
 			return errors.New("ssh key base64 cannot be empty")
 		}
@@ -184,8 +197,8 @@ func WithSshKeyBase64(sshKeyBase64 string) ServerFulfillmentHandlerOption {
 	}
 }
 
-func WithSshKeyPassword(sshKeyPassword string) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithSshKeyPassword(sshKeyPassword string) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if sshKeyPassword == "" {
 			return errors.New("ssh key password cannot be empty")
 		}
@@ -194,8 +207,8 @@ func WithSshKeyPassword(sshKeyPassword string) ServerFulfillmentHandlerOption {
 	}
 }
 
-func WithSshKeyFingerprint(sshKeyFingerprint string) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithSshKeyFingerprint(sshKeyFingerprint string) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if sshKeyFingerprint == "" {
 			return errors.New("ssh key fingerprint cannot be empty")
 		}
@@ -204,8 +217,8 @@ func WithSshKeyFingerprint(sshKeyFingerprint string) ServerFulfillmentHandlerOpt
 	}
 }
 
-func WithLogger(logger *slog.Logger) ServerFulfillmentHandlerOption {
-	return func(h *ServerFulfillmentHandler) error {
+func WithLogger(logger *slog.Logger) MessageHandlerOption {
+	return func(h *MessageHandler) error {
 		if logger == nil {
 			return errors.New("logger cannot be nil")
 		}
@@ -214,8 +227,8 @@ func WithLogger(logger *slog.Logger) ServerFulfillmentHandlerOption {
 	}
 }
 
-func NewServerFulfillmentHandler(opts ...ServerFulfillmentHandlerOption) (*ServerFulfillmentHandler, error) {
-	h := &ServerFulfillmentHandler{}
+func NewMessageHandler(opts ...MessageHandlerOption) (*MessageHandler, error) {
+	h := &MessageHandler{}
 	for _, opt := range opts {
 		if err := opt(h); err != nil {
 			return nil, err
@@ -224,6 +237,9 @@ func NewServerFulfillmentHandler(opts ...ServerFulfillmentHandlerOption) (*Serve
 	var errs []string
 	if h.q == nil {
 		errs = append(errs, "queue producer is required")
+	}
+	if h.qServerBillingHourly == nil {
+		errs = append(errs, "queue producer for server billing hourly is required")
 	}
 	if h.teamStore == nil {
 		errs = append(errs, "team store is required")
@@ -270,11 +286,11 @@ func NewServerFulfillmentHandler(opts ...ServerFulfillmentHandlerOption) (*Serve
 	return h, nil
 }
 
-func (h ServerFulfillmentHandler) ReQueue(ctx context.Context, s ServerFulfillment) error {
+func (h MessageHandler) ReQueue(ctx context.Context, s Message) error {
 	return h.q.SendWithDelay(ctx, s, ServerFulfillmentCheckInterval)
 }
 
-func (h ServerFulfillmentHandler) Handle(ctx context.Context, s ServerFulfillment) error {
+func (h MessageHandler) Handle(ctx context.Context, s Message) error {
 	logger := h.logger.With(
 		slog.String("teamId", s.TeamId),
 		slog.String("userId", s.UserId),
@@ -500,10 +516,25 @@ func (h ServerFulfillmentHandler) Handle(ctx context.Context, s ServerFulfillmen
 	}
 
 	logger.Info("Server fulfillment completed successfully")
+
+	team, err := h.teamStore.GetTeam(s.TeamId)
+	if err != nil {
+		return err
+	}
+	if err := h.qServerBillingHourly.Send(ctx, serverbillinghourly.Message{
+		TeamId:           s.TeamId,
+		OfferingId:       s.OfferingId,
+		LocationId:       s.LocationId,
+		StripeCustomerId: team.StripeCustomerId,
+		ServerId:         s.StepServerId,
+	}); err != nil {
+		logger.Error("Failed to send server billing hourly message", "error", err)
+		return err
+	}
 	return nil
 }
 
-func (h ServerFulfillmentHandler) getServerProvider(providerSlug string) (serverprovider.ServerProvider, error) {
+func (h MessageHandler) getServerProvider(providerSlug string) (serverprovider.ServerProvider, error) {
 	switch providerSlug {
 	case "hetzner":
 		return h.serverProviderHetzner, nil
@@ -512,7 +543,7 @@ func (h ServerFulfillmentHandler) getServerProvider(providerSlug string) (server
 	}
 }
 
-func (h ServerFulfillmentHandler) getTalosProvider(providerSlug string) (talosprovider.TalosProvider, error) {
+func (h MessageHandler) getTalosProvider(providerSlug string) (talosprovider.TalosProvider, error) {
 	switch providerSlug {
 	case "hetzner":
 		return h.talosProviderHetzner, nil
