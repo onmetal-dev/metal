@@ -229,7 +229,7 @@ type Server struct {
 	CellId *string `gorm:"constraint:OnDelete:SET NULL"`
 
 	// BillingStripeHourlyUsage keeps track of hourly billing for the server (nullabe in case of different billing schemes in the future)
-	BillingStripeUsageBasedHourly *ServerBillingStripeUsageBasedHourly
+	BillingStripeUsageBasedHourly *ServerBillingStripeUsageBasedHourly `gorm:"foreignKey:ServerId;references:Id"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -250,6 +250,7 @@ type ServerStore interface {
 	Get(id string) (Server, error)
 	UpdateServerStatus(serverId string, status ServerStatus) error
 	UpdateServerPublicIpv4(serverId string, publicIpv4 string) error
+	UpdateServerBillingStripeUsageBasedHourly(serverId string, usageBasedHourly *ServerBillingStripeUsageBasedHourly) error
 	UpdateProviderId(serverId string, providerId string) error
 	GetServersForTeam(teamId string) ([]Server, error)
 }

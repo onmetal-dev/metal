@@ -30,7 +30,7 @@ func (s *ServerStore) Create(server store.Server) (store.Server, error) {
 
 func (s *ServerStore) Get(id string) (store.Server, error) {
 	var server store.Server
-	return server, s.db.Where("id = ?", id).First(&server).Error
+	return server, s.db.Where("id = ?", id).Preload("BillingStripeUsageBasedHourly").First(&server).Error
 }
 
 func (s *ServerStore) UpdateServerStatus(serverId string, status store.ServerStatus) error {
@@ -47,5 +47,9 @@ func (s *ServerStore) UpdateProviderId(serverId string, providerId string) error
 
 func (s *ServerStore) GetServersForTeam(teamId string) ([]store.Server, error) {
 	var servers []store.Server
-	return servers, s.db.Where("team_id = ?", teamId).Find(&servers).Error
+	return servers, s.db.Where("team_id = ?", teamId).Preload("BillingStripeUsageBasedHourly").Find(&servers).Error
+}
+
+func (s *ServerStore) UpdateServerBillingStripeUsageBasedHourly(serverId string, usageBasedHourly *store.ServerBillingStripeUsageBasedHourly) error {
+	return s.db.Save(usageBasedHourly).Error
 }
