@@ -29,12 +29,20 @@ func TestDB(t *testing.T) {
 	cellStore := dbstore.NewCellStore(dbstore.NewCellStoreParams{
 		DB: db,
 	})
+	appStore := dbstore.NewAppStore(dbstore.NewAppStoreParams{
+		DB: db,
+	})
+	deploymentStore := dbstore.NewDeploymentStore(dbstore.NewDeploymentStoreParams{
+		DB: db,
+	})
 
 	testSuite := store.NewStoreTestSuite(store.TestStoresConfig{
-		UserStore:   userStore,
-		TeamStore:   teamStore,
-		ServerStore: serverStore,
-		CellStore:   cellStore,
+		UserStore:       userStore,
+		TeamStore:       teamStore,
+		ServerStore:     serverStore,
+		CellStore:       cellStore,
+		AppStore:        appStore,
+		DeploymentStore: deploymentStore,
 	})
 	testSuite(t)
 }

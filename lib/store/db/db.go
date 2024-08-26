@@ -36,6 +36,11 @@ func MustOpen(host, user, password, dbname string, port int, sslmode string) *go
 		&store.ServerBillingStripeUsageBasedHourly{},
 		&store.Cell{},
 		&store.TalosCellData{},
+		&store.App{},
+		&store.AppSettings{},
+		&store.Env{},
+		&store.AppEnvVars{},
+		&store.Deployment{},
 	)
 	if err != nil {
 		panic(err)

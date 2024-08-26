@@ -6,16 +6,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/onmetal-dev/metal/lib/store"
+	"github.com/onmetal-dev/metal/lib/validate"
 	"gorm.io/gorm"
 )
-
-var validate *validator.Validate
-
-func init() {
-	validate = validator.New(validator.WithRequiredStructEnabled())
-}
 
 type WaitlistStore struct {
 	loopsWaitlistFormUrl string

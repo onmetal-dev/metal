@@ -7,10 +7,12 @@ import (
 )
 
 type TestStoresConfig struct {
-	UserStore   UserStore
-	TeamStore   TeamStore
-	ServerStore ServerStore
-	CellStore   CellStore
+	UserStore       UserStore
+	TeamStore       TeamStore
+	ServerStore     ServerStore
+	CellStore       CellStore
+	AppStore        AppStore
+	DeploymentStore DeploymentStore // Add this line
 }
 
 func createUser(t *testing.T, stores TestStoresConfig, email, password string) User {
@@ -164,5 +166,246 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 
 		})
 
+		t.Run("App and AppSettings Operations", func(t *testing.T) {
+			require := require.New(t)
+
+			// Create a user and team for the app
+			email := "apptest@example.com"
+			password := "password123"
+			user := createUser(t, stores, email, password)
+
+			teamName := "App Test Team"
+			teamDesc := "A team for testing apps"
+			team := createTeam(t, stores, teamName, teamDesc)
+
+			addUserToTeam(t, stores, user.Id, team.Id)
+
+			// Create an app
+			appName := "Test App"
+			createAppOpts := CreateAppOptions{
+				Name:   appName,
+				TeamId: team.Id,
+				UserId: user.Id,
+			}
+			app, err := stores.AppStore.Create(createAppOpts)
+			require.NoError(err, "Failed to create app")
+			require.NotEmpty(app.Id, "Expected app id to be present")
+			require.Equal(appName, app.Name, "Expected app name to match")
+			require.Equal(team.Id, app.TeamId, "Expected app team id to match")
+			require.Equal(user.Id, app.UserId, "Expected app user id to match")
+
+			// Get the created app
+			fetchedApp, err := stores.AppStore.Get(app.Id)
+			require.NoError(err, "Failed to get app")
+			require.Equal(app.Id, fetchedApp.Id, "Expected fetched app id to match")
+			require.Equal(app.Name, fetchedApp.Name, "Expected fetched app name to match")
+
+			// Get apps for the team
+			teamApps, err := stores.AppStore.GetForTeam(team.Id)
+			require.NoError(err, "Failed to get apps for team")
+			require.Equal(1, len(teamApps), "Expected one app for the team")
+			require.Equal(app.Id, teamApps[0].Id, "Expected team app id to match")
+
+			// Create app settings
+			ports := Ports{
+				{Name: "http", Port: 80, Proto: "http"},
+			}
+			externalPorts := ExternalPorts{
+				{Name: "web", PortName: "http", Proto: "https", Port: 443},
+			}
+			resources := Resources{
+				Limits: ResourceLimits{
+					CpuCores:  1,
+					MemoryMiB: 1024,
+				},
+				Requests: ResourceRequests{
+					CpuCores:  0.5,
+					MemoryMiB: 512,
+				},
+			}
+			createAppSettingsOpts := CreateAppSettingsOptions{
+				TeamId:        team.Id,
+				AppId:         app.Id,
+				Ports:         ports,
+				ExternalPorts: externalPorts,
+				Resources:     resources,
+			}
+			appSettings, err := stores.AppStore.CreateAppSettings(createAppSettingsOpts)
+			require.NoError(err, "Failed to create app settings")
+			require.NotEmpty(appSettings.Id, "Expected app settings id to be present")
+			require.Equal(app.Id, appSettings.AppId, "Expected app settings app id to match")
+			require.Equal(team.Id, appSettings.TeamId, "Expected app settings team id to match")
+
+			// Get the created app settings
+			fetchedAppSettings, err := stores.AppStore.GetAppSettings(appSettings.Id)
+			require.NoError(err, "Failed to get app settings")
+			require.Equal(appSettings.Id, fetchedAppSettings.Id, "Expected fetched app settings id to match")
+			require.Equal(len(ports), len(fetchedAppSettings.Ports.Data()), "Expected fetched app settings ports to match")
+			require.Equal(len(externalPorts), len(fetchedAppSettings.ExternalPorts.Data()), "Expected fetched app settings external ports to match")
+			require.Equal(resources.Limits.CpuCores, fetchedAppSettings.Resources.Data().Limits.CpuCores, "Expected fetched app settings CPU limit to match")
+			require.Equal(resources.Limits.MemoryMiB, fetchedAppSettings.Resources.Data().Limits.MemoryMiB, "Expected fetched app settings memory limit to match")
+		})
+
+		t.Run("Deployment Operations", func(t *testing.T) {
+			require := require.New(t)
+
+			// Create a user and team for the deployment tests
+			email := "deploytest@example.com"
+			password := "password123"
+			user := createUser(t, stores, email, password)
+
+			teamName := "Deploy Test Team"
+			teamDesc := "A team for testing deployments"
+			team := createTeam(t, stores, teamName, teamDesc)
+
+			addUserToTeam(t, stores, user.Id, team.Id)
+
+			// Test Env operations
+			t.Run("Env Operations", func(t *testing.T) {
+				// Create Env
+				createEnvOpts := CreateEnvOptions{
+					TeamId: team.Id,
+					Name:   "test-env",
+				}
+				env, err := stores.DeploymentStore.CreateEnv(createEnvOpts)
+				require.NoError(err, "Failed to create env")
+				require.NotEmpty(env.Id, "Expected env id to be present")
+				require.Equal(createEnvOpts.Name, env.Name, "Expected env name to match")
+
+				// Get Env
+				fetchedEnv, err := stores.DeploymentStore.GetEnv(env.Id)
+				require.NoError(err, "Failed to get env with ID %s", env.Id)
+				require.Equal(env.Id, fetchedEnv.Id, "Expected fetched env id to match")
+				require.Equal(env.Name, fetchedEnv.Name, "Expected fetched env name to match")
+
+				// Get Envs for Team
+				teamEnvs, err := stores.DeploymentStore.GetEnvsForTeam(team.Id)
+				require.NoError(err, "Failed to get envs for team")
+				require.Equal(1, len(teamEnvs), "Expected one env for the team")
+				require.Equal(env.Id, teamEnvs[0].Id, "Expected team env id to match")
+
+				// Delete Env
+				err = stores.DeploymentStore.DeleteEnv(env.Id)
+				require.NoError(err, "Failed to delete env")
+
+				// Verify env is deleted
+				_, err = stores.DeploymentStore.GetEnv(env.Id)
+				require.Error(err, "Expected error when getting deleted env")
+			})
+
+			// Test AppEnvVars operations
+			t.Run("AppEnvVars Operations", func(t *testing.T) {
+				// Create App and Env for AppEnvVars
+				app, _ := stores.AppStore.Create(CreateAppOptions{Name: "test-app", TeamId: team.Id, UserId: user.Id})
+				env, _ := stores.DeploymentStore.CreateEnv(CreateEnvOptions{TeamId: team.Id, Name: "test-env"})
+
+				// Create AppEnvVars
+				createAppEnvVarsOpts := CreateAppEnvVarOptions{
+					TeamId:  team.Id,
+					EnvId:   env.Id,
+					AppId:   app.Id,
+					EnvVars: []EnvVar{{Name: "TEST_VAR", Value: "test_value"}},
+				}
+				appEnvVars, err := stores.DeploymentStore.CreateAppEnvVars(createAppEnvVarsOpts)
+				require.NoError(err, "Failed to create app env vars")
+				require.NotEmpty(appEnvVars.Id, "Expected app env vars id to be present")
+
+				// Get AppEnvVars
+				fetchedAppEnvVars, err := stores.DeploymentStore.GetAppEnvVars(appEnvVars.Id)
+				require.NoError(err, "Failed to get app env vars")
+				require.Equal(appEnvVars.Id, fetchedAppEnvVars.Id, "Expected fetched app env vars id to match")
+
+				// Get AppEnvVars for App and Env
+				appEnvVarsList, err := stores.DeploymentStore.GetAppEnvVarsForAppEnv(app.Id, env.Id)
+				require.NoError(err, "Failed to get app env vars for app and env")
+				require.Equal(1, len(appEnvVarsList), "Expected one app env vars for the app and env")
+				require.Equal(appEnvVars.Id, appEnvVarsList[0].Id, "Expected app env vars id to match")
+
+				// Delete AppEnvVars
+				err = stores.DeploymentStore.DeleteAppEnvVars(appEnvVars.Id)
+				require.NoError(err, "Failed to delete app env vars")
+
+				// Verify app env vars is deleted
+				_, err = stores.DeploymentStore.GetAppEnvVars(appEnvVars.Id)
+				require.Error(err, "Expected error when getting deleted app env vars")
+			})
+
+			// Test Deployment operations
+			t.Run("Deployment Operations", func(t *testing.T) {
+				// Create App, Env, AppSettings, and AppEnvVars for Deployment
+				app, _ := stores.AppStore.Create(CreateAppOptions{Name: "test-app", TeamId: team.Id, UserId: user.Id})
+				env, _ := stores.DeploymentStore.CreateEnv(CreateEnvOptions{TeamId: team.Id, Name: "test-env"})
+				appSettings, _ := stores.AppStore.CreateAppSettings(CreateAppSettingsOptions{
+					TeamId:        team.Id,
+					AppId:         app.Id,
+					Ports:         Ports{{Name: "http", Port: 80, Proto: "http"}},
+					ExternalPorts: ExternalPorts{{Name: "web", PortName: "http", Proto: "https", Port: 443}},
+					Resources: Resources{
+						Limits:   ResourceLimits{CpuCores: 1, MemoryMiB: 1024},
+						Requests: ResourceRequests{CpuCores: 0.5, MemoryMiB: 512},
+					},
+				})
+				appEnvVars, _ := stores.DeploymentStore.CreateAppEnvVars(CreateAppEnvVarOptions{
+					TeamId:  team.Id,
+					EnvId:   env.Id,
+					AppId:   app.Id,
+					EnvVars: []EnvVar{{Name: "TEST_VAR", Value: "test_value"}},
+				})
+				cell, _ := stores.CellStore.Create(Cell{TeamId: team.Id, Name: "test-cell"})
+
+				// Create Deployment
+				createDeploymentOpts := CreateDeploymentOptions{
+					TeamId:        team.Id,
+					EnvId:         env.Id,
+					AppId:         app.Id,
+					Type:          DeploymentTypeDeploy,
+					AppSettingsId: appSettings.Id,
+					AppEnvVarsId:  appEnvVars.Id,
+					CellIds:       []string{cell.Id},
+				}
+				deployment, err := stores.DeploymentStore.Create(createDeploymentOpts)
+				require.NoError(err, "Failed to create deployment")
+				require.NotEmpty(deployment.Id, "Expected deployment id to be present")
+				require.Equal(uint(1), deployment.Id, "Expected first deployment id to be 1")
+
+				// Get Deployment
+				fetchedDeployment, err := stores.DeploymentStore.Get(app.Id, env.Id, deployment.Id)
+				require.NoError(err, "Failed to get deployment")
+				require.Equal(deployment.Id, fetchedDeployment.Id, "Expected fetched deployment id to match")
+
+				// Create another deployment for the same app/env
+				deployment2, err := stores.DeploymentStore.Create(createDeploymentOpts)
+				require.NoError(err, "Failed to create second deployment")
+				require.Equal(uint(2), deployment2.Id, "Expected second deployment id to be 2")
+
+				// Get Deployments for Team
+				teamDeployments, err := stores.DeploymentStore.GetForTeam(team.Id)
+				require.NoError(err, "Failed to get deployments for team")
+				require.Equal(2, len(teamDeployments), "Expected two deployments for the team")
+
+				// Get Deployments for App
+				appDeployments, err := stores.DeploymentStore.GetForApp(app.Id)
+				require.NoError(err, "Failed to get deployments for app")
+				require.Equal(2, len(appDeployments), "Expected two deployments for the app")
+
+				// Get Deployments for Env
+				envDeployments, err := stores.DeploymentStore.GetForEnv(env.Id)
+				require.NoError(err, "Failed to get deployments for env")
+				require.Equal(2, len(envDeployments), "Expected two deployments for the env")
+
+				// Get Deployments for Cell
+				cellDeployments, err := stores.DeploymentStore.GetForCell(cell.Id)
+				require.NoError(err, "Failed to get deployments for cell")
+				require.Equal(2, len(cellDeployments), "Expected two deployments for the cell")
+
+				// Delete Deployment
+				err = stores.DeploymentStore.DeleteDeployment(app.Id, env.Id, deployment.Id)
+				require.NoError(err, "Failed to delete deployment")
+
+				// Verify deployment is deleted
+				_, err = stores.DeploymentStore.Get(app.Id, env.Id, deployment.Id)
+				require.Error(err, "Expected error when getting deleted deployment")
+			})
+		})
 	}
 }

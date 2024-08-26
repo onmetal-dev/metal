@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onmetal-dev/metal/lib/store"
+	"github.com/onmetal-dev/metal/lib/validate"
 	"gorm.io/gorm"
 )
 

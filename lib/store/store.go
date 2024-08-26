@@ -4,8 +4,16 @@ import (
 	"database/sql"
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+type Common struct {
+	Id        string         `gorm:"primaryKey" json:"id"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
 
 type WaitlistedUser struct {
 	Email     string    `gorm:"primaryKey" validate:"required,email"`
@@ -27,15 +35,14 @@ type InviteStore interface {
 }
 
 type User struct {
-	Id              string       `gorm:"primaryKey" json:"id"`
+	Common
 	Email           string       `json:"email"`
 	Password        string       `json:"-"`
 	TeamMemberships []TeamMember `json:"team_memberships"`
-	CreatedAt       time.Time    `json:"created_at"`
-	UpdatedAt       time.Time    `json:"updated_at"`
 
 	// relations
 	Servers []Server `gorm:"foreignKey:UserId"`
+	Apps    []App    `gorm:"foreignKey:UserId"`
 }
 
 type UserStore interface {
@@ -45,7 +52,7 @@ type UserStore interface {
 }
 
 type Team struct {
-	Id               string             `gorm:"primaryKey" json:"id"`
+	Common
 	Name             string             `json:"name"`
 	Description      string             `json:"description"`
 	StripeCustomerId string             `json:"stripe_customer_id"`
@@ -54,25 +61,24 @@ type Team struct {
 	InvitedMembers   []TeamMemberInvite `json:"invited_members"`
 	Members          []TeamMember       `json:"members"`
 	PaymentMethods   []PaymentMethod    `json:"payment_methods"`
-	CreatedAt        time.Time          `json:"created_at"`
-	UpdatedAt        time.Time          `json:"updated_at"`
 
 	// relations
-	Servers []Server `gorm:"foreignKey:TeamId"`
-	Cells   []Cell   `gorm:"foreignKey:TeamId"`
+	Servers     []Server     `gorm:"foreignKey:TeamId"`
+	Cells       []Cell       `gorm:"foreignKey:TeamId"`
+	Apps        []App        `gorm:"foreignKey:TeamId"`
+	Envs        []Env        `gorm:"foreignKey:TeamId"`
+	Deployments []Deployment `gorm:"foreignKey:TeamId"`
 }
 
 type PaymentMethod struct {
-	Id                    string    `gorm:"primaryKey" json:"id"`
-	TeamId                string    `json:"team_id" gorm:"uniqueIndex:idx_team_payment_method"`
-	StripePaymentMethodId string    `json:"stripe_payment_method_id" gorm:"uniqueIndex:idx_team_payment_method"`
-	Default               bool      `json:"default"`
-	Type                  string    `json:"type"` // e.g., "card", "bank_account"
-	Last4                 string    `json:"last4"`
-	ExpirationMonth       int       `json:"expiration_month,omitempty"`
-	ExpirationYear        int       `json:"expiration_year,omitempty"`
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
+	Common
+	TeamId                string `json:"team_id" gorm:"uniqueIndex:idx_team_payment_method"`
+	StripePaymentMethodId string `json:"stripe_payment_method_id" gorm:"uniqueIndex:idx_team_payment_method"`
+	Default               bool   `json:"default"`
+	Type                  string `json:"type"` // e.g., "card", "bank_account"
+	Last4                 string `json:"last4"`
+	ExpirationMonth       int    `json:"expiration_month,omitempty"`
+	ExpirationYear        int    `json:"expiration_year,omitempty"`
 }
 
 type TeamRole string
@@ -205,8 +211,7 @@ const (
 )
 
 type Server struct {
-	// Id is our unique id for the server
-	Id string
+	Common
 	// TeamId is the team that owns this server
 	TeamId string
 	// UserId is the user that created this server
@@ -230,10 +235,6 @@ type Server struct {
 
 	// BillingStripeHourlyUsage keeps track of hourly billing for the server (nullabe in case of different billing schemes in the future)
 	BillingStripeUsageBasedHourly *ServerBillingStripeUsageBasedHourly `gorm:"foreignKey:ServerId;references:Id"`
-
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 // ServerStripeUsageBasedHourly keeps track of the last time we recorded a usage event for a server
@@ -263,17 +264,16 @@ const (
 
 // Cell is a group of servers, primarily used as to separate workloads from any combination of environments / teams / etc.
 type Cell struct {
-	Id          string `gorm:"primaryKey"`
+	Common
 	Type        CellType
 	Name        string
 	TeamId      string
 	Description string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
 
 	// relations
 	Servers       []Server
 	TalosCellData *TalosCellData `gorm:"foreignKey:CellId;references:Id"`
+	Deployments   []Deployment   `gorm:"many2many:deployment_cells;"`
 }
 
 type TalosCellData struct {
@@ -289,4 +289,185 @@ type CellStore interface {
 	GetForTeam(teamId string) ([]Cell, error)
 	UpdateTalosCellData(talosCellData *TalosCellData) error
 	AddServer(cellId string, server Server) error
+}
+
+type App struct {
+	Common
+	TeamId string `json:"team_id"`
+	UserId string `json:"user_id"`
+	Name   string `json:"name"`
+}
+
+type Port struct {
+	Name  string `validate:"required,lowercasealphanumhyphen"`
+	Port  int    `validate:"required"`
+	Proto string `validate:"required,oneof=http"`
+}
+
+type Ports []Port
+
+type ExternalPort struct {
+	Name     string `validate:"required,lowercasealphanumhyphen"`
+	PortName string `validate:"required,lowercasealphanumhyphen"` // reference to a Port
+	Proto    string `validate:"required,oneof=http https"`
+	Port     int    `validate:"required"`
+}
+
+type ExternalPorts []ExternalPort
+
+type Resources struct {
+	Limits   ResourceLimits   `json:"limits"`
+	Requests ResourceRequests `json:"requests"`
+}
+
+type ResourceLimits struct {
+	CpuCores  float64 `json:"cpu_cores"`
+	MemoryMiB int     `json:"memory_mib"`
+}
+
+type ResourceRequests struct {
+	CpuCores  float64 `json:"cpu_cores"`
+	MemoryMiB int     `json:"memory_mib"`
+}
+
+type AppSettings struct {
+	Common
+	TeamId        string                            `json:"team_id"`
+	AppId         string                            `json:"app_id"`
+	Ports         datatypes.JSONType[Ports]         `gorm:"type:jsonb" json:"ports"`
+	ExternalPorts datatypes.JSONType[ExternalPorts] `gorm:"type:jsonb" json:"external_ports"`
+	Resources     datatypes.JSONType[Resources]     `gorm:"type:jsonb" json:"resources"`
+}
+
+type CreateAppOptions struct {
+	Name   string `validate:"required"`
+	TeamId string `validate:"required"`
+	UserId string `validate:"required"`
+}
+
+type CreateAppSettingsOptions struct {
+	TeamId        string        `validate:"required"`
+	AppId         string        `validate:"required"`
+	Ports         Ports         `validate:"required"`
+	ExternalPorts ExternalPorts `validate:"required"`
+	Resources     Resources     `validate:"required"`
+}
+
+type AppStore interface {
+	Create(opts CreateAppOptions) (App, error)
+	Get(id string) (App, error)
+	GetForTeam(teamId string) ([]App, error)
+	CreateAppSettings(opts CreateAppSettingsOptions) (AppSettings, error)
+	GetAppSettings(id string) (AppSettings, error)
+}
+
+// in order to deploy we need a concept of environments, as well as environment variables
+// environment variables are tied to an evironment + app. Similar to AppSettings, they are immutable. We mint a new environment variables object when changes are made.
+// This effectifely snapshots the environment variables, allowing for rollbacks.
+
+type Env struct {
+	Common
+	TeamId string
+	Name   string
+}
+
+type EnvVar struct {
+	Name  string
+	Value string
+}
+
+type AppEnvVars struct {
+	Common
+	TeamId  string
+	EnvId   string
+	AppId   string
+	EnvVars datatypes.JSONType[[]EnvVar]
+}
+
+type DeploymentType string
+
+const (
+	DeploymentTypeDeploy   DeploymentType = "deploy"
+	DeploymentTypeRollback DeploymentType = "rollback"
+	DeploymentTypeScale    DeploymentType = "scale"
+	DeploymentTypeRestart  DeploymentType = "restart"
+)
+
+// Deployment has a monotonic id that is incremented for each deployment of an app/env combination
+type Deployment struct {
+	Id            uint   `gorm:"primarykey"`
+	EnvId         string `gorm:"primaryKey;index"`
+	AppId         string `gorm:"primaryKey;index"`
+	TeamId        string `gorm:"index"`
+	Env           Env    `gorm:"foreignKey:EnvId"`
+	App           App    `gorm:"foreignKey:AppId"`
+	Type          DeploymentType
+	AppSettingsId string
+	AppSettings   AppSettings `gorm:"foreignKey:AppSettingsId"`
+	AppEnvVarsId  string
+	AppEnvVars    AppEnvVars `gorm:"foreignKey:AppEnvVarsId"`
+	Cells         []Cell     `gorm:"many2many:deployment_cells;"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	DeletedAt     gorm.DeletedAt `gorm:"index"`
+}
+
+func (d *Deployment) BeforeCreate(tx *gorm.DB) error {
+	var maxID uint
+	result := tx.Model(&Deployment{}).
+		Where("env_id = ? AND app_id = ?", d.EnvId, d.AppId).
+		Select("COALESCE(MAX(id), 0)").
+		Scan(&maxID)
+
+	if result.Error != nil {
+		return result.Error
+	}
+	d.Id = maxID + 1
+	return nil
+}
+
+type CreateEnvOptions struct {
+	TeamId string `validate:"required"`
+	Name   string `validate:"required,lowercasealphanumhyphen"`
+}
+
+type CreateAppEnvVarOptions struct {
+	TeamId  string   `validate:"required"`
+	EnvId   string   `validate:"required"`
+	AppId   string   `validate:"required"`
+	EnvVars []EnvVar `validate:"required"`
+}
+
+type CreateDeploymentOptions struct {
+	TeamId        string         `validate:"required"`
+	EnvId         string         `validate:"required"`
+	AppId         string         `validate:"required"`
+	Type          DeploymentType `validate:"required,oneof=deploy rollback scale restart"`
+	AppSettingsId string         `validate:"required"`
+	AppEnvVarsId  string         `validate:"required"`
+	CellIds       []string       `validate:"required"`
+}
+
+// DeploymentStore allows for
+// - creating, retrieving (by teamId), and deleting environments
+// - creating, retrieving (by teamId, appId, envId), and deleting AppEnvVars
+// - creating, retrieving (by teamId or by Id or by appId, or by envId, or by cellId), and deleting Deployments
+type DeploymentStore interface {
+	CreateEnv(opts CreateEnvOptions) (Env, error)
+	GetEnv(id string) (Env, error)
+	GetEnvsForTeam(teamId string) ([]Env, error)
+	DeleteEnv(id string) error
+
+	CreateAppEnvVars(opts CreateAppEnvVarOptions) (AppEnvVars, error)
+	GetAppEnvVars(id string) (AppEnvVars, error)
+	GetAppEnvVarsForAppEnv(appId string, envId string) ([]AppEnvVars, error)
+	DeleteAppEnvVars(id string) error
+
+	Create(opts CreateDeploymentOptions) (Deployment, error)
+	Get(appId string, envId string, id uint) (Deployment, error)
+	GetForTeam(teamId string) ([]Deployment, error)
+	GetForApp(appId string) ([]Deployment, error)
+	GetForEnv(envId string) ([]Deployment, error)
+	GetForCell(cellId string) ([]Deployment, error)
+	DeleteDeployment(appId string, envId string, id uint) error
 }
