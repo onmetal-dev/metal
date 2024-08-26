@@ -35,7 +35,9 @@ func (s TeamStore) CreateTeam(name string, description string) (*store.Team, err
 		return nil, err
 	}
 	team := store.Team{
-		Id:             tid.String(),
+		Common: store.Common{
+			Id: tid.String(),
+		},
 		Name:           name,
 		Description:    description,
 		AgePublicKey:   identity.Recipient().String(),

@@ -18,9 +18,13 @@ import (
 
 func TestLogin(t *testing.T) {
 
-	user := &store.User{Id: "user_asdf", Email: "test@example.com", Password: "password", TeamMemberships: []store.TeamMember{{TeamId: "team_test", Role: store.TeamRoleAdmin}}}
+	user := &store.User{Common: store.Common{Id: "user_asdf"}, Email: "test@example.com", Password: "password", TeamMemberships: []store.TeamMember{{TeamId: "team_test", Role: store.TeamRoleAdmin}}}
 	teamStore := &storemock.TeamStoreMock{}
-	teamStore.On("GetTeam", "team_test").Return(&store.Team{Id: "team_test", Name: "test", PaymentMethods: []store.PaymentMethod{{Id: "pm_test"}}}, nil)
+	teamStore.On("GetTeam", "team_test").Return(&store.Team{
+		Common:         store.Common{Id: "team_test"},
+		Name:           "test",
+		PaymentMethods: []store.PaymentMethod{{Common: store.Common{Id: "pm_test"}}},
+	}, nil)
 
 	testCases := []struct {
 		name               string
