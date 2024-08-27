@@ -33,7 +33,8 @@ func TestDB(t *testing.T) {
 		DB: db,
 	})
 	deploymentStore := dbstore.NewDeploymentStore(dbstore.NewDeploymentStoreParams{
-		DB: db,
+		DB:          db,
+		GetTeamKeys: teamStore.GetTeamKeys,
 	})
 
 	testSuite := store.NewStoreTestSuite(store.TestStoresConfig{

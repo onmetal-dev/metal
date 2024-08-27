@@ -60,6 +60,11 @@ func (m *TeamStoreMock) GetTeam(id string) (*store.Team, error) {
 	return args.Get(0).(*store.Team), args.Error(1)
 }
 
+func (m *TeamStoreMock) GetTeamKeys(id string) (string, string, error) {
+	args := m.Called(id)
+	return args.Get(0).(string), args.Get(1).(string), args.Error(2)
+}
+
 func (m *TeamStoreMock) AddUserToTeam(userId string, teamId string) error {
 	args := m.Called(userId, teamId)
 	return args.Error(0)

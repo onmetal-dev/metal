@@ -60,6 +60,15 @@ func (s TeamStore) GetTeam(id string) (*store.Team, error) {
 	return &team, nil
 }
 
+func (s TeamStore) GetTeamKeys(id string) (string, string, error) {
+	var team store.Team
+	err := s.db.Where("id = ?", id).First(&team).Error
+	if err != nil {
+		return "", "", err
+	}
+	return team.AgePublicKey, team.AgePrivateKey, nil
+}
+
 func (s TeamStore) AddUserToTeam(userId string, teamId string) error {
 	return s.db.Create(&store.TeamMember{
 		UserId: userId,

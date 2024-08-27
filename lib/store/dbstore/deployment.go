@@ -1,6 +1,12 @@
 package dbstore
 
 import (
+	"bytes"
+	"encoding/base64"
+	"fmt"
+	"io"
+
+	"filippo.io/age"
 	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/onmetal-dev/metal/lib/validate"
 	"github.com/samber/lo"
@@ -10,18 +16,21 @@ import (
 )
 
 type DeploymentStore struct {
-	db *gorm.DB
+	db          *gorm.DB
+	getTeamKeys func(id string) (string, string, error)
 }
 
 var _ store.DeploymentStore = &DeploymentStore{}
 
 type NewDeploymentStoreParams struct {
-	DB *gorm.DB
+	DB          *gorm.DB
+	GetTeamKeys func(id string) (string, string, error)
 }
 
 func NewDeploymentStore(params NewDeploymentStoreParams) *DeploymentStore {
 	return &DeploymentStore{
-		db: params.DB,
+		db:          params.DB,
+		getTeamKeys: params.GetTeamKeys,
 	}
 }
 
@@ -53,25 +62,122 @@ func (s *DeploymentStore) DeleteEnv(id string) error {
 }
 
 func (s *DeploymentStore) CreateAppEnvVars(opts store.CreateAppEnvVarOptions) (store.AppEnvVars, error) {
+	public, _, err := s.getTeamKeys(opts.TeamId)
+	if err != nil {
+		return store.AppEnvVars{}, err
+	}
+	recipient, err := age.ParseX25519Recipient(public)
+	if err != nil {
+		return store.AppEnvVars{}, err
+	}
+	encryptedEnvVars := make([]store.EnvVar, len(opts.EnvVars))
+	for i, envVar := range opts.EnvVars {
+		encryptedValue, err := ageEncryptValue(envVar.Value, recipient)
+		if err != nil {
+			return store.AppEnvVars{}, err
+		}
+		encryptedEnvVars[i] = store.EnvVar{
+			Name:  envVar.Name,
+			Value: encryptedValue,
+		}
+	}
 	tid, _ := typeid.WithPrefix("appenvvars")
 	appEnvVars := store.AppEnvVars{
 		Common:  store.Common{Id: tid.String()},
 		TeamId:  opts.TeamId,
 		EnvId:   opts.EnvId,
 		AppId:   opts.AppId,
-		EnvVars: datatypes.NewJSONType(opts.EnvVars),
+		EnvVars: datatypes.NewJSONType(encryptedEnvVars),
 	}
 	return appEnvVars, s.db.Create(&appEnvVars).Error
 }
 
+func ageEncryptValue(value string, recipient *age.X25519Recipient) (string, error) {
+	out := &bytes.Buffer{}
+	w, err := age.Encrypt(out, recipient)
+	if err != nil {
+		return "", err
+	}
+	if _, err := io.WriteString(w, value); err != nil {
+		return "", err
+	}
+	if err := w.Close(); err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(out.Bytes()), nil
+}
+
+func ageDecryptValue(encryptedValue string, identity *age.X25519Identity) (string, error) {
+	decodedValue, err := base64.StdEncoding.DecodeString(encryptedValue)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode encrypted value: %v", err)
+	}
+
+	r, err := age.Decrypt(bytes.NewReader(decodedValue), identity)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt value: %v", err)
+	}
+
+	decryptedValue := &bytes.Buffer{}
+	if _, err := io.Copy(decryptedValue, r); err != nil {
+		return "", fmt.Errorf("failed to read decrypted value: %v", err)
+	}
+
+	return decryptedValue.String(), nil
+}
+
+func (s *DeploymentStore) decryptAppEnvVars(appEnvVars *store.AppEnvVars) error {
+	_, private, err := s.getTeamKeys(appEnvVars.TeamId)
+	if err != nil {
+		return err
+	}
+	identity, err := age.ParseX25519Identity(private)
+	if err != nil {
+		return fmt.Errorf("failed to parse private key: %v", err)
+	}
+
+	decryptedEnvVars := make([]store.EnvVar, len(appEnvVars.EnvVars.Data()))
+	for i, envVar := range appEnvVars.EnvVars.Data() {
+		decryptedValue, err := ageDecryptValue(envVar.Value, identity)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt env var: %v", err)
+		}
+		decryptedEnvVars[i] = store.EnvVar{
+			Name:  envVar.Name,
+			Value: decryptedValue,
+		}
+	}
+
+	appEnvVars.EnvVars = datatypes.NewJSONType(decryptedEnvVars)
+	return nil
+}
+
 func (s *DeploymentStore) GetAppEnvVars(id string) (store.AppEnvVars, error) {
-	appEnvVars := store.AppEnvVars{Common: store.Common{Id: id}}
-	return appEnvVars, s.db.First(&appEnvVars).Error
+	var appEnvVars store.AppEnvVars
+	if err := s.db.First(&appEnvVars, "id = ?", id).Error; err != nil {
+		return store.AppEnvVars{}, err
+	}
+
+	if err := s.decryptAppEnvVars(&appEnvVars); err != nil {
+		return store.AppEnvVars{}, err
+	}
+
+	return appEnvVars, nil
 }
 
 func (s *DeploymentStore) GetAppEnvVarsForAppEnv(appId string, envId string) ([]store.AppEnvVars, error) {
 	var appEnvVars []store.AppEnvVars
-	return appEnvVars, s.db.Where(&store.AppEnvVars{AppId: appId, EnvId: envId}).Find(&appEnvVars).Error
+	if err := s.db.Where(&store.AppEnvVars{AppId: appId, EnvId: envId}).Find(&appEnvVars).Error; err != nil {
+		return nil, err
+	}
+
+	for i := range appEnvVars {
+		if err := s.decryptAppEnvVars(&appEnvVars[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	return appEnvVars, nil
 }
 
 func (s *DeploymentStore) DeleteAppEnvVars(id string) error {
