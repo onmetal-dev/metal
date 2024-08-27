@@ -106,6 +106,7 @@ type TeamMember struct {
 type TeamStore interface {
 	CreateTeam(name string, description string) (*Team, error)
 	GetTeam(id string) (*Team, error)
+	GetTeamKeys(id string) (string, string, error)
 	AddUserToTeam(userId string, teamId string) error
 	RemoveUserFromTeam(userId string, teamId string) error
 	CreateTeamInvite(email string, teamId string) error

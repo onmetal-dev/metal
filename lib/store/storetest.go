@@ -314,12 +314,14 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 				fetchedAppEnvVars, err := stores.DeploymentStore.GetAppEnvVars(appEnvVars.Id)
 				require.NoError(err, "Failed to get app env vars")
 				require.Equal(appEnvVars.Id, fetchedAppEnvVars.Id, "Expected fetched app env vars id to match")
+				require.Equal(createAppEnvVarsOpts.EnvVars[0], fetchedAppEnvVars.EnvVars.Data()[0], "Expected fetched app env vars to match")
 
 				// Get AppEnvVars for App and Env
 				appEnvVarsList, err := stores.DeploymentStore.GetAppEnvVarsForAppEnv(app.Id, env.Id)
 				require.NoError(err, "Failed to get app env vars for app and env")
 				require.Equal(1, len(appEnvVarsList), "Expected one app env vars for the app and env")
 				require.Equal(appEnvVars.Id, appEnvVarsList[0].Id, "Expected app env vars id to match")
+				require.Equal(createAppEnvVarsOpts.EnvVars[0], appEnvVarsList[0].EnvVars.Data()[0], "Expected app env vars to match")
 
 				// Delete AppEnvVars
 				err = stores.DeploymentStore.DeleteAppEnvVars(appEnvVars.Id)
