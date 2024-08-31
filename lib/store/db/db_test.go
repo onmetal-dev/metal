@@ -8,6 +8,14 @@ import (
 	"github.com/onmetal-dev/metal/lib/store/dbstore"
 )
 
+func mustCreate[T any](t *testing.T, f func() (T, error)) T {
+	v, err := f()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
 func TestDB(t *testing.T) {
 	host := "localhost"
 	user := "postgres"
@@ -32,9 +40,11 @@ func TestDB(t *testing.T) {
 	appStore := dbstore.NewAppStore(dbstore.NewAppStoreParams{
 		DB: db,
 	})
-	deploymentStore := dbstore.NewDeploymentStore(dbstore.NewDeploymentStoreParams{
-		DB:          db,
-		GetTeamKeys: teamStore.GetTeamKeys,
+	deploymentStore := mustCreate(t, func() (*dbstore.DeploymentStore, error) {
+		return dbstore.NewDeploymentStore(dbstore.NewDeploymentStoreParams{
+			DB:          db,
+			GetTeamKeys: teamStore.GetTeamKeys,
+		})
 	})
 
 	testSuite := store.NewStoreTestSuite(store.TestStoresConfig{

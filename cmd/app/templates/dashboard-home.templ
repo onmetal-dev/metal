@@ -17,6 +17,7 @@ type TabName string
 const (
 	TabNameHome         TabName = "home"
 	TabNameCreateServer TabName = "create server"
+	TabNameCreateApp    TabName = "create app"
 )
 
 type Tab struct {
@@ -28,6 +29,7 @@ func dashboardTabs(teamId string) []Tab {
 	return []Tab{
 		{Name: TabNameHome, Href: fmt.Sprintf("/dashboard/%s", teamId)},
 		{Name: TabNameCreateServer, Href: fmt.Sprintf("/dashboard/%s/servers/new", teamId)},
+		{Name: TabNameCreateApp, Href: fmt.Sprintf("/dashboard/%s/apps/new", teamId)},
 	}
 }
 
@@ -49,7 +51,7 @@ templ dashboardNav(state DashboardState) {
 						if tab.Name == state.ActiveTabName {
 							<a role="tab" class="font-bold border-b-2 tab border-primary" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a>
 						} else {
-							<a role="tab" class="tab" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a>
+							<a role="tab" class="border-b-2 border-transparent tab hover:border-primary/50" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a>
 						}
 					}
 				</div>
@@ -108,8 +110,10 @@ templ info() {
 
 templ flashes(flashes []string) {
 	for _, flash := range flashes {
-		<div role="alert" class="alert alert-success">
-			<span>{ flash }</span>
+		<div class="toast">
+			<div role="alert" class="text-xs alert alert-success">
+				<span>{ flash }</span>
+			</div>
 		</div>
 	}
 }
@@ -166,10 +170,11 @@ func humanizePercent(value float64) string {
 	return fmt.Sprintf("%.2f%%", value*100)
 }
 
-templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, serverStats []cellprovider.ServerStats) {
+templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, serverStats []cellprovider.ServerStats, deployments []store.Deployment) {
 	<div>
 		@flashes(middleware.GetFlashes(ctx))
-		<div class="flex flex-col items-center justify-start w-full h-full gap-4 mt-20">
+		<div class="flex flex-col items-center justify-start w-full h-full gap-4">
+			<div class="divider">Servers</div>
 			<table class="table table-xs" id="servers-table" hx-trigger="every 30s [document.visibilityState=='visible']" hx-get={ "/dashboard/" + teamId } hx-swap="outerHTML" hx-select="#servers-table">
 				<thead>
 					<tr>
@@ -217,6 +222,39 @@ templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, s
 							} else {
 								<td>(none)</td>
 							}
+						</tr>
+					}
+				</tbody>
+			</table>
+			<div class="divider">Deployments</div>
+			<table class="table table-xs" id="deployments-table">
+				<thead>
+					<tr>
+						<th>id</th>
+						<th>app</th>
+						<th>environment</th>
+						<th>type</th>
+						<th>status</th>
+						<th>cpu (cores)</th>
+						<th>memory (mib)</th>
+						<th>replicas</th>
+						<th>created at</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, deployment := range deployments {
+						<tr>
+							<td>{ fmt.Sprintf("%d", deployment.Id) }</td>
+							<td>{ deployment.App.Name }</td>
+							<td>{ deployment.Env.Name }</td>
+							<td>{ string(deployment.Type) }</td>
+							<td>{ string(deployment.Status) }</td>
+							if resources := deployment.AppSettings.Resources.Data(); true {
+								<td>{ fmt.Sprintf("%.2f", resources.Requests.CpuCores) }</td>
+								<td>{ fmt.Sprintf("%d", resources.Requests.MemoryMiB) }</td>
+							}
+							<td>{ fmt.Sprintf("%d", deployment.Replicas) }</td>
+							<td>{ deployment.CreatedAt.Format(time.RFC3339) }</td>
 						</tr>
 					}
 				</tbody>

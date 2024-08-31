@@ -394,6 +394,15 @@ const (
 	DeploymentTypeRestart  DeploymentType = "restart"
 )
 
+type DeploymentStatus string
+
+const (
+	DeploymentStatusDeploying DeploymentStatus = "deploying"
+	DeploymentStatusRunning   DeploymentStatus = "running"
+	DeploymentStatusFailed    DeploymentStatus = "failed"
+	DeploymentStatusStopped   DeploymentStatus = "stopped"
+)
+
 // Deployment has a monotonic id that is incremented for each deployment of an app/env combination
 type Deployment struct {
 	Id            uint   `gorm:"primarykey"`
@@ -403,6 +412,8 @@ type Deployment struct {
 	Env           Env    `gorm:"foreignKey:EnvId"`
 	App           App    `gorm:"foreignKey:AppId"`
 	Type          DeploymentType
+	Status        DeploymentStatus
+	Replicas      int
 	AppSettingsId string
 	AppSettings   AppSettings `gorm:"foreignKey:AppSettingsId"`
 	AppEnvVarsId  string
@@ -447,6 +458,7 @@ type CreateDeploymentOptions struct {
 	AppSettingsId string         `validate:"required"`
 	AppEnvVarsId  string         `validate:"required"`
 	CellIds       []string       `validate:"required"`
+	Replicas      int            `validate:"required"`
 }
 
 // DeploymentStore allows for

@@ -182,8 +182,11 @@ func (h MessageHandler) Handle(ctx context.Context, m Message) error {
 		},
 		Identifier: stripe.String(uniqueEventId),
 	}); err != nil {
-		// TODO: ignore identifier conflict error
-		return err
+		if strings.Contains(err.Error(), "event already exists with identifier") {
+			logger.Info("hourly server billing event already sent", "hoursToBill", hoursToBill, "uniqueEventId", uniqueEventId)
+		} else {
+			return err
+		}
 	}
 
 	if err := h.serverStore.UpdateServerBillingStripeUsageBasedHourly(server.Id, &newBillingMeta); err != nil {

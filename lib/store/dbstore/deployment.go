@@ -27,11 +27,17 @@ type NewDeploymentStoreParams struct {
 	GetTeamKeys func(id string) (string, string, error)
 }
 
-func NewDeploymentStore(params NewDeploymentStoreParams) *DeploymentStore {
+func NewDeploymentStore(params NewDeploymentStoreParams) (*DeploymentStore, error) {
+	if params.DB == nil {
+		return nil, fmt.Errorf("db is required")
+	}
+	if params.GetTeamKeys == nil {
+		return nil, fmt.Errorf("getTeamKeys is required")
+	}
 	return &DeploymentStore{
 		db:          params.DB,
 		getTeamKeys: params.GetTeamKeys,
-	}
+	}, nil
 }
 
 func (s *DeploymentStore) CreateEnv(opts store.CreateEnvOptions) (store.Env, error) {
@@ -190,6 +196,8 @@ func (s *DeploymentStore) Create(opts store.CreateDeploymentOptions) (store.Depl
 		AppId:         opts.AppId,
 		TeamId:        opts.TeamId,
 		Type:          opts.Type,
+		Status:        store.DeploymentStatusDeploying,
+		Replicas:      opts.Replicas,
 		AppSettingsId: opts.AppSettingsId,
 		AppEnvVarsId:  opts.AppEnvVarsId,
 		Cells: lo.Map(opts.CellIds, func(cellId string, _ int) store.Cell {
