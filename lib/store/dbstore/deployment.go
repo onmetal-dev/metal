@@ -27,11 +27,17 @@ type NewDeploymentStoreParams struct {
 	GetTeamKeys func(id string) (string, string, error)
 }
 
-func NewDeploymentStore(params NewDeploymentStoreParams) *DeploymentStore {
+func NewDeploymentStore(params NewDeploymentStoreParams) (*DeploymentStore, error) {
+	if params.DB == nil {
+		return nil, fmt.Errorf("db is required")
+	}
+	if params.GetTeamKeys == nil {
+		return nil, fmt.Errorf("getTeamKeys is required")
+	}
 	return &DeploymentStore{
 		db:          params.DB,
 		getTeamKeys: params.GetTeamKeys,
-	}
+	}, nil
 }
 
 func (s *DeploymentStore) CreateEnv(opts store.CreateEnvOptions) (store.Env, error) {
@@ -190,6 +196,8 @@ func (s *DeploymentStore) Create(opts store.CreateDeploymentOptions) (store.Depl
 		AppId:         opts.AppId,
 		TeamId:        opts.TeamId,
 		Type:          opts.Type,
+		Status:        store.DeploymentStatusPending,
+		Replicas:      opts.Replicas,
 		AppSettingsId: opts.AppSettingsId,
 		AppEnvVarsId:  opts.AppEnvVarsId,
 		Cells: lo.Map(opts.CellIds, func(cellId string, _ int) store.Cell {
@@ -205,28 +213,61 @@ func (s *DeploymentStore) preloadDeployment(query *gorm.DB) *gorm.DB {
 
 func (s *DeploymentStore) Get(appId string, envId string, id uint) (store.Deployment, error) {
 	deployment := store.Deployment{Id: id, AppId: appId, EnvId: envId}
-	return deployment, s.preloadDeployment(s.db).First(&deployment).Error
+	if err := s.preloadDeployment(s.db).First(&deployment).Error; err != nil {
+		return store.Deployment{}, err
+	}
+	if err := s.decryptAppEnvVars(&deployment.AppEnvVars); err != nil {
+		return store.Deployment{}, err
+	}
+	return deployment, nil
 }
 
 func (s *DeploymentStore) GetForTeam(teamId string) ([]store.Deployment, error) {
 	var deployments []store.Deployment
-	return deployments, s.preloadDeployment(s.db).
+	err := s.preloadDeployment(s.db).
 		Where(&store.Deployment{TeamId: teamId}).
 		Find(&deployments).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range deployments {
+		if err := s.decryptAppEnvVars(&deployments[i].AppEnvVars); err != nil {
+			return nil, err
+		}
+	}
+	return deployments, nil
 }
 
 func (s *DeploymentStore) GetForApp(appId string) ([]store.Deployment, error) {
 	var deployments []store.Deployment
-	return deployments, s.preloadDeployment(s.db).
+	err := s.preloadDeployment(s.db).
 		Where(&store.Deployment{AppId: appId}).
 		Find(&deployments).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range deployments {
+		if err := s.decryptAppEnvVars(&deployments[i].AppEnvVars); err != nil {
+			return nil, err
+		}
+	}
+	return deployments, nil
 }
 
 func (s *DeploymentStore) GetForEnv(envId string) ([]store.Deployment, error) {
 	var deployments []store.Deployment
-	return deployments, s.preloadDeployment(s.db).
+	err := s.preloadDeployment(s.db).
 		Where(&store.Deployment{EnvId: envId}).
 		Find(&deployments).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range deployments {
+		if err := s.decryptAppEnvVars(&deployments[i].AppEnvVars); err != nil {
+			return nil, err
+		}
+	}
+	return deployments, nil
 }
 
 func (s *DeploymentStore) GetForCell(cellId string) ([]store.Deployment, error) {
@@ -236,9 +277,23 @@ func (s *DeploymentStore) GetForCell(cellId string) ([]store.Deployment, error) 
 		Model(&cell).
 		Association("Deployments").
 		Find(&deployments)
-	return deployments, err
+	if err != nil {
+		return nil, err
+	}
+	for i := range deployments {
+		if err := s.decryptAppEnvVars(&deployments[i].AppEnvVars); err != nil {
+			return nil, err
+		}
+	}
+	return deployments, nil
 }
 
 func (s *DeploymentStore) DeleteDeployment(appId string, envId string, id uint) error {
 	return s.db.Delete(&store.Deployment{Id: id, AppId: appId, EnvId: envId}).Error
+}
+
+func (s *DeploymentStore) UpdateDeploymentStatus(appId string, envId string, id uint, status store.DeploymentStatus, statusReason string) error {
+	return s.db.Where(&store.Deployment{AppId: appId, EnvId: envId, Id: id}).
+		Select("Status", "StatusReason").
+		Updates(store.Deployment{Status: status, StatusReason: statusReason}).Error
 }

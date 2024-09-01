@@ -1,0 +1,231 @@
+package templates
+
+import (
+	"errors"
+	"fmt"
+	"github.com/go-playground/form/v4"
+	"github.com/go-playground/validator/v10"
+	"github.com/onmetal-dev/metal/lib/debug"
+	"github.com/onmetal-dev/metal/lib/logger"
+	"github.com/onmetal-dev/metal/lib/store"
+	"github.com/onmetal-dev/metal/lib/validate"
+	"net/http"
+)
+
+type CreateAppFormData struct {
+	AppName        *string  `validate:"required,max=63,lowercasealphanumhyphen"`
+	ContainerImage *string  `validate:"required"`
+	Replicas       *int     `validate:"required,min=1"`
+	ContainerPort  *int     `validate:"required,min=1,max=65535"`
+	CpuLimit       *float64 `validate:"required,min=0.1"`
+	MemoryLimit    *int     `validate:"required,min=32"`
+	EnvVars        *string  `validate:"omitempty,dotenvformat"`
+	CellId         *string  `validate:"required,startswith=cell_"`
+}
+
+type CreateAppFormErrors struct {
+	notNil         bool
+	AppName        error
+	ContainerImage error
+	Replicas       error
+	ContainerPort  error
+	CpuLimit       error
+	MemoryLimit    error
+	EnvVars        error
+	CellId         error
+}
+
+func (e *CreateAppFormErrors) NotNil() bool {
+	return e.notNil
+}
+
+func (e *CreateAppFormErrors) Set(field string, err error) {
+	e.notNil = true
+	switch field {
+	case "AppName":
+		e.AppName = err
+	case "ContainerImage":
+		e.ContainerImage = err
+	case "Replicas":
+		e.Replicas = err
+	case "ContainerPort":
+		e.ContainerPort = err
+	case "CpuLimit":
+		e.CpuLimit = err
+	case "MemoryLimit":
+		e.MemoryLimit = err
+	case "EnvVars":
+		e.EnvVars = err
+	case "CellId":
+		e.CellId = err
+	default:
+		panic(fmt.Sprintf("unknown field: %s", field))
+	}
+}
+
+func ParseCreateAppFormData(r *http.Request) (CreateAppFormData, CreateAppFormErrors, error) {
+	var formData CreateAppFormData
+	var formErrors CreateAppFormErrors
+	if err := r.ParseForm(); err != nil {
+		return formData, formErrors, err
+	}
+	decoder := form.NewDecoder()
+	if err := decoder.Decode(&formData, r.Form); err != nil {
+		return formData, formErrors, err
+	}
+
+	logger.FromContext(r.Context()).Info("create app form data", "formData", debug.PrettyJSON(formData))
+
+	if err := validate.Struct(formData); err != nil {
+		for _, err := range err.(validator.ValidationErrors) {
+			field := err.Field()
+			switch err.Tag() {
+			case "required":
+				formErrors.Set(field, errors.New("this is required"))
+			case "lowercasealphanumhyphen":
+				formErrors.Set(field, errors.New("must consist of lowercase alphanumeric characters and/or hyphens"))
+			case "dotenvformat":
+				formErrors.Set(field, errors.New("must be in dotenv format"))
+			default:
+				formErrors.Set(field, err)
+			}
+		}
+		logger.FromContext(r.Context()).Info("create app form errors", "formErrors", debug.PrettyJSON(formErrors))
+	}
+	return formData, formErrors, nil
+}
+
+func ptrAttr[T any](v *T) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", *v)
+}
+
+func inputClass(error error) string {
+	class := "max-w-xs input input-xs"
+	if error != nil {
+		class += " input-error"
+	}
+	return class
+}
+
+func textareaClass(error error) string {
+	class := "max-w-xs textarea textarea-xs"
+	if error != nil {
+		class += " textarea-error"
+	}
+	return class
+}
+
+func selectClass(error error) string {
+	class := "w-full max-w-xs py-0 select select-xs"
+	if error != nil {
+		class += " select-error"
+	}
+	return class
+}
+
+templ CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, errors CreateAppFormErrors, submitError error) {
+	<form
+		hx-post={ fmt.Sprintf("/dashboard/%s/apps/new", teamId) }
+		hx-disabled-elt="find button[type='submit']"
+		hx-trigger="submit"
+		hx-indicator="find .loading"
+		hx-swap="outerHTML"
+		class="grid grid-cols-[auto,1fr] gap-2 text-xs mt-4"
+	>
+		<label class="flex items-center justify-end">app name</label>
+		<div class="flex items-center justify-start gap-2">
+			<input
+				type="text"
+				name="AppName"
+				class={ inputClass(errors.AppName) }
+				placeholder="my-app"
+				value={ ptrAttr(data.AppName) }
+				required
+			/>
+			if errors.AppName != nil {
+				<div class="text-error">{ errors.AppName.Error() }</div>
+			}
+		</div>
+		<label class="flex items-center justify-end">container image</label>
+		<div class="flex items-center justify-start gap-2">
+			<input type="text" name="ContainerImage" class={ inputClass(errors.ContainerImage) } placeholder="nginx:latest" value={ ptrAttr(data.ContainerImage) } required/>
+			if errors.ContainerImage != nil {
+				<div class="text-error">{ errors.ContainerImage.Error() }</div>
+			}
+		</div>
+		<label class="flex items-center justify-end">replicas</label>
+		<div class="flex items-center justify-start gap-2">
+			<input type="number" name="Replicas" class={ inputClass(errors.Replicas) } placeholder="1" min="1" value={ ptrAttr(data.Replicas) } required/>
+			if errors.Replicas != nil {
+				<div class="text-error">{ errors.Replicas.Error() }</div>
+			}
+		</div>
+		<label class="flex items-center justify-end">container port</label>
+		<div class="flex items-center justify-start gap-2">
+			<input type="number" name="ContainerPort" class={ inputClass(errors.ContainerPort) } placeholder="80" min="1" max="65535" value={ ptrAttr(data.ContainerPort) } required/>
+			if errors.ContainerPort != nil {
+				<div class="text-error">{ errors.ContainerPort.Error() }</div>
+			}
+		</div>
+		<label class="flex items-center justify-end">cpu limit (cores)</label>
+		<div class="flex items-center justify-start gap-2">
+			<input type="number" name="CpuLimit" class={ inputClass(errors.CpuLimit) } placeholder="0.5" step="0.1" min="0.1" value={ ptrAttr(data.CpuLimit) } required/>
+			if errors.CpuLimit != nil {
+				<div class="text-error">{ errors.CpuLimit.Error() }</div>
+			}
+		</div>
+		<label class="flex items-center justify-end">memory limit (Mi)</label>
+		<div class="flex items-center justify-start gap-2">
+			<input type="number" name="MemoryLimit" class={ inputClass(errors.MemoryLimit) } placeholder="256" step="32" min="32" value={ ptrAttr(data.MemoryLimit) } required/>
+			if errors.MemoryLimit != nil {
+				<div class="text-error">{ errors.MemoryLimit.Error() }</div>
+			}
+		</div>
+		<label class="flex items-center justify-end">environment variables</label>
+		<div class="flex items-center justify-start gap-2">
+			<textarea
+				name="EnvVars"
+				class={ textareaClass(errors.EnvVars) }
+				placeholder="KEY=value
+ANOTHER_KEY=another_value"
+			>{ ptrAttr(data.EnvVars) }</textarea>
+			if errors.EnvVars != nil {
+				<div class="text-error">{ errors.EnvVars.Error() }</div>
+			}
+		</div>
+		<label class="flex items-center justify-end">cell</label>
+		<div class="flex items-center justify-start gap-2">
+			<select name="CellId" class={ selectClass(errors.CellId) } required>
+				if len(cells) > 0 {
+					<option value={ cells[0].Id } selected>{ cells[0].Name }</option>
+					for _, cell := range cells[1:] {
+						<option value={ cell.Id }>{ cell.Name }</option>
+					}
+				} else {
+					<option disabled selected>No cells available, create one first</option>
+				}
+			</select>
+			if errors.CellId != nil {
+				<div class="text-error">{ errors.CellId.Error() }</div>
+			}
+		</div>
+		<div></div>
+		<div class="flex items-center justify-start gap-2">
+			<button type="submit" class="btn btn-primary btn-sm">Create App</button>
+			<span class="htmx-indicator loading loading-ring loading-sm"></span>
+		</div>
+		<div></div>
+		if submitError != nil {
+			<div class="text-error">{ submitError.Error() }</div>
+		}
+	</form>
+}
+
+templ CreateApp(teamId string, cells []store.Cell, data CreateAppFormData, errors CreateAppFormErrors, submitError error) {
+	<div>
+		@CreateAppForm(teamId, cells, data, errors, submitError)
+	</div>
+}

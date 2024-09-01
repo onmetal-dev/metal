@@ -22,6 +22,7 @@ import (
 	"github.com/onmetal-dev/metal/cmd/app/hash/passwordhash"
 	m "github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/lib/background"
+	"github.com/onmetal-dev/metal/lib/background/deployment"
 	"github.com/onmetal-dev/metal/lib/background/serverbillinghourly"
 	"github.com/onmetal-dev/metal/lib/background/serverfulfillment"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
@@ -91,6 +92,15 @@ func initTracerProvider() (*sdktrace.TracerProvider, error) {
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 	return tp, nil
+}
+
+func mustCreate[T any](slogger *slog.Logger, f func() (T, error)) T {
+	v, err := f()
+	if err != nil {
+		slogger.Error("Error", slog.Any("err", err))
+		os.Exit(1)
+	}
+	return v
 }
 
 func main() {
@@ -186,53 +196,58 @@ func main() {
 		},
 	)
 
+	appStore := dbstore.NewAppStore(
+		dbstore.NewAppStoreParams{
+			DB: db,
+		},
+	)
+
+	deploymentStore := mustCreate(slogger, func() (*dbstore.DeploymentStore, error) {
+		return dbstore.NewDeploymentStore(
+			dbstore.NewDeploymentStoreParams{
+				DB:          db,
+				GetTeamKeys: teamStore.GetTeamKeys,
+			},
+		)
+	})
+
 	// api clients
 	hrobotClient := hrobot.NewClient(hrobot.WithToken(fmt.Sprintf("%s:%s", c.HetznerRobotUsername, c.HetznerRobotPassword)))
 
 	// serverproviders
-	serverProviderHetzner, err := serverprovider.NewHetzner(
-		serverprovider.WithHrobotClient(hrobotClient),
-		serverprovider.WithAuthorizedKeyFingerprint(c.SshKeyFingerprint),
-	)
-	if err != nil {
-		slogger.Error("Failed to create server provider", slog.Any("err", err))
-		os.Exit(1)
-	}
+	serverProviderHetzner := mustCreate(slogger, func() (serverprovider.ServerProvider, error) {
+		return serverprovider.NewHetzner(
+			serverprovider.WithHrobotClient(hrobotClient),
+			serverprovider.WithAuthorizedKeyFingerprint(c.SshKeyFingerprint),
+		)
+	})
 
 	// talosproviders
-	talosProviderHetzner, err := talosprovider.NewHetznerProvider(
-		talosprovider.WithClient(hrobotClient),
-		talosprovider.WithLogger(slogger),
-	)
-	if err != nil {
-		slogger.Error("Failed to create talos provider", slog.Any("err", err))
-		os.Exit(1)
-	}
+	talosProviderHetzner := mustCreate(slogger, func() (*talosprovider.HetznerProvider, error) {
+		return talosprovider.NewHetznerProvider(
+			talosprovider.WithClient(hrobotClient),
+			talosprovider.WithLogger(slogger),
+		)
+	})
 
 	// dnsprovider
-	cfApi, err := cloudflare.NewWithAPIToken(c.CloudflareApiToken)
-	if err != nil {
-		slogger.Error("Failed to create cloudflare api", slog.Any("err", err))
-		os.Exit(1)
-	}
-	cfDnsProvider, err := dnsprovider.NewCloudflareDNSProvider(dnsprovider.WithApi(cfApi), dnsprovider.WithZoneId(c.CloudflareOnmetalDotRunZoneId))
-	if err != nil {
-		slogger.Error("Failed to create cloudflare dns provider", slog.Any("err", err))
-		os.Exit(1)
-	}
+	cfApi := mustCreate(slogger, func() (*cloudflare.API, error) {
+		return cloudflare.NewWithAPIToken(c.CloudflareApiToken)
+	})
+	cfDnsProvider := mustCreate(slogger, func() (dnsprovider.DNSProvider, error) {
+		return dnsprovider.NewCloudflareDNSProvider(dnsprovider.WithApi(cfApi), dnsprovider.WithZoneId(c.CloudflareOnmetalDotRunZoneId))
+	})
 
 	// cellprovider
-	talosCellProvider, err := cellprovider.NewTalosClusterCellProvider(
-		cellprovider.WithDnsProvider(cfDnsProvider),
-		cellprovider.WithCellStore(cellStore),
-		cellprovider.WithServerStore(serverStore),
-		cellprovider.WithTmpDirRoot(c.TmpDirRoot),
-		cellprovider.WithLogger(slog.Default()),
-	)
-	if err != nil {
-		slogger.Error("Failed to create talos cell provider", slog.Any("err", err))
-		os.Exit(1)
-	}
+	talosCellProvider := mustCreate(slogger, func() (*cellprovider.TalosClusterCellProvider, error) {
+		return cellprovider.NewTalosClusterCellProvider(
+			cellprovider.WithDnsProvider(cfDnsProvider),
+			cellprovider.WithCellStore(cellStore),
+			cellprovider.WithServerStore(serverStore),
+			cellprovider.WithTmpDirRoot(c.TmpDirRoot),
+			cellprovider.WithLogger(slog.Default()),
+		)
+	})
 	cellProviderForType := func(cellType store.CellType) cellprovider.CellProvider {
 		switch cellType {
 		case store.CellTypeTalos:
@@ -249,18 +264,17 @@ func main() {
 	}
 	queueNameBilling := "server_billing_hourly"
 	producerBilling := background.NewQueueProducer[serverbillinghourly.Message](ctx, queueNameBilling, connString)
-	serverBillingHourlyHandler, err := serverbillinghourly.NewMessageHandler(
-		serverbillinghourly.WithLogger(slogger),
-		serverbillinghourly.WithQueueProducer(producerBilling),
-		serverbillinghourly.WithTeamStore(teamStore),
-		serverbillinghourly.WithServerStore(serverStore),
-		serverbillinghourly.WithServerOfferingStore(serverOfferingStore),
-		serverbillinghourly.WithStripeMeterEvent(stripeMeterEvent),
-	)
-	if err != nil {
-		slogger.Error("Failed to create server fulfillment handler", slog.Any("err", err))
-		os.Exit(1)
-	} else {
+	serverBillingHourlyHandler := mustCreate(slogger, func() (*serverbillinghourly.MessageHandler, error) {
+		return serverbillinghourly.NewMessageHandler(
+			serverbillinghourly.WithLogger(slogger),
+			serverbillinghourly.WithQueueProducer(producerBilling),
+			serverbillinghourly.WithTeamStore(teamStore),
+			serverbillinghourly.WithServerStore(serverStore),
+			serverbillinghourly.WithServerOfferingStore(serverOfferingStore),
+			serverbillinghourly.WithStripeMeterEvent(stripeMeterEvent),
+		)
+	})
+	{
 		consumer := background.NewQueueConsumer[serverbillinghourly.Message](ctx, queueNameBilling, connString, 30, serverBillingHourlyHandler.Handle, slogger)
 		go consumer.Start(ctx)
 		defer consumer.Stop()
@@ -268,32 +282,47 @@ func main() {
 
 	queueNameFulfillment := "fulfillment"
 	producerFulfillment := background.NewQueueProducer[serverfulfillment.Message](ctx, queueNameFulfillment, connString)
-	serverFulfillmentHandler, err := serverfulfillment.NewMessageHandler(
-		serverfulfillment.WithLogger(slogger),
-		serverfulfillment.WithQueueProducer(producerFulfillment),
-		serverfulfillment.WithServerBillingHourlyProducer(producerBilling),
-		serverfulfillment.WithTeamStore(teamStore),
-		serverfulfillment.WithUserStore(userStore),
-		serverfulfillment.WithServerStore(serverStore),
-		serverfulfillment.WithServerOfferingStore(serverOfferingStore),
-		serverfulfillment.WithCellStore(cellStore),
-		serverfulfillment.WithStripeCheckoutSession(stripeCheckoutSession),
-		serverfulfillment.WithServerProviderHetzner(serverProviderHetzner),
-		serverfulfillment.WithTalosProviderHetzner(talosProviderHetzner),
-		serverfulfillment.WithTalosCellProvider(talosCellProvider),
-		serverfulfillment.WithSshKeyBase64(c.SshKeyBase64),
-		serverfulfillment.WithSshKeyPassword(c.SshKeyPassword),
-		serverfulfillment.WithSshKeyFingerprint(c.SshKeyFingerprint),
-	)
-	if err != nil {
-		slogger.Error("Failed to create server fulfillment handler", slog.Any("err", err))
-		os.Exit(1)
-	} else {
+	serverFulfillmentHandler := mustCreate(slogger, func() (*serverfulfillment.MessageHandler, error) {
+		return serverfulfillment.NewMessageHandler(
+			serverfulfillment.WithLogger(slogger),
+			serverfulfillment.WithQueueProducer(producerFulfillment),
+			serverfulfillment.WithServerBillingHourlyProducer(producerBilling),
+			serverfulfillment.WithTeamStore(teamStore),
+			serverfulfillment.WithUserStore(userStore),
+			serverfulfillment.WithServerStore(serverStore),
+			serverfulfillment.WithServerOfferingStore(serverOfferingStore),
+			serverfulfillment.WithCellStore(cellStore),
+			serverfulfillment.WithStripeCheckoutSession(stripeCheckoutSession),
+			serverfulfillment.WithServerProviderHetzner(serverProviderHetzner),
+			serverfulfillment.WithTalosProviderHetzner(talosProviderHetzner),
+			serverfulfillment.WithTalosCellProvider(talosCellProvider),
+			serverfulfillment.WithSshKeyBase64(c.SshKeyBase64),
+			serverfulfillment.WithSshKeyPassword(c.SshKeyPassword),
+			serverfulfillment.WithSshKeyFingerprint(c.SshKeyFingerprint),
+		)
+	})
+	{
 		consumer := background.NewQueueConsumer[serverfulfillment.Message](ctx, queueNameFulfillment, connString, 180, serverFulfillmentHandler.Handle, slogger)
 		go consumer.Start(ctx)
 		defer consumer.Stop()
 	}
 
+	queueNameDeployment := "deployment"
+	producerDeployment := background.NewQueueProducer[deployment.Message](ctx, queueNameDeployment, connString)
+	deploymentHandler := mustCreate(slogger, func() (*deployment.MessageHandler, error) {
+		return deployment.NewMessageHandler(
+			deployment.WithLogger(slogger),
+			deployment.WithQueueProducer(producerDeployment),
+			deployment.WithDeploymentStore(deploymentStore),
+			deployment.WithCellProviderForType(cellProviderForType),
+			deployment.WithCellStore(cellStore),
+		)
+	})
+	{
+		consumer := background.NewQueueConsumer[deployment.Message](ctx, queueNameDeployment, connString, 60, deploymentHandler.Handle, slogger)
+		go consumer.Start(ctx)
+		defer consumer.Stop()
+	}
 	// http router
 	r := chi.NewRouter()
 	r.Use(httprate.LimitByIP(100, time.Minute))
@@ -350,10 +379,12 @@ func main() {
 			r.Get("/onboarding/{teamId}/payment", handlers.NewGetOnboardingPaymentHandler(teamStore, stripeCustomerSession).ServeHTTP)
 			r.Post("/onboarding/{teamId}/payment", handlers.NewPostOnboardingPaymentHandler(teamStore, stripeSetupIntent).ServeHTTP)
 			r.Get("/onboarding/{teamId}/payment/confirm", handlers.NewGetOnboardingPaymentConfirmHandler(teamStore, stripeSetupIntent, stripeCustomer).ServeHTTP)
-			r.Get("/dashboard/{teamId}", handlers.NewDashboardHandler(userStore, teamStore, serverStore, cellStore, cellProviderForType).ServeHTTP)
+			r.Get("/dashboard/{teamId}", handlers.NewDashboardHandler(userStore, teamStore, serverStore, cellStore, deploymentStore, cellProviderForType).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/new", handlers.NewGetServersNewHandler(teamStore, serverOfferingStore).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout", handlers.NewGetServersCheckoutHandler(teamStore, serverOfferingStore, stripeCheckoutSession, stripeProduct, stripePrice, stripeMeter, c.StripePublishableKey).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout-return-url", handlers.NewGetServersCheckoutReturnHandler(teamStore, serverOfferingStore, stripeCheckoutSession, producerFulfillment).ServeHTTP)
+			r.Get("/dashboard/{teamId}/apps/new", handlers.NewGetAppsNewHandler(userStore, teamStore, serverStore, cellStore).ServeHTTP)
+			r.Post("/dashboard/{teamId}/apps/new", handlers.NewPostAppsNewHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, producerDeployment).ServeHTTP)
 		})
 	})
 

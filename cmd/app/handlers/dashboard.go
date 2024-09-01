@@ -16,15 +16,17 @@ type DashboardHandler struct {
 	teamStore           store.TeamStore
 	serverStore         store.ServerStore
 	cellStore           store.CellStore
+	deploymentStore     store.DeploymentStore
 	cellProviderForType func(cellType store.CellType) cellprovider.CellProvider
 }
 
-func NewDashboardHandler(userStore store.UserStore, teamStore store.TeamStore, serverStore store.ServerStore, cellStore store.CellStore, cellProviderForType func(cellType store.CellType) cellprovider.CellProvider) *DashboardHandler {
+func NewDashboardHandler(userStore store.UserStore, teamStore store.TeamStore, serverStore store.ServerStore, cellStore store.CellStore, deploymentStore store.DeploymentStore, cellProviderForType func(cellType store.CellType) cellprovider.CellProvider) *DashboardHandler {
 	return &DashboardHandler{
 		userStore:           userStore,
 		teamStore:           teamStore,
 		serverStore:         serverStore,
 		cellStore:           cellStore,
+		deploymentStore:     deploymentStore,
 		cellProviderForType: cellProviderForType,
 	}
 }
@@ -58,12 +60,18 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		serverStats = append(serverStats, stats...)
 	}
 
+	deployments, err := h.deploymentStore.GetForTeam(teamId)
+	if err != nil {
+		http.Error(w, "error fetching deployments", http.StatusInternalServerError)
+		return
+	}
+
 	if err := templates.DashboardLayout(templates.DashboardState{
 		User:          *user,
 		UserTeams:     userTeams,
 		ActiveTeam:    *team,
 		ActiveTabName: templates.TabNameHome,
-	}, templates.DashboardHome(teamId, servers, cells, serverStats)).Render(r.Context(), w); err != nil {
+	}, templates.DashboardHome(teamId, servers, cells, serverStats, deployments)).Render(r.Context(), w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }

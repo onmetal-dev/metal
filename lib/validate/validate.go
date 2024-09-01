@@ -3,8 +3,10 @@ package validate
 
 import (
 	"regexp"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/joho/godotenv"
 )
 
 var validate *validator.Validate
@@ -13,12 +15,19 @@ var validate *validator.Validate
 func init() {
 	validate = validator.New(validator.WithRequiredStructEnabled())
 	validate.RegisterValidation("lowercasealphanumhyphen", isLowercaseAlphaNumHyphen)
+	validate.RegisterValidation("dotenvformat", isDotenvFormat)
 }
 
 var lowerCaseAlphaNumHyphenRegex = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 func isLowercaseAlphaNumHyphen(fl validator.FieldLevel) bool {
 	return lowerCaseAlphaNumHyphenRegex.MatchString(fl.Field().String())
+}
+
+func isDotenvFormat(fl validator.FieldLevel) bool {
+	input := fl.Field().String()
+	_, err := godotenv.Parse(strings.NewReader(input))
+	return err == nil
 }
 
 func Validator() *validator.Validate {

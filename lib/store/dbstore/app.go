@@ -58,6 +58,7 @@ func (s *AppStore) CreateAppSettings(opts store.CreateAppSettingsOptions) (store
 		},
 		TeamId:        opts.TeamId,
 		AppId:         opts.AppId,
+		Artifact:      datatypes.NewJSONType(opts.Artifact),
 		Ports:         datatypes.NewJSONType(opts.Ports),
 		ExternalPorts: datatypes.NewJSONType(opts.ExternalPorts),
 		Resources:     datatypes.NewJSONType(opts.Resources),

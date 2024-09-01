@@ -299,6 +299,13 @@ type App struct {
 	Name   string `json:"name"`
 }
 
+type Artifact struct {
+	Image Image `json:"image"`
+}
+
+type Image struct {
+	Name string `json:"name"`
+}
 type Port struct {
 	Name  string `validate:"required,lowercasealphanumhyphen"`
 	Port  int    `validate:"required"`
@@ -335,6 +342,7 @@ type AppSettings struct {
 	Common
 	TeamId        string                            `json:"team_id"`
 	AppId         string                            `json:"app_id"`
+	Artifact      datatypes.JSONType[Artifact]      `gorm:"type:jsonb" json:"artifact"`
 	Ports         datatypes.JSONType[Ports]         `gorm:"type:jsonb" json:"ports"`
 	ExternalPorts datatypes.JSONType[ExternalPorts] `gorm:"type:jsonb" json:"external_ports"`
 	Resources     datatypes.JSONType[Resources]     `gorm:"type:jsonb" json:"resources"`
@@ -349,6 +357,7 @@ type CreateAppOptions struct {
 type CreateAppSettingsOptions struct {
 	TeamId        string        `validate:"required"`
 	AppId         string        `validate:"required"`
+	Artifact      Artifact      `validate:"required"`
 	Ports         Ports         `validate:"required"`
 	ExternalPorts ExternalPorts `validate:"required"`
 	Resources     Resources     `validate:"required"`
@@ -394,6 +403,16 @@ const (
 	DeploymentTypeRestart  DeploymentType = "restart"
 )
 
+type DeploymentStatus string
+
+const (
+	DeploymentStatusPending   DeploymentStatus = "pending"
+	DeploymentStatusDeploying DeploymentStatus = "deploying"
+	DeploymentStatusRunning   DeploymentStatus = "running"
+	DeploymentStatusFailed    DeploymentStatus = "failed"
+	DeploymentStatusStopped   DeploymentStatus = "stopped"
+)
+
 // Deployment has a monotonic id that is incremented for each deployment of an app/env combination
 type Deployment struct {
 	Id            uint   `gorm:"primarykey"`
@@ -403,6 +422,9 @@ type Deployment struct {
 	Env           Env    `gorm:"foreignKey:EnvId"`
 	App           App    `gorm:"foreignKey:AppId"`
 	Type          DeploymentType
+	Status        DeploymentStatus
+	StatusReason  string
+	Replicas      int
 	AppSettingsId string
 	AppSettings   AppSettings `gorm:"foreignKey:AppSettingsId"`
 	AppEnvVarsId  string
@@ -447,6 +469,7 @@ type CreateDeploymentOptions struct {
 	AppSettingsId string         `validate:"required"`
 	AppEnvVarsId  string         `validate:"required"`
 	CellIds       []string       `validate:"required"`
+	Replicas      int            `validate:"required"`
 }
 
 // DeploymentStore allows for
@@ -471,4 +494,5 @@ type DeploymentStore interface {
 	GetForEnv(envId string) ([]Deployment, error)
 	GetForCell(cellId string) ([]Deployment, error)
 	DeleteDeployment(appId string, envId string, id uint) error
+	UpdateDeploymentStatus(appId string, envId string, id uint, status DeploymentStatus, statusReason string) error
 }
