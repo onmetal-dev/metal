@@ -39,10 +39,14 @@ import (
 	"github.com/siderolabs/talos/pkg/machinery/config"
 	"github.com/siderolabs/talos/pkg/machinery/config/generate/secrets"
 	"google.golang.org/protobuf/types/known/emptypb"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/utils/ptr"
 )
 
 // TalosClusterCellProvider creates a talos k8s cluster using cloudflare for DNS
@@ -530,44 +534,166 @@ func archiveRepository(sourceDir, destZip string) error {
 	return nil
 }
 
-// func unarchiveRepository(sourceZip, destDir string) error {
-// 	in, err := os.Open(sourceZip)
-// 	if err != nil {
-// 		return fmt.Errorf("error opening zip file: %v", err)
-// 	}
-// 	defer in.Close()
+func (p *TalosClusterCellProvider) AdvanceDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error) {
+	switch deployment.Status {
+	case store.DeploymentStatusPending:
+		return p.handlePendingDeployment(ctx, cellId, deployment)
+	case store.DeploymentStatusDeploying:
+		return p.handleDeployingDeployment(ctx, cellId, deployment)
+	}
+	return nil, nil
+}
 
-// 	format := archiver.CompressedArchive{
-// 		Compression: archiver.Gz{},
-// 		Archival:    archiver.Tar{},
-// 	}
-// 	err = format.Extract(context.Background(), in, nil, func(ctx context.Context, f archiver.File) error {
-// 		filePath := filepath.Join(destDir, f.NameInArchive)
-// 		if f.FileInfo.IsDir() {
-// 			return os.MkdirAll(filePath, os.ModePerm)
-// 		}
+func (p *TalosClusterCellProvider) handlePendingDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error) {
+	// TODO: change error returns into AdvanceDeploymentResult with a failed status and a reason
+	cell, err := p.cellStore.Get(cellId)
+	if err != nil {
+		return nil, fmt.Errorf("error getting cell: %v", err)
+	}
+	if cell.TalosCellData == nil {
+		return nil, fmt.Errorf("cell %s has no config", cellId)
+	}
 
-// 		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.FileInfo.Mode())
-// 		if err != nil {
-// 			return err
-// 		}
-// 		defer destFile.Close()
+	clientset, err := initializeK8sClient(cell.TalosCellData.Kubecfg)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing k8s client: %v", err)
+	}
 
-// 		srcFile, err := f.Open()
-// 		if err != nil {
-// 			return err
-// 		}
-// 		defer srcFile.Close()
+	if err := ensureNamespaceExists(clientset, deployment.Env.Name); err != nil {
+		return nil, fmt.Errorf("error ensuring namespace exists: %v", err)
+	}
 
-// 		_, err = io.Copy(destFile, srcFile)
-// 		return err
-// 	})
-// 	if err != nil {
-// 		return fmt.Errorf("error extracting files: %v", err)
-// 	}
+	limits, requests, err := getResourceLimits(deployment.AppSettings.Resources.Data())
+	if err != nil {
+		return nil, fmt.Errorf("error getting resource limits: %v", err)
+	}
 
-// 	return nil
-// }
+	ports, err := getContainerPorts(deployment.AppSettings)
+	if err != nil {
+		return nil, fmt.Errorf("error getting container ports: %v", err)
+	}
+
+	k8sDeployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: deployment.App.Name,
+			Labels: map[string]string{
+				"app": deployment.App.Name,
+			},
+			Annotations: map[string]string{
+				"kubernetes.io/change-cause": fmt.Sprintf("deploy %s id %d", deployment.App.Name, deployment.Id),
+				"onmetal.dev/app-id":         deployment.App.Id,
+				"onmetal.dev/team-id":        deployment.TeamId,
+				"onmetal.dev/deployment-id":  fmt.Sprintf("%d", deployment.Id),
+			},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: ptr.To(int32(deployment.Replicas)),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": deployment.App.Name,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": deployment.App.Name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Resources: corev1.ResourceRequirements{
+								Limits:   limits,
+								Requests: requests,
+							},
+							Name:  deployment.App.Name,
+							Image: deployment.AppSettings.Artifact.Data().Image.Name,
+							Ports: ports,
+							Env:   convertEnvVars(deployment.AppEnvVars.EnvVars.Data()),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Check if the deployment already exists
+	_, err = clientset.AppsV1().Deployments(deployment.Env.Name).Get(ctx, deployment.App.Name, metav1.GetOptions{})
+	if err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return nil, fmt.Errorf("error checking existing deployment: %v", err)
+		}
+		// Deployment doesn't exist, create it
+		_, err = clientset.AppsV1().Deployments(deployment.Env.Name).Create(ctx, k8sDeployment, metav1.CreateOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("error creating deployment: %v", err)
+		}
+	} else {
+		// Deployment exists, update it
+		_, err = clientset.AppsV1().Deployments(deployment.Env.Name).Update(ctx, k8sDeployment, metav1.UpdateOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("error updating deployment: %v", err)
+		}
+	}
+
+	return &AdvanceDeploymentResult{
+		Status: store.DeploymentStatusDeploying,
+	}, nil
+}
+
+func (p *TalosClusterCellProvider) handleDeployingDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error) {
+	cell, err := p.cellStore.Get(cellId)
+	if err != nil {
+		return nil, fmt.Errorf("error getting cell: %v", err)
+	}
+	if cell.TalosCellData == nil {
+		return nil, fmt.Errorf("cell %s has no config", cellId)
+	}
+
+	clientset, err := initializeK8sClient(cell.TalosCellData.Kubecfg)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing k8s client: %v", err)
+	}
+
+	// Get the deployment
+	k8sDeployment, err := clientset.AppsV1().Deployments(deployment.Env.Name).Get(ctx, deployment.App.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error getting deployment: %v", err)
+	}
+
+	// double check annotations match
+	if k8sDeployment.Annotations["onmetal.dev/app-id"] != deployment.App.Id {
+		return nil, fmt.Errorf("deployment app id mismatch")
+	}
+	if k8sDeployment.Annotations["onmetal.dev/team-id"] != deployment.TeamId {
+		return nil, fmt.Errorf("deployment team id mismatch")
+	}
+	if k8sDeployment.Annotations["onmetal.dev/deployment-id"] != fmt.Sprintf("%d", deployment.Id) {
+		return nil, fmt.Errorf("deployment deployment id mismatch")
+	}
+
+	// Check if the deployment is ready
+	if k8sDeployment.Status.ReadyReplicas == k8sDeployment.Status.Replicas {
+		return &AdvanceDeploymentResult{
+			Status: store.DeploymentStatusRunning,
+		}, nil
+	}
+
+	// Check for any errors in the deployment
+	for _, condition := range k8sDeployment.Status.Conditions {
+		if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
+			return &AdvanceDeploymentResult{
+				Status:       store.DeploymentStatusFailed,
+				StatusReason: condition.Message,
+			}, nil
+		}
+	}
+
+	// If not ready and no errors, it's still deploying
+	return &AdvanceDeploymentResult{
+		Status: store.DeploymentStatusDeploying,
+	}, nil
+}
 
 // initializeK8sClient initializes the Kubernetes client using the provided kubeconfig string.
 func initializeK8sClient(kubeconfig string) (*kubernetes.Clientset, error) {
@@ -646,3 +772,127 @@ func parseNodeLabels(labels map[string]string) (NodeLabelInfo, error) {
 
 	return info, nil
 }
+
+func ensureNamespaceExists(clientset *kubernetes.Clientset, namespace string) error {
+	_, err := clientset.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			// Namespace doesn't exist, create it
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+				},
+			}
+			_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to create namespace: %v", err)
+			}
+			fmt.Printf("Namespace %s created\n", namespace)
+		} else {
+			return fmt.Errorf("error checking namespace: %v", err)
+		}
+	}
+	return nil
+}
+
+func getResourceLimits(resources store.Resources) (corev1.ResourceList, corev1.ResourceList, error) {
+	limits := corev1.ResourceList{}
+	requests := corev1.ResourceList{}
+
+	cpuLimit, err := resource.ParseQuantity(fmt.Sprintf("%f", resources.Limits.CpuCores))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse CPU limit: %v", err)
+	}
+	memLimit, err := resource.ParseQuantity(fmt.Sprintf("%dMi", resources.Limits.MemoryMiB))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse memory limit: %v", err)
+	}
+
+	cpuRequest, err := resource.ParseQuantity(fmt.Sprintf("%f", resources.Requests.CpuCores))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse CPU request: %v", err)
+	}
+	memRequest, err := resource.ParseQuantity(fmt.Sprintf("%dMi", resources.Requests.MemoryMiB))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse memory request: %v", err)
+	}
+
+	limits[corev1.ResourceCPU] = cpuLimit
+	limits[corev1.ResourceMemory] = memLimit
+	requests[corev1.ResourceCPU] = cpuRequest
+	requests[corev1.ResourceMemory] = memRequest
+
+	return limits, requests, nil
+}
+
+// getContainerPorts converts AppSettings ports to Kubernetes container ports
+func getContainerPorts(appSettings store.AppSettings) ([]corev1.ContainerPort, error) {
+	ports := appSettings.Ports.Data()
+	containerPorts := make([]corev1.ContainerPort, len(ports))
+	for i, port := range ports {
+		proto, err := getContainerPortProto(port)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get container port protocol: %w", err)
+		}
+		containerPorts[i] = corev1.ContainerPort{
+			Name:          port.Name,
+			ContainerPort: int32(port.Port),
+			Protocol:      proto,
+		}
+	}
+	return containerPorts, nil
+}
+
+func getContainerPortProto(port store.Port) (corev1.Protocol, error) {
+	switch port.Proto {
+	case "http":
+		return corev1.ProtocolTCP, nil
+	}
+	return "", fmt.Errorf("invalid port protocol: %s", port.Proto)
+}
+
+// convertEnvVars converts []store.EnvVar to []corev1.EnvVar
+func convertEnvVars(storeEnvVars []store.EnvVar) []corev1.EnvVar {
+	k8sEnvVars := make([]corev1.EnvVar, len(storeEnvVars))
+	for i, env := range storeEnvVars {
+		k8sEnvVars[i] = corev1.EnvVar{
+			Name:  env.Name,
+			Value: env.Value,
+		}
+	}
+	return k8sEnvVars
+}
+
+// func unarchiveRepository(sourceZip, destDir string) error {
+//  in, err := os.Open(sourceZip)
+//  if err != nil {
+//      return fmt.Errorf("error opening zip file: %v", err)
+//  }
+//  defer in.Close()
+//  format := archiver.CompressedArchive{
+//      Compression: archiver.Gz{},
+//      Archival:    archiver.Tar{},
+//  }
+//  err = format.Extract(context.Background(), in, nil, func(ctx context.Context, f archiver.File) error {
+//      filePath := filepath.Join(destDir, f.NameInArchive)
+//      if f.FileInfo.IsDir() {
+//          return os.MkdirAll(filePath, os.ModePerm)
+//      }
+//      destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.FileInfo.Mode())
+//      if err != nil {
+//          return err
+//      }
+//      defer destFile.Close()
+//      srcFile, err := f.Open()
+//      if err != nil {
+//          return err
+//      }
+//      defer srcFile.Close()
+//      _, err = io.Copy(destFile, srcFile)
+//      return err
+//  })
+//  if err != nil {
+//      return fmt.Errorf("error extracting files: %v", err)
+//  }
+//  return nil
+// }

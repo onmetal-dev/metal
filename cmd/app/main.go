@@ -22,6 +22,7 @@ import (
 	"github.com/onmetal-dev/metal/cmd/app/hash/passwordhash"
 	m "github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/lib/background"
+	"github.com/onmetal-dev/metal/lib/background/deployment"
 	"github.com/onmetal-dev/metal/lib/background/serverbillinghourly"
 	"github.com/onmetal-dev/metal/lib/background/serverfulfillment"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
@@ -306,6 +307,22 @@ func main() {
 		defer consumer.Stop()
 	}
 
+	queueNameDeployment := "deployment"
+	producerDeployment := background.NewQueueProducer[deployment.Message](ctx, queueNameDeployment, connString)
+	deploymentHandler := mustCreate(slogger, func() (*deployment.MessageHandler, error) {
+		return deployment.NewMessageHandler(
+			deployment.WithLogger(slogger),
+			deployment.WithQueueProducer(producerDeployment),
+			deployment.WithDeploymentStore(deploymentStore),
+			deployment.WithCellProviderForType(cellProviderForType),
+			deployment.WithCellStore(cellStore),
+		)
+	})
+	{
+		consumer := background.NewQueueConsumer[deployment.Message](ctx, queueNameDeployment, connString, 60, deploymentHandler.Handle, slogger)
+		go consumer.Start(ctx)
+		defer consumer.Stop()
+	}
 	// http router
 	r := chi.NewRouter()
 	r.Use(httprate.LimitByIP(100, time.Minute))
@@ -367,7 +384,7 @@ func main() {
 			r.Get("/dashboard/{teamId}/servers/checkout", handlers.NewGetServersCheckoutHandler(teamStore, serverOfferingStore, stripeCheckoutSession, stripeProduct, stripePrice, stripeMeter, c.StripePublishableKey).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout-return-url", handlers.NewGetServersCheckoutReturnHandler(teamStore, serverOfferingStore, stripeCheckoutSession, producerFulfillment).ServeHTTP)
 			r.Get("/dashboard/{teamId}/apps/new", handlers.NewGetAppsNewHandler(userStore, teamStore, serverStore, cellStore).ServeHTTP)
-			r.Post("/dashboard/{teamId}/apps/new", handlers.NewPostAppsNewHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore).ServeHTTP)
+			r.Post("/dashboard/{teamId}/apps/new", handlers.NewPostAppsNewHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, producerDeployment).ServeHTTP)
 		})
 	})
 

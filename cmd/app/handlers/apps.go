@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/cmd/app/templates"
+	"github.com/onmetal-dev/metal/lib/background"
+	"github.com/onmetal-dev/metal/lib/background/deployment"
 	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/store"
 )
@@ -63,22 +66,32 @@ func (h *AppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type PostAppsNewHandler struct {
-	userStore       store.UserStore
-	teamStore       store.TeamStore
-	serverStore     store.ServerStore
-	cellStore       store.CellStore
-	appStore        store.AppStore
-	deploymentStore store.DeploymentStore
+	userStore          store.UserStore
+	teamStore          store.TeamStore
+	serverStore        store.ServerStore
+	cellStore          store.CellStore
+	appStore           store.AppStore
+	deploymentStore    store.DeploymentStore
+	producerDeployment *background.QueueProducer[deployment.Message]
 }
 
-func NewPostAppsNewHandler(userStore store.UserStore, teamStore store.TeamStore, serverStore store.ServerStore, cellStore store.CellStore, appStore store.AppStore, deploymentStore store.DeploymentStore) *PostAppsNewHandler {
+func NewPostAppsNewHandler(
+	userStore store.UserStore,
+	teamStore store.TeamStore,
+	serverStore store.ServerStore,
+	cellStore store.CellStore,
+	appStore store.AppStore,
+	deploymentStore store.DeploymentStore,
+	producerDeployment *background.QueueProducer[deployment.Message],
+) *PostAppsNewHandler {
 	return &PostAppsNewHandler{
-		userStore:       userStore,
-		teamStore:       teamStore,
-		serverStore:     serverStore,
-		cellStore:       cellStore,
-		appStore:        appStore,
-		deploymentStore: deploymentStore,
+		userStore:          userStore,
+		teamStore:          teamStore,
+		serverStore:        serverStore,
+		cellStore:          cellStore,
+		appStore:           appStore,
+		deploymentStore:    deploymentStore,
+		producerDeployment: producerDeployment,
 	}
 }
 
@@ -176,6 +189,9 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	appSettings, err := h.appStore.CreateAppSettings(store.CreateAppSettingsOptions{
 		TeamId: teamId,
 		AppId:  app.Id,
+		Artifact: store.Artifact{
+			Image: store.Image{Name: *f.ContainerImage},
+		},
 		Ports: store.Ports{{
 			Name:  "http",
 			Port:  *f.ContainerPort,
@@ -223,7 +239,7 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Create Deployment
 	log.Info("creating deployment")
-	_, err = h.deploymentStore.Create(store.CreateDeploymentOptions{
+	d, err := h.deploymentStore.Create(store.CreateDeploymentOptions{
 		TeamId:        teamId,
 		EnvId:         devEnv.Id,
 		AppId:         app.Id,
@@ -236,6 +252,21 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error creating deployment: %v", err), http.StatusInternalServerError)
 		return
+	}
+
+	// Send a message to the deployment queue
+	err = h.producerDeployment.Send(r.Context(), deployment.Message{
+		DeploymentId: d.Id,
+		AppId:        d.AppId,
+		EnvId:        d.EnvId,
+	})
+	if err != nil {
+		log.Error("Failed to send deployment message to queue",
+			slog.Any("error", err),
+			slog.Int("deploymentId", int(d.Id)),
+			slog.String("appId", d.AppId),
+			slog.String("envId", d.EnvId),
+		)
 	}
 
 	// Redirect to the dashboard on success

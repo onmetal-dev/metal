@@ -23,7 +23,13 @@ type ServerStats struct {
 	MemoryUtilization float64
 }
 
+type AdvanceDeploymentResult struct {
+	Status       store.DeploymentStatus
+	StatusReason string
+}
+
 type CellProvider interface {
 	CreateCell(ctx context.Context, opts CreateCellOptions) (*store.Cell, error)
 	ServerStats(ctx context.Context, cellId string) ([]ServerStats, error)
+	AdvanceDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error)
 }
