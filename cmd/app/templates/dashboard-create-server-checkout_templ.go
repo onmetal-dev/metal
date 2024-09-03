@@ -26,7 +26,7 @@ func CreateServerCheckout(nonce string, stripePublishableKey string, stripeCheck
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-col items-center justify-start max-w-md gap-4 mx-auto\"><div id=\"checkout\" class=\"w-full skeleton h-80\"></div>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-col gap-4\"><div class=\"flex flex-col items-center justify-start max-w-md gap-4 mx-auto\"><div id=\"checkout\" class=\"w-full skeleton h-80\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -44,13 +44,13 @@ func CreateServerCheckout(nonce string, stripePublishableKey string, stripeCheck
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(nonce)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-server-checkout.templ`, Line: 11, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-server-checkout.templ`, Line: 12, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\">\n            const scriptData = JSON.parse(document.getElementById('scriptData').textContent);\n            const stripe = Stripe(scriptData.stripePublishableKey);\n            initialize();\n            async function initialize() {\n                const fetchClientSecret = async () => {\n                    return scriptData.stripeCheckoutSessionClientSecret;\n                }\n                const checkout = await stripe.initEmbeddedCheckout({\n                    fetchClientSecret,\n                });\n                // make sure the checkout iframe is correctly enclosed in the div\n                document.getElementById('checkout').classList.remove('skeleton', 'h-80');\n                document.getElementById('checkout').classList.add('h-fit');\n                checkout.mount('#checkout');\n            }\n        </script></div>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\">\n            const scriptData = JSON.parse(document.getElementById('scriptData').textContent);\n            const stripe = Stripe(scriptData.stripePublishableKey);\n            initialize();\n            async function initialize() {\n                const fetchClientSecret = async () => {\n                    return scriptData.stripeCheckoutSessionClientSecret;\n                }\n                const checkout = await stripe.initEmbeddedCheckout({\n                    fetchClientSecret,\n                });\n                // make sure the checkout iframe is correctly enclosed in the div\n                document.getElementById('checkout').classList.remove('skeleton', 'h-80');\n                document.getElementById('checkout').classList.add('h-fit');\n                checkout.mount('#checkout');\n            }\n        </script></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

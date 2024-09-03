@@ -45,9 +45,9 @@ func party() templ.Component {
 type TabName string
 
 const (
-	TabNameHome         TabName = "home"
-	TabNameCreateServer TabName = "create server"
-	TabNameCreateApp    TabName = "create app"
+	TabNameHome      TabName = "home"
+	TabNameBuyServer TabName = "buy server"
+	TabNameCreateApp TabName = "create app"
 )
 
 type Tab struct {
@@ -58,7 +58,7 @@ type Tab struct {
 func dashboardTabs(teamId string) []Tab {
 	return []Tab{
 		{Name: TabNameHome, Href: fmt.Sprintf("/dashboard/%s", teamId)},
-		{Name: TabNameCreateServer, Href: fmt.Sprintf("/dashboard/%s/servers/new", teamId)},
+		{Name: TabNameBuyServer, Href: fmt.Sprintf("/dashboard/%s/servers/new", teamId)},
 		{Name: TabNameCreateApp, Href: fmt.Sprintf("/dashboard/%s/apps/new", teamId)},
 	}
 }

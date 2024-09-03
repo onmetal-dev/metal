@@ -85,7 +85,7 @@ func (h *GetServersNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		User:          *user,
 		UserTeams:     userTeams,
 		ActiveTeam:    *team,
-		ActiveTabName: templates.TabNameCreateServer,
+		ActiveTabName: templates.TabNameBuyServer,
 	}, templates.CreateServer(teamId, serverOfferings)).Render(r.Context(), w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
@@ -348,7 +348,7 @@ func (h *GetServersCheckoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		User:          *user,
 		UserTeams:     userTeams,
 		ActiveTeam:    *team,
-		ActiveTabName: templates.TabNameCreateServer,
+		ActiveTabName: templates.TabNameBuyServer,
 		AdditionalScripts: []templates.ScriptTag{
 			{Src: "https://js.stripe.com/v3/"},
 		},
