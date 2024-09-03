@@ -44,10 +44,12 @@ require (
 	gorm.io/datatypes v1.2.1
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/gorm v1.25.11
+	gorm.io/hints v1.1.2
 	k8s.io/api v0.31.0
 	k8s.io/apimachinery v0.31.0
 	k8s.io/client-go v0.31.0
 	k8s.io/kubectl v0.31.0
+	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 )
 
 require (
@@ -279,7 +281,6 @@ require (
 	k8s.io/cli-runtime v0.31.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240703190633-0aa61b46e8c2 // indirect
-	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect

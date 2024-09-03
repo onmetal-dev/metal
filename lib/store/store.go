@@ -417,7 +417,7 @@ const (
 type Deployment struct {
 	Id            uint   `gorm:"primarykey"`
 	EnvId         string `gorm:"primaryKey;index"`
-	AppId         string `gorm:"primaryKey;index"`
+	AppId         string `gorm:"primaryKey;index:idx_app_createdat"`
 	TeamId        string `gorm:"index"`
 	Env           Env    `gorm:"foreignKey:EnvId"`
 	App           App    `gorm:"foreignKey:AppId"`
@@ -430,7 +430,7 @@ type Deployment struct {
 	AppEnvVarsId  string
 	AppEnvVars    AppEnvVars `gorm:"foreignKey:AppEnvVarsId"`
 	Cells         []Cell     `gorm:"many2many:deployment_cells;"`
-	CreatedAt     time.Time
+	CreatedAt     time.Time  `gorm:"index:idx_app_createdat"`
 	UpdatedAt     time.Time
 	DeletedAt     gorm.DeletedAt `gorm:"index"`
 }

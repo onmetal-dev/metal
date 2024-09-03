@@ -390,6 +390,9 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 				require.NoError(err, "Failed to get deployments for app")
 				require.Equal(2, len(appDeployments), "Expected two deployments for the app")
 
+				// Verify deployments are ordered descending by date
+				require.True(appDeployments[0].CreatedAt.After(appDeployments[1].CreatedAt), "Expected deployments to be ordered descending by date")
+
 				// Get Deployments for Env
 				envDeployments, err := stores.DeploymentStore.GetForEnv(env.Id)
 				require.NoError(err, "Failed to get deployments for env")
