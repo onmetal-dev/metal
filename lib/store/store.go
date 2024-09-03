@@ -294,9 +294,10 @@ type CellStore interface {
 
 type App struct {
 	Common
-	TeamId string `json:"team_id"`
-	UserId string `json:"user_id"`
-	Name   string `json:"name"`
+	TeamId    string    `json:"team_id" gorm:"index:idx_team_createdat"`
+	UserId    string    `json:"user_id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `gorm:"index:idx_team_createdat"`
 }
 
 type Artifact struct {

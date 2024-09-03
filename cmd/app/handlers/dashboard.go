@@ -9,6 +9,7 @@ import (
 	"github.com/onmetal-dev/metal/cmd/app/templates"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/store"
+	"golang.org/x/sync/errgroup"
 )
 
 type DashboardHandler struct {
@@ -17,16 +18,18 @@ type DashboardHandler struct {
 	serverStore         store.ServerStore
 	cellStore           store.CellStore
 	deploymentStore     store.DeploymentStore
+	appStore            store.AppStore
 	cellProviderForType func(cellType store.CellType) cellprovider.CellProvider
 }
 
-func NewDashboardHandler(userStore store.UserStore, teamStore store.TeamStore, serverStore store.ServerStore, cellStore store.CellStore, deploymentStore store.DeploymentStore, cellProviderForType func(cellType store.CellType) cellprovider.CellProvider) *DashboardHandler {
+func NewDashboardHandler(userStore store.UserStore, teamStore store.TeamStore, serverStore store.ServerStore, cellStore store.CellStore, deploymentStore store.DeploymentStore, appStore store.AppStore, cellProviderForType func(cellType store.CellType) cellprovider.CellProvider) *DashboardHandler {
 	return &DashboardHandler{
 		userStore:           userStore,
 		teamStore:           teamStore,
 		serverStore:         serverStore,
 		cellStore:           cellStore,
 		deploymentStore:     deploymentStore,
+		appStore:            appStore,
 		cellProviderForType: cellProviderForType,
 	}
 }
@@ -38,31 +41,61 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if team == nil {
 		return
 	}
-	servers, err := h.serverStore.GetServersForTeam(teamId)
-	if err != nil {
-		http.Error(w, "error fetching servers", http.StatusInternalServerError)
-		return
-	}
-	cells, err := h.cellStore.GetForTeam(teamId)
-	if err != nil {
-		http.Error(w, "error fetching cells", http.StatusInternalServerError)
-		return
-	}
+	var (
+		servers     []store.Server
+		cells       []store.Cell
+		serverStats []cellprovider.ServerStats
+		deployments []store.Deployment
+		apps        []store.App
+	)
 
-	serverStats := []cellprovider.ServerStats{}
-	for _, cell := range cells {
-		stats, err := h.cellProviderForType(cell.Type).ServerStats(r.Context(), cell.Id)
+	g, ctx := errgroup.WithContext(r.Context())
+
+	g.Go(func() error {
+		var err error
+		servers, err = h.serverStore.GetServersForTeam(teamId)
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		cells, err = h.cellStore.GetForTeam(teamId)
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		cells, err = h.cellStore.GetForTeam(teamId)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("error fetching server stats: %v", err), http.StatusInternalServerError)
-			return
+			return err
 		}
-		// for now assume these are ordered correctly (until we can figure out matching talos servers within the cell provider to our server object)
-		serverStats = append(serverStats, stats...)
-	}
 
-	deployments, err := h.deploymentStore.GetForTeam(teamId)
-	if err != nil {
-		http.Error(w, "error fetching deployments", http.StatusInternalServerError)
+		var stats []cellprovider.ServerStats
+		for _, cell := range cells {
+			cellStats, err := h.cellProviderForType(cell.Type).ServerStats(ctx, cell.Id)
+			if err != nil {
+				return fmt.Errorf("error fetching server stats: %v", err)
+			}
+			stats = append(stats, cellStats...)
+		}
+		serverStats = stats
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		deployments, err = h.deploymentStore.GetForTeam(teamId)
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		apps, err = h.appStore.GetForTeam(teamId)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -71,7 +104,7 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		UserTeams:     userTeams,
 		ActiveTeam:    *team,
 		ActiveTabName: templates.TabNameHome,
-	}, templates.DashboardHome(teamId, servers, cells, serverStats, deployments)).Render(r.Context(), w); err != nil {
+	}, templates.DashboardHome(teamId, servers, cells, serverStats, deployments, apps)).Render(r.Context(), w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }

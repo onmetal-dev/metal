@@ -5,6 +5,8 @@ import (
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/store"
+	"github.com/samber/lo"
+	"strings"
 	"time"
 )
 
@@ -170,7 +172,31 @@ func humanizePercent(value float64) string {
 	return fmt.Sprintf("%.2f%%", value*100)
 }
 
-templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, serverStats []cellprovider.ServerStats, deployments []store.Deployment) {
+func deploymentEnvsForApp(deployments []store.Deployment, app store.App) []store.Env {
+	envs := []store.Env{}
+	for _, deployment := range deployments {
+		if deployment.AppId == app.Id {
+			envs = append(envs, deployment.Env)
+		}
+	}
+	return envs
+}
+
+func totalResourcesForApp(deployments []store.Deployment, app store.App) (float64, int) {
+	cpu := 0.0
+	mem := 0
+	for _, deployment := range deployments {
+		if deployment.AppId == app.Id {
+			resources := deployment.AppSettings.Resources.Data()
+			replicas := deployment.Replicas
+			cpu += resources.Requests.CpuCores * float64(replicas)
+			mem += resources.Requests.MemoryMiB * replicas
+		}
+	}
+	return cpu, mem
+}
+
+templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, serverStats []cellprovider.ServerStats, deployments []store.Deployment, apps []store.App) {
 	<div>
 		@flashes(middleware.GetFlashes(ctx))
 		<div class="flex flex-col items-center justify-start w-full h-full gap-4">
@@ -255,6 +281,37 @@ templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, s
 							}
 							<td>{ fmt.Sprintf("%d", deployment.Replicas) }</td>
 							<td>{ deployment.CreatedAt.Format(time.RFC3339) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<div class="divider">Apps</div>
+			<table class="table table-xs" id="apps-table">
+				<thead>
+					<tr>
+						<th>id</th>
+						<th>name</th>
+						<th>deployment envs</th>
+						<th>total cpu (cores)</th>
+						<th>total memory (mib)</th>
+						<th>created at</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, app := range apps {
+						<tr>
+							<td>{ app.Id }</td>
+							<td>{ app.Name }</td>
+							<td>
+								{ strings.Join(lo.Map(deploymentEnvsForApp(deployments, app), func(env store.Env, _ int) string {
+								return env.Name
+							}), ", ") }
+							</td>
+							if cpu, mem := totalResourcesForApp(deployments, app); true {
+								<td>{ fmt.Sprintf("%.2f", cpu) }</td>
+								<td>{ fmt.Sprintf("%d", mem) }</td>
+							}
+							<td>{ app.CreatedAt.Format(time.RFC3339) }</td>
 						</tr>
 					}
 				</tbody>

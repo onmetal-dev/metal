@@ -13,7 +13,6 @@ import (
 	"go.jetify.com/typeid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
-	"gorm.io/hints"
 )
 
 type DeploymentStore struct {
@@ -242,7 +241,6 @@ func (s *DeploymentStore) GetForTeam(teamId string) ([]store.Deployment, error) 
 func (s *DeploymentStore) GetForApp(appId string) ([]store.Deployment, error) {
 	var deployments []store.Deployment
 	err := s.preloadDeployment(s.db).
-		Clauses(hints.UseIndex("idx_app_createdat")).
 		Where(&store.Deployment{AppId: appId}).
 		Order("created_at DESC").
 		Find(&deployments).Error

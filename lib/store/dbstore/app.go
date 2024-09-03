@@ -47,7 +47,10 @@ func (s *AppStore) Get(id string) (store.App, error) {
 
 func (s *AppStore) GetForTeam(teamId string) ([]store.App, error) {
 	var apps []store.App
-	return apps, s.db.Where("team_id = ?", teamId).Find(&apps).Error
+	return apps, s.db.
+		Where(&store.App{TeamId: teamId}).
+		Order("created_at DESC").
+		Find(&apps).Error
 }
 
 func (s *AppStore) CreateAppSettings(opts store.CreateAppSettingsOptions) (store.AppSettings, error) {
