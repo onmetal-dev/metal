@@ -48,7 +48,7 @@ air:
 .PHONY: build
 build: templ-generate tailwind-build
 	mkdir -p bin/
-	go build $(LDFLAGS) -o ./bin/app ./cmd/app/main.go
+	go build $(LDFLAGS) -o ./bin/app ./cmd/app
 
 .PHONY: dev-app
 dev: bun

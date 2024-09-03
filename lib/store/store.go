@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -105,15 +106,15 @@ type TeamMember struct {
 
 type TeamStore interface {
 	CreateTeam(name string, description string) (*Team, error)
-	GetTeam(id string) (*Team, error)
+	GetTeam(ctx context.Context, id string) (*Team, error)
 	GetTeamKeys(id string) (string, string, error)
 	AddUserToTeam(userId string, teamId string) error
 	RemoveUserFromTeam(userId string, teamId string) error
 	CreateTeamInvite(email string, teamId string) error
 	DeleteTeamInvite(email string, teamId string) error
 	GetInvitesForEmail(email string) ([]TeamMemberInvite, error)
-	CreateStripeCustomer(teamId string, billingEmail string) error
-	AddPaymentMethod(teamId string, paymentMethodData PaymentMethod) error
+	CreateStripeCustomer(ctx context.Context, teamId string, billingEmail string) error
+	AddPaymentMethod(ctx context.Context, teamId string, paymentMethodData PaymentMethod) error
 	RemovePaymentMethod(teamId string, paymentMethodId string) error
 	GetPaymentMethods(teamId string) ([]PaymentMethod, error)
 }
@@ -254,7 +255,7 @@ type ServerStore interface {
 	UpdateServerPublicIpv4(serverId string, publicIpv4 string) error
 	UpdateServerBillingStripeUsageBasedHourly(serverId string, usageBasedHourly *ServerBillingStripeUsageBasedHourly) error
 	UpdateProviderId(serverId string, providerId string) error
-	GetServersForTeam(teamId string) ([]Server, error)
+	GetServersForTeam(ctx context.Context, teamId string) ([]Server, error)
 }
 
 type CellType string
@@ -287,7 +288,7 @@ type TalosCellData struct {
 type CellStore interface {
 	Create(c Cell) (Cell, error)
 	Get(id string) (Cell, error)
-	GetForTeam(teamId string) ([]Cell, error)
+	GetForTeam(ctx context.Context, teamId string) ([]Cell, error)
 	UpdateTalosCellData(talosCellData *TalosCellData) error
 	AddServer(cellId string, server Server) error
 }
@@ -367,7 +368,7 @@ type CreateAppSettingsOptions struct {
 type AppStore interface {
 	Create(opts CreateAppOptions) (App, error)
 	Get(id string) (App, error)
-	GetForTeam(teamId string) ([]App, error)
+	GetForTeam(ctx context.Context, teamId string) ([]App, error)
 	CreateAppSettings(opts CreateAppSettingsOptions) (AppSettings, error)
 	GetAppSettings(id string) (AppSettings, error)
 }
@@ -490,7 +491,7 @@ type DeploymentStore interface {
 
 	Create(opts CreateDeploymentOptions) (Deployment, error)
 	Get(appId string, envId string, id uint) (Deployment, error)
-	GetForTeam(teamId string) ([]Deployment, error)
+	GetForTeam(ctx context.Context, teamId string) ([]Deployment, error)
 	GetForApp(appId string) ([]Deployment, error)
 	GetForEnv(envId string) ([]Deployment, error)
 	GetForCell(cellId string) ([]Deployment, error)

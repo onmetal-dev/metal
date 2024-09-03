@@ -1,6 +1,8 @@
 package dbstore
 
 import (
+	"context"
+
 	"github.com/onmetal-dev/metal/lib/store"
 	"go.jetify.com/typeid"
 	"gorm.io/gorm"
@@ -36,9 +38,9 @@ func (s *CellStore) Get(id string) (store.Cell, error) {
 	return cell, s.db.Preload("Servers").Preload("TalosCellData").Where("id = ?", id).First(&cell).Error
 }
 
-func (s *CellStore) GetForTeam(teamId string) ([]store.Cell, error) {
+func (s *CellStore) GetForTeam(ctx context.Context, teamId string) ([]store.Cell, error) {
 	var cells []store.Cell
-	return cells, s.db.Preload("Servers").Preload("TalosCellData").Where("team_id = ?", teamId).Find(&cells).Error
+	return cells, s.db.WithContext(ctx).Preload("Servers").Preload("TalosCellData").Where("team_id = ?", teamId).Find(&cells).Error
 }
 
 func (s *CellStore) UpdateTalosCellData(talosCellData *store.TalosCellData) error {

@@ -29,8 +29,9 @@ func NewGetOnboardingHandler(teamStore store.TeamStore) *GetOnboardingHandler {
 }
 
 func (h *GetOnboardingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if err := templates.Layout(templates.Onboarding(*user), "metal | onboarding").Render(r.Context(), w); err != nil {
+	ctx := r.Context()
+	user := middleware.GetUser(ctx)
+	if err := templates.Layout(templates.Onboarding(*user), "metal | onboarding").Render(ctx, w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }
@@ -46,7 +47,8 @@ func NewPostOnboardingHandler(teamStore store.TeamStore) *PostOnboardingHandler 
 }
 
 func (h *PostOnboardingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
+	ctx := r.Context()
+	user := middleware.GetUser(ctx)
 	teamName := r.FormValue("team-name")
 	if teamName == "" || len(teamName) < 5 {
 		http.Error(w, "team name is required, and should be at least 5 characters long", http.StatusBadRequest)
@@ -61,7 +63,7 @@ func (h *PostOnboardingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		http.Error(w, fmt.Sprintf("error adding user to team: %v", err), http.StatusInternalServerError)
 		return
 	}
-	if err := h.teamStore.CreateStripeCustomer(team.Id, user.Email); err != nil {
+	if err := h.teamStore.CreateStripeCustomer(ctx, team.Id, user.Email); err != nil {
 		http.Error(w, fmt.Sprintf("error creating stripe customer: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -89,8 +91,9 @@ func generateNonce() string {
 }
 
 func (h *GetOnboardingPaymentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
-	team, err := h.teamStore.GetTeam(teamId)
+	team, err := h.teamStore.GetTeam(ctx, teamId)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error getting team: %v", err), http.StatusInternalServerError)
 		return
@@ -127,7 +130,7 @@ func (h *GetOnboardingPaymentHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	}
 	w.Header().Set("Content-Security-Policy", strings.Join(csp, "; "))
 
-	if err := templates.Layout(templates.OnboardingPayment(nonce, team.Id, customerSession.ClientSecret), "metal | onboarding", templates.ScriptTag{Src: "https://js.stripe.com/v3/"}).Render(r.Context(), w); err != nil {
+	if err := templates.Layout(templates.OnboardingPayment(nonce, team.Id, customerSession.ClientSecret), "metal | onboarding", templates.ScriptTag{Src: "https://js.stripe.com/v3/"}).Render(ctx, w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }
@@ -145,8 +148,9 @@ func NewPostOnboardingPaymentHandler(teamStore store.TeamStore, stripeSetupInten
 }
 
 func (h *PostOnboardingPaymentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
-	team, err := h.teamStore.GetTeam(teamId)
+	team, err := h.teamStore.GetTeam(ctx, teamId)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error getting team: %v", err), http.StatusInternalServerError)
 		return
@@ -183,13 +187,14 @@ func NewGetOnboardingPaymentConfirmHandler(teamStore store.TeamStore, stripeSetu
 }
 
 func (h *GetOnboardingPaymentConfirmHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	redirectStatus := r.URL.Query().Get("redirect_status")
 	if redirectStatus != "succeeded" {
 		http.Error(w, "error redirect status", http.StatusInternalServerError)
 		return
 	}
 	teamId := chi.URLParam(r, "teamId")
-	team, err := h.teamStore.GetTeam(teamId)
+	team, err := h.teamStore.GetTeam(ctx, teamId)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error getting team: %v", err), http.StatusInternalServerError)
 		return
@@ -208,7 +213,7 @@ func (h *GetOnboardingPaymentConfirmHandler) ServeHTTP(w http.ResponseWriter, r 
 		http.Error(w, fmt.Sprintf("error getting payment method: %v", err), http.StatusInternalServerError)
 		return
 	}
-	if err := h.teamStore.AddPaymentMethod(teamId, store.PaymentMethod{
+	if err := h.teamStore.AddPaymentMethod(ctx, teamId, store.PaymentMethod{
 		StripePaymentMethodId: pm.ID,
 		Default:               true, // this is the first pm they've set up, so make it default
 		Type:                  string(pm.Card.Brand),
@@ -225,7 +230,7 @@ func (h *GetOnboardingPaymentConfirmHandler) ServeHTTP(w http.ResponseWriter, r 
 	confettiUrl := "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"
 	csp := fmt.Sprintf("script-src 'nonce-%s' %s 'nonce-%s' 'nonce-%s'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:", nonce, confettiUrl, nonces.Htmx, nonces.ResponseTargets)
 	w.Header().Set("Content-Security-Policy", csp)
-	if err := templates.Layout(templates.OnboardingSuccess(nonce, teamId), "metal | onboarding", templates.ScriptTag{Src: confettiUrl}).Render(r.Context(), w); err != nil {
+	if err := templates.Layout(templates.OnboardingSuccess(nonce, teamId), "metal | onboarding", templates.ScriptTag{Src: confettiUrl}).Render(ctx, w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }

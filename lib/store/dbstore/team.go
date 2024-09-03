@@ -1,6 +1,8 @@
 package dbstore
 
 import (
+	"context"
+
 	"filippo.io/age"
 	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/stripe/stripe-go/v79"
@@ -51,9 +53,9 @@ func (s TeamStore) CreateTeam(name string, description string) (*store.Team, err
 	return &team, nil
 }
 
-func (s TeamStore) GetTeam(id string) (*store.Team, error) {
+func (s TeamStore) GetTeam(ctx context.Context, id string) (*store.Team, error) {
 	var team store.Team
-	err := s.db.Where("id = ?", id).Preload("Members").Preload("InvitedMembers").Preload("PaymentMethods").Preload("Cells").First(&team).Error
+	err := s.db.WithContext(ctx).Where("id = ?", id).Preload("Members").Preload("InvitedMembers").Preload("PaymentMethods").Preload("Cells").First(&team).Error
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +101,8 @@ func (s TeamStore) GetInvitesForEmail(email string) ([]store.TeamMemberInvite, e
 	return invites, err
 }
 
-func (s TeamStore) CreateStripeCustomer(teamId string, billingEmail string) error {
-	team, err := s.GetTeam(teamId)
+func (s TeamStore) CreateStripeCustomer(ctx context.Context, teamId string, billingEmail string) error {
+	team, err := s.GetTeam(ctx, teamId)
 	if err != nil {
 		return err
 	}
@@ -118,7 +120,7 @@ func (s TeamStore) CreateStripeCustomer(teamId string, billingEmail string) erro
 	return s.db.Save(team).Error
 }
 
-func (s TeamStore) AddPaymentMethod(teamId string, paymentMethodData store.PaymentMethod) error {
+func (s TeamStore) AddPaymentMethod(ctx context.Context, teamId string, paymentMethodData store.PaymentMethod) error {
 	tid, _ := typeid.WithPrefix("pm")
 	paymentMethodData.Id = tid.String()
 	paymentMethodData.TeamId = teamId
@@ -130,7 +132,7 @@ func (s TeamStore) AddPaymentMethod(teamId string, paymentMethodData store.Payme
 		return err
 	}
 
-	team, err := s.GetTeam(teamId)
+	team, err := s.GetTeam(ctx, teamId)
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@ package dbstore
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -222,9 +223,9 @@ func (s *DeploymentStore) Get(appId string, envId string, id uint) (store.Deploy
 	return deployment, nil
 }
 
-func (s *DeploymentStore) GetForTeam(teamId string) ([]store.Deployment, error) {
+func (s *DeploymentStore) GetForTeam(ctx context.Context, teamId string) ([]store.Deployment, error) {
 	var deployments []store.Deployment
-	err := s.preloadDeployment(s.db).
+	err := s.preloadDeployment(s.db).WithContext(ctx).
 		Where(&store.Deployment{TeamId: teamId}).
 		Find(&deployments).Error
 	if err != nil {

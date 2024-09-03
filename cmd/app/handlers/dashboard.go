@@ -35,9 +35,10 @@ func NewDashboardHandler(userStore store.UserStore, teamStore store.TeamStore, s
 }
 
 func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
-	user := middleware.GetUser(r.Context())
-	team, userTeams := validateAndFetchTeams(h.teamStore, w, teamId, user)
+	user := middleware.GetUser(ctx)
+	team, userTeams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
@@ -49,23 +50,23 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		apps        []store.App
 	)
 
-	g, ctx := errgroup.WithContext(r.Context())
+	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		var err error
-		servers, err = h.serverStore.GetServersForTeam(teamId)
+		servers, err = h.serverStore.GetServersForTeam(ctx, teamId)
 		return err
 	})
 
 	g.Go(func() error {
 		var err error
-		cells, err = h.cellStore.GetForTeam(teamId)
+		cells, err = h.cellStore.GetForTeam(ctx, teamId)
 		return err
 	})
 
 	g.Go(func() error {
 		var err error
-		cells, err = h.cellStore.GetForTeam(teamId)
+		cells, err = h.cellStore.GetForTeam(ctx, teamId)
 		if err != nil {
 			return err
 		}
@@ -84,13 +85,13 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	g.Go(func() error {
 		var err error
-		deployments, err = h.deploymentStore.GetForTeam(teamId)
+		deployments, err = h.deploymentStore.GetForTeam(ctx, teamId)
 		return err
 	})
 
 	g.Go(func() error {
 		var err error
-		apps, err = h.appStore.GetForTeam(teamId)
+		apps, err = h.appStore.GetForTeam(ctx, teamId)
 		return err
 	})
 
@@ -104,7 +105,7 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		UserTeams:     userTeams,
 		ActiveTeam:    *team,
 		ActiveTabName: templates.TabNameHome,
-	}, templates.DashboardHome(teamId, servers, cells, serverStats, deployments, apps)).Render(r.Context(), w); err != nil {
+	}, templates.DashboardHome(teamId, servers, cells, serverStats, deployments, apps)).Render(ctx, w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }

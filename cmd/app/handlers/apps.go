@@ -33,13 +33,14 @@ func NewGetAppsNewHandler(userStore store.UserStore, teamStore store.TeamStore, 
 }
 
 func (h *AppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
-	user := middleware.GetUser(r.Context())
-	team, userTeams := validateAndFetchTeams(h.teamStore, w, teamId, user)
+	user := middleware.GetUser(ctx)
+	team, userTeams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
-	cells, err := h.cellStore.GetForTeam(teamId)
+	cells, err := h.cellStore.GetForTeam(ctx, teamId)
 	if err != nil {
 		http.Error(w, "error fetching cells", http.StatusInternalServerError)
 		return
@@ -54,13 +55,13 @@ func (h *AppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(cells) == 0 {
-		if err := templates.DashboardLayout(dashboardState, templates.DashboardHomeNoServers(teamId)).Render(r.Context(), w); err != nil {
+		if err := templates.DashboardLayout(dashboardState, templates.DashboardHomeNoServers(teamId)).Render(ctx, w); err != nil {
 			http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 		}
 		return
 	}
 
-	if err := templates.DashboardLayout(dashboardState, templates.CreateApp(teamId, cells, templates.CreateAppFormData{}, templates.CreateAppFormErrors{}, nil)).Render(r.Context(), w); err != nil {
+	if err := templates.DashboardLayout(dashboardState, templates.CreateApp(teamId, cells, templates.CreateAppFormData{}, templates.CreateAppFormErrors{}, nil)).Render(ctx, w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }
@@ -96,14 +97,15 @@ func NewPostAppsNewHandler(
 }
 
 func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log := logger.FromContext(r.Context())
+	ctx := r.Context()
+	log := logger.FromContext(ctx)
 	teamId := chi.URLParam(r, "teamId")
-	user := middleware.GetUser(r.Context())
-	team, _ := validateAndFetchTeams(h.teamStore, w, teamId, user)
+	user := middleware.GetUser(ctx)
+	team, _ := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
-	cells, err := h.cellStore.GetForTeam(teamId)
+	cells, err := h.cellStore.GetForTeam(ctx, teamId)
 	if err != nil {
 		http.Error(w, "error fetching cells", http.StatusInternalServerError)
 		return
@@ -111,14 +113,14 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f, inputErrs, err := templates.ParseCreateAppFormData(r)
 	if inputErrs.NotNil() || err != nil {
 		// send back the form html w/ errors
-		if err := templates.CreateAppForm(teamId, cells, f, inputErrs, err).Render(r.Context(), w); err != nil {
+		if err := templates.CreateAppForm(teamId, cells, f, inputErrs, err).Render(ctx, w); err != nil {
 			http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 		}
 		return
 	}
 
 	// 1. Validate that the app name does not already exist
-	existingApps, err := h.appStore.GetForTeam(teamId)
+	existingApps, err := h.appStore.GetForTeam(ctx, teamId)
 	if err != nil {
 		http.Error(w, "error fetching existing apps", http.StatusInternalServerError)
 		return
@@ -126,7 +128,7 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, app := range existingApps {
 		if app.Name == *f.AppName {
 			inputErrs.Set("AppName", fmt.Errorf("an app with this name already exists"))
-			if err := templates.CreateAppForm(teamId, cells, f, inputErrs, nil).Render(r.Context(), w); err != nil {
+			if err := templates.CreateAppForm(teamId, cells, f, inputErrs, nil).Render(ctx, w); err != nil {
 				http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 			}
 			return
@@ -143,7 +145,7 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !cellFound {
 		inputErrs.Set("CellId", fmt.Errorf("invalid cell ID"))
-		if err := templates.CreateAppForm(teamId, cells, f, inputErrs, nil).Render(r.Context(), w); err != nil {
+		if err := templates.CreateAppForm(teamId, cells, f, inputErrs, nil).Render(ctx, w); err != nil {
 			http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 		}
 		return
@@ -255,7 +257,7 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send a message to the deployment queue
-	err = h.producerDeployment.Send(r.Context(), deployment.Message{
+	err = h.producerDeployment.Send(ctx, deployment.Message{
 		DeploymentId: d.Id,
 		AppId:        d.AppId,
 		EnvId:        d.EnvId,
@@ -270,7 +272,7 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Redirect to the dashboard on success
-	middleware.AddFlash(r.Context(), fmt.Sprintf("app %s created successfully", *f.AppName))
+	middleware.AddFlash(ctx, fmt.Sprintf("app %s created successfully", *f.AppName))
 	w.Header().Set("HX-Redirect", fmt.Sprintf("/dashboard/%s", teamId))
 	w.WriteHeader(http.StatusOK)
 }

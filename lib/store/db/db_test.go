@@ -22,7 +22,7 @@ func TestDB(t *testing.T) {
 	password := "postgres"
 	dbname := "metal_test"
 	port := 5433
-	db := MustOpen(host, user, password, dbname, port, "disable")
+	db := MustOpen(host, user, password, dbname, port, "disable", nil)
 
 	userStore := dbstore.NewUserStore(dbstore.NewUserStoreParams{
 		DB:           db,

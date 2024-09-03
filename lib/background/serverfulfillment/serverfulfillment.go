@@ -464,7 +464,7 @@ func (h MessageHandler) Handle(ctx context.Context, s Message) error {
 	if !s.StepServerAddedToCell {
 		logger.Info("Adding server to cell")
 		var c *store.Cell
-		if cells, err := h.cellStore.GetForTeam(s.TeamId); err != nil {
+		if cells, err := h.cellStore.GetForTeam(ctx, s.TeamId); err != nil {
 			return err
 		} else if len(cells) > 0 {
 			for _, cell := range cells {
@@ -494,7 +494,7 @@ func (h MessageHandler) Handle(ctx context.Context, s Message) error {
 			return fmt.Errorf("cell already has talos installed, TODO: add server to existing talos cluster")
 		} else {
 			// use taloscellprovider to create a new single-node talos cluster with this server
-			team, err := h.teamStore.GetTeam(s.TeamId)
+			team, err := h.teamStore.GetTeam(ctx, s.TeamId)
 			if err != nil {
 				return err
 			}
@@ -517,7 +517,7 @@ func (h MessageHandler) Handle(ctx context.Context, s Message) error {
 
 	logger.Info("Server fulfillment completed successfully")
 
-	team, err := h.teamStore.GetTeam(s.TeamId)
+	team, err := h.teamStore.GetTeam(ctx, s.TeamId)
 	if err != nil {
 		return err
 	}

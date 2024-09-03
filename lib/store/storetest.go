@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -61,7 +62,7 @@ func addUserToTeam(t *testing.T, stores TestStoresConfig, userId, teamId string)
 	err := stores.TeamStore.AddUserToTeam(userId, teamId)
 	require.NoError(err, "Failed to add user to team")
 
-	updatedTeam, err := stores.TeamStore.GetTeam(teamId)
+	updatedTeam, err := stores.TeamStore.GetTeam(context.Background(), teamId)
 	require.NoError(err, "Failed to get updated team")
 	require.Equal(1, len(updatedTeam.Members), "Expected team members to be 1")
 	require.Equal(userId, updatedTeam.Members[0].UserId, "Expected user to be in team members")
@@ -87,7 +88,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			require.NoError(err, "Failed to create team invite")
 
 			// Verify invite is present in the team
-			teamWithInvite, err := stores.TeamStore.GetTeam(team.Id)
+			teamWithInvite, err := stores.TeamStore.GetTeam(context.Background(), team.Id)
 			require.NoError(err, "Failed to get team with invite")
 			require.Equal(1, len(teamWithInvite.InvitedMembers), "Expected team invited members to be 1")
 			require.Equal(inviteEmail, teamWithInvite.InvitedMembers[0].Email, "Expected invite email to be %s, got %s", inviteEmail, teamWithInvite.InvitedMembers[0].Email)
@@ -103,7 +104,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			require.NoError(err, "Failed to delete team invite")
 
 			// Verify invite has been deleted
-			teamAfterDelete, err := stores.TeamStore.GetTeam(team.Id)
+			teamAfterDelete, err := stores.TeamStore.GetTeam(context.Background(), team.Id)
 			require.NoError(err, "Failed to get team after invite deletion")
 			require.Equal(0, len(teamAfterDelete.InvitedMembers), "Expected team invited members to be empty")
 
@@ -201,7 +202,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			require.Equal(app.Name, fetchedApp.Name, "Expected fetched app name to match")
 
 			// Get apps for the team
-			teamApps, err := stores.AppStore.GetForTeam(team.Id)
+			teamApps, err := stores.AppStore.GetForTeam(context.Background(), team.Id)
 			require.NoError(err, "Failed to get apps for team")
 			require.Equal(1, len(teamApps), "Expected one app for the team")
 			require.Equal(app.Id, teamApps[0].Id, "Expected team app id to match")
@@ -381,7 +382,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 				require.Equal(uint(2), deployment2.Id, "Expected second deployment id to be 2")
 
 				// Get Deployments for Team
-				teamDeployments, err := stores.DeploymentStore.GetForTeam(team.Id)
+				teamDeployments, err := stores.DeploymentStore.GetForTeam(context.Background(), team.Id)
 				require.NoError(err, "Failed to get deployments for team")
 				require.Equal(2, len(teamDeployments), "Expected two deployments for the team")
 

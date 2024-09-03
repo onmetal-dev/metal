@@ -1,6 +1,8 @@
 package dbstore
 
 import (
+	"context"
+
 	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/onmetal-dev/metal/lib/validate"
 	"go.jetify.com/typeid"
@@ -45,9 +47,9 @@ func (s *AppStore) Get(id string) (store.App, error) {
 	return app, s.db.Where("id = ?", id).First(&app).Error
 }
 
-func (s *AppStore) GetForTeam(teamId string) ([]store.App, error) {
+func (s *AppStore) GetForTeam(ctx context.Context, teamId string) ([]store.App, error) {
 	var apps []store.App
-	return apps, s.db.
+	return apps, s.db.WithContext(ctx).
 		Where(&store.App{TeamId: teamId}).
 		Order("created_at DESC").
 		Find(&apps).Error
