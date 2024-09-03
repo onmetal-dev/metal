@@ -3067,6 +3067,16 @@ input.tab:checked + .tab-content,
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
 
+.menu-xs :where(li:not(.menu-title) > *:not(ul, details, .menu-title)), .menu-xs :where(li:not(.menu-title) > details > summary:not(.menu-title)) {
+  border-radius: 0.25rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
 .menu-xs .menu-title {
   padding-left: 0.5rem;
   padding-right: 0.5rem;
@@ -3300,6 +3310,10 @@ input.tab:checked + .tab-content,
   height: 0.75rem;
 }
 
+.h-5 {
+  height: 1.25rem;
+}
+
 .h-80 {
   height: 20rem;
 }
@@ -3319,6 +3333,10 @@ input.tab:checked + .tab-content,
 
 .w-48 {
   width: 12rem;
+}
+
+.w-5 {
+  width: 1.25rem;
 }
 
 .w-96 {
@@ -3395,6 +3413,10 @@ input.tab:checked + .tab-content,
 
 .gap-4 {
   gap: 1rem;
+}
+
+.rounded-box {
+  border-radius: var(--rounded-box, 1rem);
 }
 
 .rounded-t-none {

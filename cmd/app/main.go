@@ -217,6 +217,7 @@ func main() {
 			cellprovider.WithCellStore(cellStore),
 			cellprovider.WithServerStore(serverStore),
 			cellprovider.WithTmpDirRoot(c.TmpDirRoot),
+			cellprovider.WithTracerProvider(tracerProvider),
 			cellprovider.WithLogger(slog.Default()),
 		)
 	})
