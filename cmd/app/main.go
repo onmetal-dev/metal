@@ -357,8 +357,9 @@ func main() {
 			r.Get("/dashboard/{teamId}/servers/new", handlers.NewGetServersNewHandler(teamStore, serverOfferingStore).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout", handlers.NewGetServersCheckoutHandler(teamStore, serverOfferingStore, stripeCheckoutSession, stripeProduct, stripePrice, stripeMeter, c.StripePublishableKey).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout-return-url", handlers.NewGetServersCheckoutReturnHandler(teamStore, serverOfferingStore, stripeCheckoutSession, producerFulfillment).ServeHTTP)
-			r.Get("/dashboard/{teamId}/apps/new", handlers.NewGetAppsNewHandler(userStore, teamStore, serverStore, cellStore).ServeHTTP)
+			r.Get("/dashboard/{teamId}/apps/new", handlers.NewAppsNewHandler(userStore, teamStore, serverStore, cellStore).ServeHTTP)
 			r.Post("/dashboard/{teamId}/apps/new", handlers.NewPostAppsNewHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, producerDeployment).ServeHTTP)
+			r.Delete("/dashboard/{teamId}/apps/{appId}", handlers.NewDeleteAppHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, cellProviderForType).ServeHTTP)
 		})
 	})
 

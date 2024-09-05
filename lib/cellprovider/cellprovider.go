@@ -32,4 +32,5 @@ type CellProvider interface {
 	CreateCell(ctx context.Context, opts CreateCellOptions) (*store.Cell, error)
 	ServerStats(ctx context.Context, cellId string) ([]ServerStats, error)
 	AdvanceDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error)
+	DestroyDeployments(ctx context.Context, cellId string, deployments []store.Deployment) error
 }

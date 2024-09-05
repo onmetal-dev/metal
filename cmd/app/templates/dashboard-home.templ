@@ -112,7 +112,7 @@ templ iconInfo() {
 
 templ flashes(flashes []string) {
 	for _, flash := range flashes {
-		<div class="toast">
+		<div class="z-50 toast">
 			<div role="alert" class="text-xs alert alert-success">
 				<span>{ flash }</span>
 			</div>
@@ -252,82 +252,86 @@ templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, s
 					}
 				</tbody>
 			</table>
-			<div class="divider">Deployments</div>
-			<table class="table table-xs" id="deployments-table">
-				<thead>
-					<tr>
-						<th>id</th>
-						<th>app</th>
-						<th>environment</th>
-						<th>type</th>
-						<th>status</th>
-						<th>cpu (cores)</th>
-						<th>memory (mib)</th>
-						<th>replicas</th>
-						<th>created at</th>
-					</tr>
-				</thead>
-				<tbody>
-					for _, deployment := range deployments {
+			if (len(deployments) > 0) {
+				<div class="divider">Deployments</div>
+				<table class="table table-xs" id="deployments-table">
+					<thead>
 						<tr>
-							<td>{ fmt.Sprintf("%d", deployment.Id) }</td>
-							<td>{ deployment.App.Name }</td>
-							<td>{ deployment.Env.Name }</td>
-							<td>{ string(deployment.Type) }</td>
-							<td>{ string(deployment.Status) }</td>
-							if resources := deployment.AppSettings.Resources.Data(); true {
-								<td>{ fmt.Sprintf("%.2f", resources.Requests.CpuCores) }</td>
-								<td>{ fmt.Sprintf("%d", resources.Requests.MemoryMiB) }</td>
-							}
-							<td>{ fmt.Sprintf("%d", deployment.Replicas) }</td>
-							<td>{ deployment.CreatedAt.Format(time.RFC3339) }</td>
+							<th>id</th>
+							<th>app</th>
+							<th>environment</th>
+							<th>type</th>
+							<th>status</th>
+							<th>cpu (cores)</th>
+							<th>memory (mib)</th>
+							<th>replicas</th>
+							<th>created at</th>
 						</tr>
-					}
-				</tbody>
-			</table>
-			<div class="divider">Apps</div>
-			<table class="table table-xs" id="apps-table">
-				<thead>
-					<tr>
-						<th>id</th>
-						<th>name</th>
-						<th>deployment envs</th>
-						<th>total cpu (cores)</th>
-						<th>total memory (mib)</th>
-						<th>created at</th>
-						<th></th>
-					</tr>
-				</thead>
-				<tbody>
-					for _, app := range apps {
+					</thead>
+					<tbody>
+						for _, deployment := range deployments {
+							<tr>
+								<td>{ fmt.Sprintf("%d", deployment.Id) }</td>
+								<td>{ deployment.App.Name }</td>
+								<td>{ deployment.Env.Name }</td>
+								<td>{ string(deployment.Type) }</td>
+								<td>{ string(deployment.Status) }</td>
+								if resources := deployment.AppSettings.Resources.Data(); true {
+									<td>{ fmt.Sprintf("%.2f", resources.Requests.CpuCores) }</td>
+									<td>{ fmt.Sprintf("%d", resources.Requests.MemoryMiB) }</td>
+								}
+								<td>{ fmt.Sprintf("%d", deployment.Replicas) }</td>
+								<td>{ deployment.CreatedAt.Format(time.RFC3339) }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			}
+			if (len(apps) > 0) {
+				<div class="divider">Apps</div>
+				<table class="table table-xs" id="apps-table">
+					<thead>
 						<tr>
-							<td>{ app.Id }</td>
-							<td>{ app.Name }</td>
-							<td>
-								{ strings.Join(lo.Map(deploymentEnvsForApp(deployments, app), func(env store.Env, _ int) string {
+							<th>id</th>
+							<th>name</th>
+							<th>deployment envs</th>
+							<th>total cpu (cores)</th>
+							<th>total memory (mib)</th>
+							<th>created at</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, app := range apps {
+							<tr>
+								<td>{ app.Id }</td>
+								<td>{ app.Name }</td>
+								<td>
+									{ strings.Join(lo.Map(deploymentEnvsForApp(deployments, app), func(env store.Env, _ int) string {
 								return env.Name
 							}), ", ") }
-							</td>
-							if cpu, mem := totalResourcesForApp(deployments, app); true {
-								<td>{ fmt.Sprintf("%.2f", cpu) }</td>
-								<td>{ fmt.Sprintf("%d", mem) }</td>
-							}
-							<td>{ app.CreatedAt.Format(time.RFC3339) }</td>
-							<td>
-								<ul class="p-0 menu menu-horizontal menu-xs rounded-box">
-									<li>
-										<a class="tooltip" data-tip="Delete">
-											<button hx-delete={ "/dashboard/" + teamId + "/apps/" + app.Id } hx-confirm="Are you sure you want to delete this app?" class="w-5 h-5">
-												@iconTrash()
-											</button>
-										</a>
-									</li>
-								</ul>
-							</td>
-						</tr>
-					}
-				</tbody>
-			</table>
+								</td>
+								if cpu, mem := totalResourcesForApp(deployments, app); true {
+									<td>{ fmt.Sprintf("%.2f", cpu) }</td>
+									<td>{ fmt.Sprintf("%d", mem) }</td>
+								}
+								<td>{ app.CreatedAt.Format(time.RFC3339) }</td>
+								<td>
+									<ul class="p-0 menu menu-horizontal menu-xs rounded-box">
+										<li>
+											<a class="tooltip" data-tip="Delete">
+												<button hx-delete={ "/dashboard/" + teamId + "/apps/" + app.Id } hx-confirm="Are you sure you want to delete this app?" class="w-4 h-4">
+													@iconTrash()
+												</button>
+											</a>
+										</li>
+									</ul>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			}
 		</div>
 	</div>
 }

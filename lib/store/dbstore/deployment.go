@@ -239,9 +239,10 @@ func (s *DeploymentStore) GetForTeam(ctx context.Context, teamId string) ([]stor
 	return deployments, nil
 }
 
-func (s *DeploymentStore) GetForApp(appId string) ([]store.Deployment, error) {
+func (s *DeploymentStore) GetForApp(ctx context.Context, appId string) ([]store.Deployment, error) {
 	var deployments []store.Deployment
 	err := s.preloadDeployment(s.db).
+		WithContext(ctx).
 		Where(&store.Deployment{AppId: appId}).
 		Order("created_at DESC").
 		Find(&deployments).Error

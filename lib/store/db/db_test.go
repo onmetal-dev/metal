@@ -24,6 +24,9 @@ func TestDB(t *testing.T) {
 	port := 5433
 	db := MustOpen(host, user, password, dbname, port, "disable", nil)
 
+	waitlistStore := dbstore.NewWaitlistStore(dbstore.NewWaitlistStoreParams{
+		DB: db,
+	})
 	userStore := dbstore.NewUserStore(dbstore.NewUserStoreParams{
 		DB:           db,
 		PasswordHash: passwordhash.NewHPasswordHash(),
@@ -48,6 +51,7 @@ func TestDB(t *testing.T) {
 	})
 
 	testSuite := store.NewStoreTestSuite(store.TestStoresConfig{
+		WaitlistStore:   waitlistStore,
 		UserStore:       userStore,
 		TeamStore:       teamStore,
 		ServerStore:     serverStore,

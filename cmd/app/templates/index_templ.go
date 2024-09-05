@@ -8,7 +8,13 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func WaitlistSuccess() templ.Component {
+import "github.com/onmetal-dev/metal/lib/form"
+
+type JoinWaitlistFormData struct {
+	Email string `validate:"required,email"`
+}
+
+func WaitlistForm(data JoinWaitlistFormData, errors form.FieldErrors, submitError error, successMsg string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -26,46 +32,93 @@ func WaitlistSuccess() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<h1>you're on the list. very nice</h1>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<form novalidate hx-post=\"/waitlist\" hx-disabled-elt=\"find button[type=&#39;submit&#39;], find input[name=&#39;Email&#39;]\" hx-trigger=\"submit\" hx-indicator=\"find .loading\" hx-swap=\"outerHTML\" class=\"flex flex-col items-center gap-2\"><div class=\"join\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		return templ_7745c5c3_Err
-	})
-}
-
-func WaitlistError(err string) templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
+		var templ_7745c5c3_Var2 = []any{cls("text-xs input input-sm input-bordered", errors.Get("Email"), "input-error")}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
 		}
-		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var2 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var2 == nil {
-			templ_7745c5c3_Var2 = templ.NopComponent
-		}
-		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<p>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<input type=\"email\" name=\"Email\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(err)
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var2).String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/index.templ`, Line: 8, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/index.templ`, Line: 1, Col: 0}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</p>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\" placeholder=\"🤘@lfg.com\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(form.InputValue(data.Email))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/index.templ`, Line: 25, Col: 39}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\"><div class=\"flex items-center justify-start gap-2\"><button type=\"submit\" class=\"btn btn-sm btn-primary\">join waitlist</button> <span class=\"htmx-indicator loading loading-ring loading-sm\"></span></div></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if submitError != nil {
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-error\"><span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var5 string
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(submitError.Error())
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/index.templ`, Line: 34, Col: 31}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</span></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if errors.Get("Email") != nil {
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-error\"><span>that's not an email</span></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if successMsg != "" {
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-primary\"><span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var6 string
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(successMsg)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/index.templ`, Line: 42, Col: 22}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</span></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div><span>&nbsp;</span></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -86,12 +139,20 @@ func Index() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var4 == nil {
-			templ_7745c5c3_Var4 = templ.NopComponent
+		templ_7745c5c3_Var7 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var7 == nil {
+			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div><div class=\"hero\"><div class=\"text-center hero-content\"><div class=\"flex flex-col items-center max-w-md\"><h1 class=\"text-5xl font-bold\">orchestrate your cloud exit</h1><p class=\"py-6\">metal is the fastest way to start using compute on bare metal servers</p><div class=\"join\" hx-ext=\"response-targets\"><form hx-post=\"/waitlist\" hx-trigger=\"submit\" hx-target-400=\"#waitlist-error\" hx-swap=\"outerHTML\"><div id=\"waitlist-error\"></div><input class=\"text-xs input input-sm input-bordered\" placeholder=\"🤘@lfg.com\" type=\"email\" name=\"email\" id=\"email\"> <button class=\"btn btn-sm btn-primary\">waitlist</button></form></div></div></div></div><div class=\"pt-10 divider\">cut that bill by 80%</div><div><table class=\"table max-w-[1000px] mx-auto\"><thead><tr><th></th><th class=\"w-48\"><div class=\"flex flex-row items-center\"><img src=\"/static/images/hetzner.svg\" width=\"100\"></div></th><th class=\"w-48\"><div class=\"flex flex-row items-center\"><img src=\"/static/images/aws-ec2.svg\" width=\"20\"> <span class=\"pl-1\">AWS EC2</span></div></th><th class=\"w-48\"><div class=\"flex flex-row items-center\"><img src=\"/static/images/aws-fargate.svg\" width=\"20\"> <span class=\"pl-1\">AWS Fargate</span></div></th></tr></thead> <tbody><tr><th class=\"text-xs\">16 cpu / 128 GB; price per month<sup><a href=\"https://docs.google.com/spreadsheets/d/1CVfpt1q62_4-rtAQGgXptamJloYO4Yj0VIGWLaBlJ90/edit?usp=sharing\" class=\"underline\" target=\"_blank\">*</a></sup></th><td>$115</td><td>$688</td><td>$888</td></tr></tbody></table></div><div class=\"py-10 divider\">features</div><div class=\"grid grid-cols-1 gap-4 md:grid-cols-3\"><div class=\"w-full shadow-xl card card-compact bg-base-200\"><div class=\"card-body\"><h2 class=\"mx-auto text-center card-title md:mx-0\">provision</h2><div><p class=\"pb-2\"></p><ul><li>• No need to set up a Hetzner, OVH, etc. account</li><li>• Provision servers with a few clicks or an API call</li><li>• Metal stays on top of the best offerings from all the main providers, so you don't have to</li></ul></div></div></div><div class=\"w-full shadow-xl card card-compact bg-base-200\"><div class=\"card-body\"><h2 class=\"mx-auto text-center card-title md:mx-0\">deploy</h2><div><p>Give us a docker image and we'll deploy it</p><ul><li>• Deployment environments to separate dev/prod/etc.</li><li>• Progressive rollouts across regions</li><li>• Control deployment promotion or rollback via CLI or Slack</li></ul></div></div></div><div class=\"w-full shadow-xl card card-compact bg-base-200\"><div class=\"card-body\"><h2 class=\"mx-auto text-center card-title md:mx-0\">monitor</h2><div><ul><li>• Basic logging, metrics, and alerts provided</li><li>• Forward logs, metrics, etc. to your existing monitoring stack if you want</li></ul></div></div></div></div><div class=\"py-10 divider\">pricing</div><div class=\"flex flex-row justify-center mx-auto\"><div class=\"shadow-xl card card-compact bg-base-200 w-96\"><div class=\"card-body\"><h2 class=\"mx-auto text-center card-title\">10%</h2><div><p class=\"pb-2\">We take a 10% cut of your bill at the underlying server providers you choose.</p></div></div></div></div></div>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div><div class=\"hero\"><div class=\"text-center hero-content\"><div class=\"flex flex-col items-center max-w-md\"><h1 class=\"text-5xl font-bold\">orchestrate your cloud exit</h1><p class=\"py-6\">metal is the fastest way to start using compute on bare metal servers</p>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = WaitlistForm(JoinWaitlistFormData{}, form.FieldErrors{}, nil, "").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div></div></div><div class=\"pt-10 divider\">cut that bill by 80%</div><div><table class=\"table max-w-[1000px] mx-auto\"><thead><tr><th></th><th class=\"w-48\"><div class=\"flex flex-row items-center\"><img src=\"/static/images/hetzner.svg\" width=\"100\"></div></th><th class=\"w-48\"><div class=\"flex flex-row items-center\"><img src=\"/static/images/aws-ec2.svg\" width=\"20\"> <span class=\"pl-1\">AWS EC2</span></div></th><th class=\"w-48\"><div class=\"flex flex-row items-center\"><img src=\"/static/images/aws-fargate.svg\" width=\"20\"> <span class=\"pl-1\">AWS Fargate</span></div></th></tr></thead> <tbody><tr><th class=\"text-xs\">16 cpu / 128 GB; price per month<sup><a href=\"https://docs.google.com/spreadsheets/d/1CVfpt1q62_4-rtAQGgXptamJloYO4Yj0VIGWLaBlJ90/edit?usp=sharing\" class=\"underline\" target=\"_blank\">*</a></sup></th><td>$115</td><td>$688</td><td>$888</td></tr></tbody></table></div><div class=\"py-10 divider\">features</div><div class=\"grid grid-cols-1 gap-4 md:grid-cols-3\"><div class=\"w-full shadow-xl card card-compact bg-base-200\"><div class=\"card-body\"><h2 class=\"mx-auto text-center card-title md:mx-0\">provision</h2><div><p class=\"pb-2\"></p><ul><li>• No need to set up a Hetzner, OVH, etc. account</li><li>• Provision servers with a few clicks or an API call</li><li>• Metal stays on top of the best offerings from all the main providers, so you don't have to</li></ul></div></div></div><div class=\"w-full shadow-xl card card-compact bg-base-200\"><div class=\"card-body\"><h2 class=\"mx-auto text-center card-title md:mx-0\">deploy</h2><div><p>Give us a docker image and we'll deploy it</p><ul><li>• Deployment environments to separate dev/prod/etc.</li><li>• Progressive rollouts across regions</li><li>• Control deployment promotion or rollback via CLI or Slack</li></ul></div></div></div><div class=\"w-full shadow-xl card card-compact bg-base-200\"><div class=\"card-body\"><h2 class=\"mx-auto text-center card-title md:mx-0\">monitor</h2><div><ul><li>• Basic logging, metrics, and alerts provided</li><li>• Forward logs, metrics, etc. to your existing monitoring stack if you want</li></ul></div></div></div></div><div class=\"py-10 divider\">pricing</div><div class=\"flex flex-row justify-center mx-auto\"><div class=\"shadow-xl card card-compact bg-base-200 w-96\"><div class=\"card-body\"><h2 class=\"mx-auto text-center card-title\">10%</h2><div><p class=\"pb-2\">We take a 10% cut of your bill at the underlying server providers you choose.</p></div></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

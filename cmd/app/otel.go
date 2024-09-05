@@ -17,7 +17,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.
@@ -103,10 +102,10 @@ func newTraceProvider(ctx context.Context) (*trace.TracerProvider, error) {
 		return nil, err
 	}
 
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-		sdktrace.WithResource(resource),
-		sdktrace.WithBatcher(exporter),
+	tp := trace.NewTracerProvider(
+		trace.WithSampler(trace.AlwaysSample()),
+		trace.WithResource(resource),
+		trace.WithBatcher(exporter),
 	)
 	return tp, nil
 }

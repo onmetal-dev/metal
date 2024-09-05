@@ -42,9 +42,13 @@ func (s *AppStore) Create(opts store.CreateAppOptions) (store.App, error) {
 	return app, s.db.Create(&app).Error
 }
 
-func (s *AppStore) Get(id string) (store.App, error) {
+func (s *AppStore) Get(ctx context.Context, id string) (store.App, error) {
 	var app store.App
-	return app, s.db.Where("id = ?", id).First(&app).Error
+	return app, s.db.WithContext(ctx).Where("id = ?", id).First(&app).Error
+}
+
+func (s *AppStore) Delete(ctx context.Context, id string) error {
+	return s.db.WithContext(ctx).Where("id = ?", id).Delete(&store.App{}).Error
 }
 
 func (s *AppStore) GetForTeam(ctx context.Context, teamId string) ([]store.App, error) {

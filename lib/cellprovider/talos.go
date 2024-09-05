@@ -565,6 +565,44 @@ func (p *TalosClusterCellProvider) AdvanceDeployment(ctx context.Context, cellId
 	return nil, nil
 }
 
+func (p *TalosClusterCellProvider) DestroyDeployments(ctx context.Context, cellId string, deployments []store.Deployment) error {
+	cell, err := p.cellStore.Get(cellId)
+	if err != nil {
+		return fmt.Errorf("error getting cell: %v", err)
+	}
+	if cell.TalosCellData == nil {
+		return fmt.Errorf("cell %s has no config", cellId)
+	}
+
+	clientset, err := initializeK8sClient(cell.TalosCellData.Kubecfg, p.tracerProvider)
+	if err != nil {
+		return fmt.Errorf("error initializing k8s client: %v", err)
+	}
+
+	for _, deployment := range deployments {
+		k8sDeployment, err := clientset.AppsV1().Deployments(deployment.Env.Name).Get(ctx, deployment.App.Name, metav1.GetOptions{})
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				continue // job's done
+			}
+			return fmt.Errorf("error getting deployment: %v", err)
+		}
+		if k8sDeployment.Annotations["onmetal.dev/app-id"] != deployment.App.Id {
+			return fmt.Errorf("deployment app id mismatch")
+		}
+		if k8sDeployment.Annotations["onmetal.dev/team-id"] != deployment.TeamId {
+			return fmt.Errorf("deployment team id mismatch")
+		}
+		if k8sDeployment.Annotations["onmetal.dev/deployment-id"] != fmt.Sprintf("%d", deployment.Id) {
+			continue // deployment in k8s is more recent, so we don't need to delete it
+		}
+		if err := clientset.AppsV1().Deployments(deployment.Env.Name).Delete(ctx, deployment.App.Name, metav1.DeleteOptions{}); err != nil {
+			return fmt.Errorf("error deleting deployment: %v", err)
+		}
+	}
+	return nil
+}
+
 func (p *TalosClusterCellProvider) handlePendingDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error) {
 	// TODO: change error returns into AdvanceDeploymentResult with a failed status and a reason
 	cell, err := p.cellStore.Get(cellId)
