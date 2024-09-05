@@ -13,6 +13,7 @@ import (
 	storemock "github.com/onmetal-dev/metal/lib/store/mock"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"gorm.io/gorm"
 )
 
@@ -20,7 +21,7 @@ func TestLogin(t *testing.T) {
 
 	user := &store.User{Common: store.Common{Id: "user_asdf"}, Email: "test@example.com", Password: "password", TeamMemberships: []store.TeamMember{{TeamId: "team_test", Role: store.TeamRoleAdmin}}}
 	teamStore := &storemock.TeamStoreMock{}
-	teamStore.On("GetTeam", "team_test").Return(&store.Team{
+	teamStore.On("GetTeam", mock.Anything, "team_test").Return(&store.Team{
 		Common:         store.Common{Id: "team_test"},
 		Name:           "test",
 		PaymentMethods: []store.PaymentMethod{{Common: store.Common{Id: "pm_test"}}},

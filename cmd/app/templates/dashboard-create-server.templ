@@ -70,13 +70,6 @@ func humanizePrice(price float64, currency store.Currency) string {
 
 templ CreateServer(teamId string, serverOfferings []store.ServerOffering) {
 	<div class="flex flex-col gap-4">
-		<div class="flex flex-col items-center ">
-			<ul class="steps">
-				<li class="w-48 step step-primary">select</li>
-				<li class="w-48 step">review</li>
-				<li class="w-48 step">confirm</li>
-			</ul>
-		</div>
 		<table class="table">
 			<!-- head -->
 			<thead>

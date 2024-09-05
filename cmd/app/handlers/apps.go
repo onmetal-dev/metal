@@ -12,8 +12,11 @@ import (
 	"github.com/onmetal-dev/metal/cmd/app/templates"
 	"github.com/onmetal-dev/metal/lib/background"
 	"github.com/onmetal-dev/metal/lib/background/deployment"
+	"github.com/onmetal-dev/metal/lib/cellprovider"
+	"github.com/onmetal-dev/metal/lib/form"
 	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/store"
+	"github.com/samber/lo"
 )
 
 type AppsNewHandler struct {
@@ -23,7 +26,7 @@ type AppsNewHandler struct {
 	cellStore   store.CellStore
 }
 
-func NewGetAppsNewHandler(userStore store.UserStore, teamStore store.TeamStore, serverStore store.ServerStore, cellStore store.CellStore) *AppsNewHandler {
+func NewAppsNewHandler(userStore store.UserStore, teamStore store.TeamStore, serverStore store.ServerStore, cellStore store.CellStore) *AppsNewHandler {
 	return &AppsNewHandler{
 		userStore:   userStore,
 		teamStore:   teamStore,
@@ -33,13 +36,14 @@ func NewGetAppsNewHandler(userStore store.UserStore, teamStore store.TeamStore, 
 }
 
 func (h *AppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
-	user := middleware.GetUser(r.Context())
-	team, userTeams := validateAndFetchTeams(h.teamStore, w, teamId, user)
+	user := middleware.GetUser(ctx)
+	team, userTeams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
-	cells, err := h.cellStore.GetForTeam(teamId)
+	cells, err := h.cellStore.GetForTeam(ctx, teamId)
 	if err != nil {
 		http.Error(w, "error fetching cells", http.StatusInternalServerError)
 		return
@@ -54,13 +58,13 @@ func (h *AppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(cells) == 0 {
-		if err := templates.DashboardLayout(dashboardState, templates.DashboardHomeNoServers(teamId)).Render(r.Context(), w); err != nil {
+		if err := templates.DashboardLayout(dashboardState, templates.DashboardHomeNoServers(teamId)).Render(ctx, w); err != nil {
 			http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 		}
 		return
 	}
 
-	if err := templates.DashboardLayout(dashboardState, templates.CreateApp(teamId, cells, templates.CreateAppFormData{}, templates.CreateAppFormErrors{}, nil)).Render(r.Context(), w); err != nil {
+	if err := templates.DashboardLayout(dashboardState, templates.CreateApp(teamId, cells, templates.CreateAppFormData{}, form.FieldErrors{}, nil)).Render(ctx, w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }
@@ -96,37 +100,39 @@ func NewPostAppsNewHandler(
 }
 
 func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log := logger.FromContext(r.Context())
+	ctx := r.Context()
+	log := logger.FromContext(ctx)
 	teamId := chi.URLParam(r, "teamId")
-	user := middleware.GetUser(r.Context())
-	team, _ := validateAndFetchTeams(h.teamStore, w, teamId, user)
+	user := middleware.GetUser(ctx)
+	team, _ := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
-	cells, err := h.cellStore.GetForTeam(teamId)
+	cells, err := h.cellStore.GetForTeam(ctx, teamId)
 	if err != nil {
 		http.Error(w, "error fetching cells", http.StatusInternalServerError)
 		return
 	}
-	f, inputErrs, err := templates.ParseCreateAppFormData(r)
+	var f templates.CreateAppFormData
+	inputErrs, err := form.Decode(&f, r)
 	if inputErrs.NotNil() || err != nil {
 		// send back the form html w/ errors
-		if err := templates.CreateAppForm(teamId, cells, f, inputErrs, err).Render(r.Context(), w); err != nil {
+		if err := templates.CreateAppForm(teamId, cells, f, inputErrs, err).Render(ctx, w); err != nil {
 			http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 		}
 		return
 	}
 
 	// 1. Validate that the app name does not already exist
-	existingApps, err := h.appStore.GetForTeam(teamId)
+	existingApps, err := h.appStore.GetForTeam(ctx, teamId)
 	if err != nil {
 		http.Error(w, "error fetching existing apps", http.StatusInternalServerError)
 		return
 	}
 	for _, app := range existingApps {
-		if app.Name == *f.AppName {
+		if app.Name == f.AppName {
 			inputErrs.Set("AppName", fmt.Errorf("an app with this name already exists"))
-			if err := templates.CreateAppForm(teamId, cells, f, inputErrs, nil).Render(r.Context(), w); err != nil {
+			if err := templates.CreateAppForm(teamId, cells, f, inputErrs, nil).Render(ctx, w); err != nil {
 				http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 			}
 			return
@@ -136,14 +142,14 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 2. Validate that the cell ID exists and is part of the team
 	var cellFound bool
 	for _, cell := range cells {
-		if cell.Id == *f.CellId {
+		if cell.Id == f.CellId {
 			cellFound = true
 			break
 		}
 	}
 	if !cellFound {
 		inputErrs.Set("CellId", fmt.Errorf("invalid cell ID"))
-		if err := templates.CreateAppForm(teamId, cells, f, inputErrs, nil).Render(r.Context(), w); err != nil {
+		if err := templates.CreateAppForm(teamId, cells, f, inputErrs, nil).Render(ctx, w); err != nil {
 			http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 		}
 		return
@@ -152,7 +158,7 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 3. Create app, appenv, env, and deployment objects
 	log.Info("creating app")
 	app, err := h.appStore.Create(store.CreateAppOptions{
-		Name:   *f.AppName,
+		Name:   f.AppName,
 		TeamId: teamId,
 		UserId: user.Id,
 	})
@@ -190,22 +196,22 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		TeamId: teamId,
 		AppId:  app.Id,
 		Artifact: store.Artifact{
-			Image: store.Image{Name: *f.ContainerImage},
+			Image: store.Image{Name: f.ContainerImage},
 		},
 		Ports: store.Ports{{
 			Name:  "http",
-			Port:  *f.ContainerPort,
+			Port:  f.ContainerPort,
 			Proto: "http",
 		}},
 		ExternalPorts: store.ExternalPorts{},
 		Resources: store.Resources{
 			Limits: store.ResourceLimits{
-				CpuCores:  *f.CpuLimit,
-				MemoryMiB: *f.MemoryLimit,
+				CpuCores:  f.CpuLimit,
+				MemoryMiB: f.MemoryLimit,
 			},
 			Requests: store.ResourceRequests{
-				CpuCores:  *f.CpuLimit,
-				MemoryMiB: *f.MemoryLimit,
+				CpuCores:  f.CpuLimit,
+				MemoryMiB: f.MemoryLimit,
 			},
 		},
 	})
@@ -216,8 +222,8 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Create AppEnvVars
 	var envVars []store.EnvVar
-	if f.EnvVars != nil {
-		parsedEnvVars, err := godotenv.Parse(strings.NewReader(*f.EnvVars))
+	if f.EnvVars != "" {
+		parsedEnvVars, err := godotenv.Parse(strings.NewReader(f.EnvVars))
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error parsing environment variables: %v", err), http.StatusBadRequest)
 			return
@@ -246,8 +252,8 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Type:          store.DeploymentTypeDeploy,
 		AppSettingsId: appSettings.Id,
 		AppEnvVarsId:  appEnvVars.Id,
-		CellIds:       []string{*f.CellId},
-		Replicas:      *f.Replicas,
+		CellIds:       []string{f.CellId},
+		Replicas:      f.Replicas,
 	})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error creating deployment: %v", err), http.StatusInternalServerError)
@@ -255,7 +261,7 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send a message to the deployment queue
-	err = h.producerDeployment.Send(r.Context(), deployment.Message{
+	err = h.producerDeployment.Send(ctx, deployment.Message{
 		DeploymentId: d.Id,
 		AppId:        d.AppId,
 		EnvId:        d.EnvId,
@@ -270,7 +276,114 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Redirect to the dashboard on success
-	middleware.AddFlash(r.Context(), fmt.Sprintf("app %s created successfully", *f.AppName))
+	middleware.AddFlash(ctx, fmt.Sprintf("app %s created successfully", f.AppName))
+	w.Header().Set("HX-Redirect", fmt.Sprintf("/dashboard/%s", teamId))
+	w.WriteHeader(http.StatusOK)
+}
+
+type DeleteAppHandler struct {
+	userStore           store.UserStore
+	teamStore           store.TeamStore
+	serverStore         store.ServerStore
+	cellStore           store.CellStore
+	appStore            store.AppStore
+	deploymentStore     store.DeploymentStore
+	cellProviderForType func(cellType store.CellType) cellprovider.CellProvider
+}
+
+func NewDeleteAppHandler(
+	userStore store.UserStore,
+	teamStore store.TeamStore,
+	serverStore store.ServerStore,
+	cellStore store.CellStore,
+	appStore store.AppStore,
+	deploymentStore store.DeploymentStore,
+	cellProviderForType func(cellType store.CellType) cellprovider.CellProvider,
+) *DeleteAppHandler {
+	return &DeleteAppHandler{
+		userStore:           userStore,
+		teamStore:           teamStore,
+		serverStore:         serverStore,
+		cellStore:           cellStore,
+		appStore:            appStore,
+		deploymentStore:     deploymentStore,
+		cellProviderForType: cellProviderForType,
+	}
+}
+
+func (h *DeleteAppHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	teamId := chi.URLParam(r, "teamId")
+	user := middleware.GetUser(ctx)
+	team, _ := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
+	if team == nil {
+		return
+	}
+	cells, err := h.cellStore.GetForTeam(ctx, teamId)
+	if err != nil {
+		http.Error(w, "error fetching cells", http.StatusInternalServerError)
+		return
+	}
+
+	appId := chi.URLParam(r, "appId")
+	if appId == "" {
+		http.Error(w, "appId is required", http.StatusBadRequest)
+		return
+	}
+
+	app, err := h.appStore.Get(ctx, appId)
+	if err != nil {
+		http.Error(w, "error fetching app", http.StatusInternalServerError)
+		return
+	}
+
+	if app.TeamId != teamId {
+		http.Error(w, "app does not belong to team", http.StatusNotFound)
+		return
+	}
+
+	// get all deployments for the app
+	deployments, err := h.deploymentStore.GetForApp(ctx, app.Id)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error fetching deployments: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	for _, cell := range cells {
+		deploymentsForCell := lo.Filter(deployments, func(deployment store.Deployment, _ int) bool {
+			inThisCell := false
+			for _, c := range deployment.Cells {
+				if c.Id == cell.Id {
+					inThisCell = true
+					break
+				}
+			}
+			return inThisCell
+		})
+		if err := h.cellProviderForType(cell.Type).DestroyDeployments(ctx, cell.Id, deploymentsForCell); err != nil {
+			http.Error(w, fmt.Sprintf("error destroying deployments: %v", err), http.StatusInternalServerError)
+			return
+		}
+		// update deployment status for all deployments, then delete them so they don't appear in the dashboard
+		for _, d := range deploymentsForCell {
+			if err := h.deploymentStore.UpdateDeploymentStatus(app.Id, d.EnvId, d.Id, store.DeploymentStatusStopped, "app deleted"); err != nil {
+				http.Error(w, fmt.Sprintf("error updating deployment status: %v", err), http.StatusInternalServerError)
+				return
+			}
+			if err := h.deploymentStore.DeleteDeployment(app.Id, d.EnvId, d.Id); err != nil {
+				http.Error(w, fmt.Sprintf("error deleting deployment: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	if err := h.appStore.Delete(ctx, app.Id); err != nil {
+		http.Error(w, fmt.Sprintf("error deleting app: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Redirect to the dashboard on success
+	middleware.AddFlash(ctx, fmt.Sprintf("app %s deleted successfully", app.Name))
 	w.Header().Set("HX-Redirect", fmt.Sprintf("/dashboard/%s", teamId))
 	w.WriteHeader(http.StatusOK)
 }

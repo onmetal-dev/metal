@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/onmetal-dev/metal/cmd/app/templates"
+	"github.com/onmetal-dev/metal/lib/form"
+	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/store"
 )
 
@@ -22,17 +24,21 @@ func NewPostWaitlistHandler(params PostWaitlistHandlerParams) *PostWaitlistHandl
 }
 
 func (h *PostWaitlistHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	email := r.FormValue("email")
-	if err := h.waitlistStore.Add(email); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		c := templates.WaitlistError(err.Error())
-		c.Render(r.Context(), w)
+	ctx := r.Context()
+	var f templates.JoinWaitlistFormData
+	fieldErrors, err := form.Decode(&f, r)
+	if fieldErrors.NotNil() || err != nil {
+		logger.FromContext(ctx).Info("DEBUG: field errors", "fieldErrors", fieldErrors, "err", err)
+		templates.WaitlistForm(f, fieldErrors, err, "").Render(ctx, w)
 		return
 	}
 
-	if err := templates.WaitlistSuccess().Render(r.Context(), w); err != nil {
-		http.Error(w, "error rendering template", http.StatusInternalServerError)
-		return
+	if err := h.waitlistStore.Add(ctx, f.Email); err != nil {
+		if err != store.ErrDuplicateWaitlistEntry {
+			// be very forgiving here... can recover from errors by looking at logs
+			logger.FromContext(ctx).Error("error adding waitlist entry", "email", f.Email, "error", err)
+		}
 	}
 
+	templates.WaitlistForm(f, fieldErrors, err, "you're on the list! 👍").Render(ctx, w)
 }

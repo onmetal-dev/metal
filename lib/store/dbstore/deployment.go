@@ -2,6 +2,7 @@ package dbstore
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -222,9 +223,9 @@ func (s *DeploymentStore) Get(appId string, envId string, id uint) (store.Deploy
 	return deployment, nil
 }
 
-func (s *DeploymentStore) GetForTeam(teamId string) ([]store.Deployment, error) {
+func (s *DeploymentStore) GetForTeam(ctx context.Context, teamId string) ([]store.Deployment, error) {
 	var deployments []store.Deployment
-	err := s.preloadDeployment(s.db).
+	err := s.preloadDeployment(s.db).WithContext(ctx).
 		Where(&store.Deployment{TeamId: teamId}).
 		Find(&deployments).Error
 	if err != nil {
@@ -238,10 +239,12 @@ func (s *DeploymentStore) GetForTeam(teamId string) ([]store.Deployment, error) 
 	return deployments, nil
 }
 
-func (s *DeploymentStore) GetForApp(appId string) ([]store.Deployment, error) {
+func (s *DeploymentStore) GetForApp(ctx context.Context, appId string) ([]store.Deployment, error) {
 	var deployments []store.Deployment
 	err := s.preloadDeployment(s.db).
+		WithContext(ctx).
 		Where(&store.Deployment{AppId: appId}).
+		Order("created_at DESC").
 		Find(&deployments).Error
 	if err != nil {
 		return nil, err

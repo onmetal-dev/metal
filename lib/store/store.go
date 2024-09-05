@@ -1,7 +1,9 @@
 package store
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"gorm.io/datatypes"
@@ -15,13 +17,16 @@ type Common struct {
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
+// ErrDuplicateWaitlistEntry is returned when trying to add a duplicate email to the waitlist
+var ErrDuplicateWaitlistEntry = errors.New("email already exists in waitlist")
+
 type WaitlistedUser struct {
 	Email     string    `gorm:"primaryKey" validate:"required,email"`
 	CreatedAt time.Time `gorm:"index"`
 }
 
 type WaitlistStore interface {
-	Add(email string) error
+	Add(ctx context.Context, email string) error
 }
 
 type InvitedUser struct {
@@ -105,15 +110,15 @@ type TeamMember struct {
 
 type TeamStore interface {
 	CreateTeam(name string, description string) (*Team, error)
-	GetTeam(id string) (*Team, error)
+	GetTeam(ctx context.Context, id string) (*Team, error)
 	GetTeamKeys(id string) (string, string, error)
 	AddUserToTeam(userId string, teamId string) error
 	RemoveUserFromTeam(userId string, teamId string) error
 	CreateTeamInvite(email string, teamId string) error
 	DeleteTeamInvite(email string, teamId string) error
 	GetInvitesForEmail(email string) ([]TeamMemberInvite, error)
-	CreateStripeCustomer(teamId string, billingEmail string) error
-	AddPaymentMethod(teamId string, paymentMethodData PaymentMethod) error
+	CreateStripeCustomer(ctx context.Context, teamId string, billingEmail string) error
+	AddPaymentMethod(ctx context.Context, teamId string, paymentMethodData PaymentMethod) error
 	RemovePaymentMethod(teamId string, paymentMethodId string) error
 	GetPaymentMethods(teamId string) ([]PaymentMethod, error)
 }
@@ -254,7 +259,7 @@ type ServerStore interface {
 	UpdateServerPublicIpv4(serverId string, publicIpv4 string) error
 	UpdateServerBillingStripeUsageBasedHourly(serverId string, usageBasedHourly *ServerBillingStripeUsageBasedHourly) error
 	UpdateProviderId(serverId string, providerId string) error
-	GetServersForTeam(teamId string) ([]Server, error)
+	GetServersForTeam(ctx context.Context, teamId string) ([]Server, error)
 }
 
 type CellType string
@@ -287,16 +292,17 @@ type TalosCellData struct {
 type CellStore interface {
 	Create(c Cell) (Cell, error)
 	Get(id string) (Cell, error)
-	GetForTeam(teamId string) ([]Cell, error)
+	GetForTeam(ctx context.Context, teamId string) ([]Cell, error)
 	UpdateTalosCellData(talosCellData *TalosCellData) error
 	AddServer(cellId string, server Server) error
 }
 
 type App struct {
 	Common
-	TeamId string `json:"team_id"`
-	UserId string `json:"user_id"`
-	Name   string `json:"name"`
+	TeamId    string    `json:"team_id" gorm:"index:idx_team_createdat"`
+	UserId    string    `json:"user_id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `gorm:"index:idx_team_createdat"`
 }
 
 type Artifact struct {
@@ -365,8 +371,9 @@ type CreateAppSettingsOptions struct {
 
 type AppStore interface {
 	Create(opts CreateAppOptions) (App, error)
-	Get(id string) (App, error)
-	GetForTeam(teamId string) ([]App, error)
+	Get(ctx context.Context, id string) (App, error)
+	Delete(ctx context.Context, id string) error
+	GetForTeam(ctx context.Context, teamId string) ([]App, error)
 	CreateAppSettings(opts CreateAppSettingsOptions) (AppSettings, error)
 	GetAppSettings(id string) (AppSettings, error)
 }
@@ -417,7 +424,7 @@ const (
 type Deployment struct {
 	Id            uint   `gorm:"primarykey"`
 	EnvId         string `gorm:"primaryKey;index"`
-	AppId         string `gorm:"primaryKey;index"`
+	AppId         string `gorm:"primaryKey;index:idx_app_createdat"`
 	TeamId        string `gorm:"index"`
 	Env           Env    `gorm:"foreignKey:EnvId"`
 	App           App    `gorm:"foreignKey:AppId"`
@@ -430,7 +437,7 @@ type Deployment struct {
 	AppEnvVarsId  string
 	AppEnvVars    AppEnvVars `gorm:"foreignKey:AppEnvVarsId"`
 	Cells         []Cell     `gorm:"many2many:deployment_cells;"`
-	CreatedAt     time.Time
+	CreatedAt     time.Time  `gorm:"index:idx_app_createdat"`
 	UpdatedAt     time.Time
 	DeletedAt     gorm.DeletedAt `gorm:"index"`
 }
@@ -489,8 +496,8 @@ type DeploymentStore interface {
 
 	Create(opts CreateDeploymentOptions) (Deployment, error)
 	Get(appId string, envId string, id uint) (Deployment, error)
-	GetForTeam(teamId string) ([]Deployment, error)
-	GetForApp(appId string) ([]Deployment, error)
+	GetForTeam(ctx context.Context, teamId string) ([]Deployment, error)
+	GetForApp(ctx context.Context, appId string) ([]Deployment, error)
 	GetForEnv(envId string) ([]Deployment, error)
 	GetForCell(cellId string) ([]Deployment, error)
 	DeleteDeployment(appId string, envId string, id uint) error

@@ -9,132 +9,35 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	"errors"
 	"fmt"
-	"github.com/go-playground/form/v4"
-	"github.com/go-playground/validator/v10"
-	"github.com/onmetal-dev/metal/lib/debug"
-	"github.com/onmetal-dev/metal/lib/logger"
+	"github.com/onmetal-dev/metal/lib/form"
 	"github.com/onmetal-dev/metal/lib/store"
-	"github.com/onmetal-dev/metal/lib/validate"
-	"net/http"
 )
 
 type CreateAppFormData struct {
-	AppName        *string  `validate:"required,max=63,lowercasealphanumhyphen"`
-	ContainerImage *string  `validate:"required"`
-	Replicas       *int     `validate:"required,min=1"`
-	ContainerPort  *int     `validate:"required,min=1,max=65535"`
-	CpuLimit       *float64 `validate:"required,min=0.1"`
-	MemoryLimit    *int     `validate:"required,min=32"`
-	EnvVars        *string  `validate:"omitempty,dotenvformat"`
-	CellId         *string  `validate:"required,startswith=cell_"`
-}
-
-type CreateAppFormErrors struct {
-	notNil         bool
-	AppName        error
-	ContainerImage error
-	Replicas       error
-	ContainerPort  error
-	CpuLimit       error
-	MemoryLimit    error
-	EnvVars        error
-	CellId         error
-}
-
-func (e *CreateAppFormErrors) NotNil() bool {
-	return e.notNil
-}
-
-func (e *CreateAppFormErrors) Set(field string, err error) {
-	e.notNil = true
-	switch field {
-	case "AppName":
-		e.AppName = err
-	case "ContainerImage":
-		e.ContainerImage = err
-	case "Replicas":
-		e.Replicas = err
-	case "ContainerPort":
-		e.ContainerPort = err
-	case "CpuLimit":
-		e.CpuLimit = err
-	case "MemoryLimit":
-		e.MemoryLimit = err
-	case "EnvVars":
-		e.EnvVars = err
-	case "CellId":
-		e.CellId = err
-	default:
-		panic(fmt.Sprintf("unknown field: %s", field))
-	}
-}
-
-func ParseCreateAppFormData(r *http.Request) (CreateAppFormData, CreateAppFormErrors, error) {
-	var formData CreateAppFormData
-	var formErrors CreateAppFormErrors
-	if err := r.ParseForm(); err != nil {
-		return formData, formErrors, err
-	}
-	decoder := form.NewDecoder()
-	if err := decoder.Decode(&formData, r.Form); err != nil {
-		return formData, formErrors, err
-	}
-
-	logger.FromContext(r.Context()).Info("create app form data", "formData", debug.PrettyJSON(formData))
-
-	if err := validate.Struct(formData); err != nil {
-		for _, err := range err.(validator.ValidationErrors) {
-			field := err.Field()
-			switch err.Tag() {
-			case "required":
-				formErrors.Set(field, errors.New("this is required"))
-			case "lowercasealphanumhyphen":
-				formErrors.Set(field, errors.New("must consist of lowercase alphanumeric characters and/or hyphens"))
-			case "dotenvformat":
-				formErrors.Set(field, errors.New("must be in dotenv format"))
-			default:
-				formErrors.Set(field, err)
-			}
-		}
-		logger.FromContext(r.Context()).Info("create app form errors", "formErrors", debug.PrettyJSON(formErrors))
-	}
-	return formData, formErrors, nil
-}
-
-func ptrAttr[T any](v *T) string {
-	if v == nil {
-		return ""
-	}
-	return fmt.Sprintf("%v", *v)
+	AppName        string  `validate:"required,max=63,lowercasealphanumhyphen"`
+	ContainerImage string  `validate:"required"`
+	Replicas       int     `validate:"required,min=1"`
+	ContainerPort  int     `validate:"required,min=1,max=65535"`
+	CpuLimit       float64 `validate:"required,min=0.1"`
+	MemoryLimit    int     `validate:"required,min=32"`
+	EnvVars        string  `validate:"omitempty,dotenvformat"`
+	CellId         string  `validate:"required,startswith=cell_"`
 }
 
 func inputClass(error error) string {
-	class := "max-w-xs input input-xs"
-	if error != nil {
-		class += " input-error"
-	}
-	return class
+	return cls("max-w-xs input input-xs", error, "input-error")
 }
 
 func textareaClass(error error) string {
-	class := "max-w-xs textarea textarea-xs"
-	if error != nil {
-		class += " textarea-error"
-	}
-	return class
+	return cls("max-w-xs textarea textarea-xs", error, "textarea-error")
 }
 
 func selectClass(error error) string {
-	class := "w-full max-w-xs py-0 select select-xs"
-	if error != nil {
-		class += " select-error"
-	}
-	return class
+	return cls("w-full max-w-xs py-0 select select-xs", error, "select-error")
 }
 
-func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, errors CreateAppFormErrors, submitError error) templ.Component {
+func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, errors form.FieldErrors, submitError error) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -152,14 +55,14 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<form hx-post=\"")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<form novalidate hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/dashboard/%s/apps/new", teamId))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 131, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 35, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -169,7 +72,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var3 = []any{inputClass(errors.AppName)}
+		var templ_7745c5c3_Var3 = []any{inputClass(errors.Get("AppName"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var3...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -192,9 +95,9 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(ptrAttr(data.AppName))
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(form.InputValue(data.AppName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 145, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 49, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -204,15 +107,15 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if errors.AppName != nil {
+		if errors.Get("AppName") != nil {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-error\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 string
-			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(errors.AppName.Error())
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(errors.Get("AppName").Error())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 149, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 53, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -227,7 +130,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var7 = []any{inputClass(errors.ContainerImage)}
+		var templ_7745c5c3_Var7 = []any{inputClass(errors.Get("ContainerImage"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var7...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -250,9 +153,9 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
-		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(ptrAttr(data.ContainerImage))
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(form.InputValue(data.ContainerImage))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 154, Col: 151}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 58, Col: 166}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -262,15 +165,15 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if errors.ContainerImage != nil {
+		if errors.Get("ContainerImage") != nil {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-error\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
-			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(errors.ContainerImage.Error())
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(errors.Get("ContainerImage").Error())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 156, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 60, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -285,7 +188,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var11 = []any{inputClass(errors.Replicas)}
+		var templ_7745c5c3_Var11 = []any{inputClass(errors.Get("Replicas"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var11...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -308,9 +211,9 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var13 string
-		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(ptrAttr(data.Replicas))
+		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(form.InputValue(data.Replicas))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 161, Col: 132}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 65, Col: 147}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -320,15 +223,15 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if errors.Replicas != nil {
+		if errors.Get("Replicas") != nil {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-error\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var14 string
-			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(errors.Replicas.Error())
+			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(errors.Get("Replicas").Error())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 163, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 67, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -343,7 +246,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var15 = []any{inputClass(errors.ContainerPort)}
+		var templ_7745c5c3_Var15 = []any{inputClass(errors.Get("ContainerPort"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var15...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -366,9 +269,9 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var17 string
-		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(ptrAttr(data.ContainerPort))
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(form.InputValue(data.ContainerPort))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 168, Col: 160}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 72, Col: 175}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -378,15 +281,15 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if errors.ContainerPort != nil {
+		if errors.Get("ContainerPort") != nil {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-error\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var18 string
-			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(errors.ContainerPort.Error())
+			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(errors.Get("ContainerPort").Error())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 170, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 74, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -401,7 +304,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var19 = []any{inputClass(errors.CpuLimit)}
+		var templ_7745c5c3_Var19 = []any{inputClass(errors.Get("CpuLimit"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var19...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -424,9 +327,9 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var21 string
-		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(ptrAttr(data.CpuLimit))
+		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(form.InputValue(data.CpuLimit))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 175, Col: 147}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 79, Col: 162}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -436,15 +339,15 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if errors.CpuLimit != nil {
+		if errors.Get("CpuLimit") != nil {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-error\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var22 string
-			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(errors.CpuLimit.Error())
+			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(errors.Get("CpuLimit").Error())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 177, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 81, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -459,7 +362,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var23 = []any{inputClass(errors.MemoryLimit)}
+		var templ_7745c5c3_Var23 = []any{inputClass(errors.Get("MemoryLimit"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var23...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -482,9 +385,9 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var25 string
-		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(ptrAttr(data.MemoryLimit))
+		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(form.InputValue(data.MemoryLimit))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 182, Col: 154}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 86, Col: 169}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -494,15 +397,15 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if errors.MemoryLimit != nil {
+		if errors.Get("MemoryLimit") != nil {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-error\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var26 string
-			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(errors.MemoryLimit.Error())
+			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(errors.Get("MemoryLimit").Error())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 184, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 88, Col: 63}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -517,7 +420,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var27 = []any{textareaClass(errors.EnvVars)}
+		var templ_7745c5c3_Var27 = []any{textareaClass(errors.Get("EnvVars"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var27...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -540,9 +443,9 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var29 string
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(ptrAttr(data.EnvVars))
+		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(form.InputValue(data.EnvVars))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 194, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 98, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
@@ -552,15 +455,15 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if errors.EnvVars != nil {
+		if errors.Get("EnvVars") != nil {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-error\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var30 string
-			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(errors.EnvVars.Error())
+			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(errors.Get("EnvVars").Error())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 196, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 100, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
@@ -575,7 +478,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var31 = []any{selectClass(errors.CellId)}
+		var templ_7745c5c3_Var31 = []any{selectClass(errors.Get("CellId"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var31...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -605,7 +508,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(cells[0].Id)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 203, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 107, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 			if templ_7745c5c3_Err != nil {
@@ -618,7 +521,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(cells[0].Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 203, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 107, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 			if templ_7745c5c3_Err != nil {
@@ -636,7 +539,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 				var templ_7745c5c3_Var35 string
 				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(cell.Id)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 205, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 109, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 				if templ_7745c5c3_Err != nil {
@@ -649,7 +552,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 				var templ_7745c5c3_Var36 string
 				templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(cell.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 205, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 109, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 				if templ_7745c5c3_Err != nil {
@@ -670,15 +573,15 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if errors.CellId != nil {
+		if errors.Get("CellId") != nil {
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-error\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var37 string
-			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(errors.CellId.Error())
+			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(errors.Get("CellId").Error())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 212, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 116, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {
@@ -701,7 +604,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			var templ_7745c5c3_Var38 string
 			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(submitError.Error())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 222, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 126, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
@@ -720,7 +623,7 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 	})
 }
 
-func CreateApp(teamId string, cells []store.Cell, data CreateAppFormData, errors CreateAppFormErrors, submitError error) templ.Component {
+func CreateApp(teamId string, cells []store.Cell, data CreateAppFormData, errors form.FieldErrors, submitError error) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)

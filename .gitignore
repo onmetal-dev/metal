@@ -26,6 +26,7 @@ go.work.sum
 **/.env.hetzner.test
 
 TODO
+TODO.md
 node_modules/
 bin/
 **/tmp/

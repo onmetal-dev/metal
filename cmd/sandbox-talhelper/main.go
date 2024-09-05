@@ -70,7 +70,7 @@ func WithEnv(m map[string]string, f func() error) error {
 func run(ctx context.Context) error {
 	c := MustLoadConfig()
 
-	db := database.MustOpen(c.DatabaseHost, c.DatabaseUser, c.DatabasePassword, c.DatabaseName, c.DatabasePort, c.DatabaseSslMode)
+	db := database.MustOpen(c.DatabaseHost, c.DatabaseUser, c.DatabasePassword, c.DatabaseName, c.DatabasePort, c.DatabaseSslMode, nil)
 	cellStore := dbstore.NewCellStore(
 		dbstore.NewCellStoreParams{
 			DB: db,
@@ -86,7 +86,7 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("error getting cell: %v", err)
 	}
 
-	team, err := teamStore.GetTeam(cell.TeamId)
+	team, err := teamStore.GetTeam(ctx, cell.TeamId)
 	if err != nil {
 		return fmt.Errorf("error getting team: %v", err)
 	}

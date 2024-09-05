@@ -1,11 +1,52 @@
 package templates
 
-templ WaitlistSuccess() {
-	<h1>you're on the list. very nice</h1>
+import "github.com/onmetal-dev/metal/lib/form"
+
+type JoinWaitlistFormData struct {
+	Email string `validate:"required,email"`
 }
 
-templ WaitlistError(err string) {
-	<p>{ err }</p>
+templ WaitlistForm(data JoinWaitlistFormData, errors form.FieldErrors, submitError error, successMsg string) {
+	<form
+		novalidate
+		hx-post="/waitlist"
+		hx-disabled-elt="find button[type='submit'], find input[name='Email']"
+		hx-trigger="submit"
+		hx-indicator="find .loading"
+		hx-swap="outerHTML"
+		class="flex flex-col items-center gap-2"
+	>
+		<div class="join">
+			<input
+				type="email"
+				name="Email"
+				class={ cls("text-xs input input-sm input-bordered", errors.Get("Email"), "input-error") }
+				placeholder="🤘@lfg.com"
+				value={ form.InputValue(data.Email) }
+			/>
+			<div class="flex items-center justify-start gap-2">
+				<button type="submit" class="btn btn-sm btn-primary">join waitlist</button>
+				<span class="htmx-indicator loading loading-ring loading-sm"></span>
+			</div>
+		</div>
+		if submitError != nil {
+			<div class="text-error">
+				<span>{ submitError.Error() }</span>
+			</div>
+		} else if errors.Get("Email") != nil {
+			<div class="text-error">
+				<span>that's not an email</span>
+			</div>
+		} else if successMsg != "" {
+			<div class="text-primary">
+				<span>{ successMsg }</span>
+			</div>
+		} else {
+			<div>
+				<span>&nbsp;</span>
+			</div>
+		}
+	</form>
 }
 
 templ Index() {
@@ -15,24 +56,7 @@ templ Index() {
 				<div class="flex flex-col items-center max-w-md">
 					<h1 class="text-5xl font-bold">orchestrate your cloud exit</h1>
 					<p class="py-6">metal is the fastest way to start using compute on bare metal servers</p>
-					<div class="join" hx-ext="response-targets">
-						<form
-							hx-post="/waitlist"
-							hx-trigger="submit"
-							hx-target-400="#waitlist-error"
-							hx-swap="outerHTML"
-						>
-							<div id="waitlist-error"></div>
-							<input
-								class="text-xs input input-sm input-bordered"
-								placeholder="🤘@lfg.com"
-								type="email"
-								name="email"
-								id="email"
-							/>
-							<button class="btn btn-sm btn-primary">waitlist</button>
-						</form>
-					</div>
+					@WaitlistForm(JoinWaitlistFormData{}, form.FieldErrors{}, nil, "")
 				</div>
 			</div>
 		</div>

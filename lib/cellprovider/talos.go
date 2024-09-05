@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,6 +39,10 @@ import (
 	clientconfig "github.com/siderolabs/talos/pkg/machinery/client/config"
 	"github.com/siderolabs/talos/pkg/machinery/config"
 	"github.com/siderolabs/talos/pkg/machinery/config/generate/secrets"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/sdk/trace"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -51,11 +56,12 @@ import (
 
 // TalosClusterCellProvider creates a talos k8s cluster using cloudflare for DNS
 type TalosClusterCellProvider struct {
-	dnsProvider dnsprovider.DNSProvider
-	cellStore   store.CellStore
-	serverStore store.ServerStore
-	tmpDirRoot  string
-	logger      *slog.Logger
+	dnsProvider    dnsprovider.DNSProvider
+	cellStore      store.CellStore
+	serverStore    store.ServerStore
+	tmpDirRoot     string
+	logger         *slog.Logger
+	tracerProvider *trace.TracerProvider
 }
 
 var _ CellProvider = &TalosClusterCellProvider{}
@@ -92,6 +98,12 @@ func WithLogger(logger *slog.Logger) TalosClusterCellProviderOption {
 	}
 }
 
+func WithTracerProvider(tp *trace.TracerProvider) TalosClusterCellProviderOption {
+	return func(p *TalosClusterCellProvider) {
+		p.tracerProvider = tp
+	}
+}
+
 func NewTalosClusterCellProvider(opts ...TalosClusterCellProviderOption) (*TalosClusterCellProvider, error) {
 	provider := &TalosClusterCellProvider{}
 	for _, opt := range opts {
@@ -112,6 +124,9 @@ func NewTalosClusterCellProvider(opts ...TalosClusterCellProviderOption) (*Talos
 	}
 	if provider.logger == nil {
 		errs = append(errs, fmt.Errorf("must provide a valid logger"))
+	}
+	if provider.tracerProvider == nil {
+		errs = append(errs, fmt.Errorf("must provide a valid tracer provider"))
 	}
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("errors: %v", errs)
@@ -137,7 +152,11 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 	}
 
 	// figure out install disk
-	c, err := client.New(ctx, client.WithTLSConfig(&tls.Config{InsecureSkipVerify: true}), client.WithEndpoints(*opts.FirstServer.PublicIpv4))
+	c, err := client.New(ctx,
+		client.WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
+		client.WithEndpoints(*opts.FirstServer.PublicIpv4),
+		client.WithGRPCDialOptions(grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(p.tracerProvider)))),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create talos client: %w", err)
 	}
@@ -297,6 +316,7 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 	c, err = client.New(ctx,
 		client.WithConfigFromFile(filepath.Join(tempDir, "clusterconfig", "talosconfig")),
 		client.WithContextName(opts.Name),
+		client.WithGRPCDialOptions(grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(p.tracerProvider)))),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create talos client from config: %w", err)
@@ -376,7 +396,7 @@ func (p *TalosClusterCellProvider) ServerStats(ctx context.Context, cellId strin
 		return nil, fmt.Errorf("error getting cell: %v", err)
 	}
 
-	k8sClient, err := initializeK8sClient(cell.TalosCellData.Kubecfg)
+	k8sClient, err := initializeK8sClient(cell.TalosCellData.Kubecfg, p.tracerProvider)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing k8s client: %v", err)
 	}
@@ -388,6 +408,7 @@ func (p *TalosClusterCellProvider) ServerStats(ctx context.Context, cellId strin
 
 	talosClient, err := client.New(ctx,
 		client.WithConfig(talosClientConfig),
+		client.WithGRPCDialOptions(grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(p.tracerProvider)))),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create talos client from config: %w", err)
@@ -405,7 +426,7 @@ func (p *TalosClusterCellProvider) ServerStats(ctx context.Context, cellId strin
 
 	go func() {
 		defer wg.Done()
-		nodeInfo, nodeInfoErr = getNodeIpv4ToLabels(k8sClient)
+		nodeInfo, nodeInfoErr = getNodeIpv4ToLabels(ctx, k8sClient)
 	}()
 
 	go func() {
@@ -544,6 +565,44 @@ func (p *TalosClusterCellProvider) AdvanceDeployment(ctx context.Context, cellId
 	return nil, nil
 }
 
+func (p *TalosClusterCellProvider) DestroyDeployments(ctx context.Context, cellId string, deployments []store.Deployment) error {
+	cell, err := p.cellStore.Get(cellId)
+	if err != nil {
+		return fmt.Errorf("error getting cell: %v", err)
+	}
+	if cell.TalosCellData == nil {
+		return fmt.Errorf("cell %s has no config", cellId)
+	}
+
+	clientset, err := initializeK8sClient(cell.TalosCellData.Kubecfg, p.tracerProvider)
+	if err != nil {
+		return fmt.Errorf("error initializing k8s client: %v", err)
+	}
+
+	for _, deployment := range deployments {
+		k8sDeployment, err := clientset.AppsV1().Deployments(deployment.Env.Name).Get(ctx, deployment.App.Name, metav1.GetOptions{})
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				continue // job's done
+			}
+			return fmt.Errorf("error getting deployment: %v", err)
+		}
+		if k8sDeployment.Annotations["onmetal.dev/app-id"] != deployment.App.Id {
+			return fmt.Errorf("deployment app id mismatch")
+		}
+		if k8sDeployment.Annotations["onmetal.dev/team-id"] != deployment.TeamId {
+			return fmt.Errorf("deployment team id mismatch")
+		}
+		if k8sDeployment.Annotations["onmetal.dev/deployment-id"] != fmt.Sprintf("%d", deployment.Id) {
+			continue // deployment in k8s is more recent, so we don't need to delete it
+		}
+		if err := clientset.AppsV1().Deployments(deployment.Env.Name).Delete(ctx, deployment.App.Name, metav1.DeleteOptions{}); err != nil {
+			return fmt.Errorf("error deleting deployment: %v", err)
+		}
+	}
+	return nil
+}
+
 func (p *TalosClusterCellProvider) handlePendingDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error) {
 	// TODO: change error returns into AdvanceDeploymentResult with a failed status and a reason
 	cell, err := p.cellStore.Get(cellId)
@@ -554,12 +613,12 @@ func (p *TalosClusterCellProvider) handlePendingDeployment(ctx context.Context, 
 		return nil, fmt.Errorf("cell %s has no config", cellId)
 	}
 
-	clientset, err := initializeK8sClient(cell.TalosCellData.Kubecfg)
+	clientset, err := initializeK8sClient(cell.TalosCellData.Kubecfg, p.tracerProvider)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing k8s client: %v", err)
 	}
 
-	if err := ensureNamespaceExists(clientset, deployment.Env.Name); err != nil {
+	if err := ensureNamespaceExists(ctx, clientset, deployment.Env.Name); err != nil {
 		return nil, fmt.Errorf("error ensuring namespace exists: %v", err)
 	}
 
@@ -650,7 +709,7 @@ func (p *TalosClusterCellProvider) handleDeployingDeployment(ctx context.Context
 		return nil, fmt.Errorf("cell %s has no config", cellId)
 	}
 
-	clientset, err := initializeK8sClient(cell.TalosCellData.Kubecfg)
+	clientset, err := initializeK8sClient(cell.TalosCellData.Kubecfg, p.tracerProvider)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing k8s client: %v", err)
 	}
@@ -696,11 +755,14 @@ func (p *TalosClusterCellProvider) handleDeployingDeployment(ctx context.Context
 }
 
 // initializeK8sClient initializes the Kubernetes client using the provided kubeconfig string.
-func initializeK8sClient(kubeconfig string) (*kubernetes.Clientset, error) {
+func initializeK8sClient(kubeconfig string, tp *trace.TracerProvider) (*kubernetes.Clientset, error) {
 	config, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create REST config from kubeconfig: %w", err)
 	}
+	config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		return otelhttp.NewTransport(rt, otelhttp.WithTracerProvider(tp))
+	})
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
@@ -715,8 +777,8 @@ type NodeInfo struct {
 }
 
 // getNodeIpv4ToLabels retrieves node labels and external IPs from the Kubernetes cluster.
-func getNodeIpv4ToLabels(clientset *kubernetes.Clientset) (map[string]NodeInfo, error) {
-	nodes, err := clientset.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+func getNodeIpv4ToLabels(ctx context.Context, clientset *kubernetes.Clientset) (map[string]NodeInfo, error) {
+	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
@@ -773,8 +835,8 @@ func parseNodeLabels(labels map[string]string) (NodeLabelInfo, error) {
 	return info, nil
 }
 
-func ensureNamespaceExists(clientset *kubernetes.Clientset, namespace string) error {
-	_, err := clientset.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
+func ensureNamespaceExists(ctx context.Context, clientset *kubernetes.Clientset, namespace string) error {
+	_, err := clientset.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			// Namespace doesn't exist, create it
@@ -783,7 +845,7 @@ func ensureNamespaceExists(clientset *kubernetes.Clientset, namespace string) er
 					Name: namespace,
 				},
 			}
-			_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			_, err := clientset.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 			if err != nil {
 				return fmt.Errorf("failed to create namespace: %v", err)
 			}

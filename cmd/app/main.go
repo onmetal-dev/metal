@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/cloudflare/cloudflare-go"
@@ -33,6 +32,7 @@ import (
 	database "github.com/onmetal-dev/metal/lib/store/db"
 	"github.com/onmetal-dev/metal/lib/store/dbstore"
 	"github.com/onmetal-dev/metal/lib/talosprovider"
+	"github.com/riandyrn/otelchi"
 	slogformatter "github.com/samber/slog-formatter"
 	"github.com/stripe/stripe-go/v79"
 	"github.com/stripe/stripe-go/v79/billing/meter"
@@ -43,13 +43,6 @@ import (
 	"github.com/stripe/stripe-go/v79/price"
 	"github.com/stripe/stripe-go/v79/product"
 	"github.com/stripe/stripe-go/v79/setupintent"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 /*
@@ -60,38 +53,6 @@ var Environment = "local"
 
 func init() {
 	os.Setenv("env", Environment)
-}
-
-func initTracerProvider() (*sdktrace.TracerProvider, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	resource, err := resource.New(ctx, resource.WithAttributes(
-		attribute.String("service.name", "metal"),
-		attribute.String("service.namespace", "default"),
-	))
-	if err != nil {
-		return nil, err
-	}
-
-	exporter, err := otlptrace.New(
-		ctx,
-		otlptracegrpc.NewClient(
-			otlptracegrpc.WithInsecure(),
-			otlptracegrpc.WithEndpoint("localhost:4317"), // Default OTLP gRPC port
-		),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-		sdktrace.WithResource(resource),
-		sdktrace.WithBatcher(exporter),
-	)
-	otel.SetTracerProvider(tp)
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-	return tp, nil
 }
 
 func mustCreate[T any](slogger *slog.Logger, f func() (T, error)) T {
@@ -113,9 +74,20 @@ func main() {
 		),
 	)
 	c := config.MustLoadConfig()
-	ctx := context.Background()
-	tp, _ := initTracerProvider()
-	defer tp.Shutdown(ctx)
+
+	// Handle SIGINT (CTRL+C) gracefully.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	// Set up OpenTelemetry.
+	otelShutdown, tracerProvider, err := setupOTelSDK(ctx)
+	if err != nil {
+		return
+	}
+	// Handle shutdown properly so nothing leaks.
+	defer func() {
+		err = errors.Join(err, otelShutdown(context.Background()))
+	}()
 
 	// stripe clients
 	stripeBackend := stripe.NewBackends(http.DefaultClient).API
@@ -152,7 +124,7 @@ func main() {
 		Key: c.StripeSecretKey,
 	}
 
-	db := database.MustOpen(c.DatabaseHost, c.DatabaseUser, c.DatabasePassword, c.DatabaseName, c.DatabasePort, c.DatabaseSslMode)
+	db := database.MustOpen(c.DatabaseHost, c.DatabaseUser, c.DatabasePassword, c.DatabaseName, c.DatabasePort, c.DatabaseSslMode, tracerProvider)
 	passwordhash := passwordhash.NewHPasswordHash()
 
 	waitlistStore := dbstore.NewWaitlistStore(
@@ -245,6 +217,7 @@ func main() {
 			cellprovider.WithCellStore(cellStore),
 			cellprovider.WithServerStore(serverStore),
 			cellprovider.WithTmpDirRoot(c.TmpDirRoot),
+			cellprovider.WithTracerProvider(tracerProvider),
 			cellprovider.WithLogger(slog.Default()),
 		)
 	})
@@ -347,6 +320,7 @@ func main() {
 					next.ServeHTTP(w, r.WithContext(ctx))
 				})
 			},
+			otelchi.Middleware("metal", otelchi.WithChiRoutes(r), otelchi.WithTracerProvider(tracerProvider)),
 		)
 
 		r.NotFound(handlers.NewNotFoundHandler().ServeHTTP)
@@ -379,37 +353,41 @@ func main() {
 			r.Get("/onboarding/{teamId}/payment", handlers.NewGetOnboardingPaymentHandler(teamStore, stripeCustomerSession).ServeHTTP)
 			r.Post("/onboarding/{teamId}/payment", handlers.NewPostOnboardingPaymentHandler(teamStore, stripeSetupIntent).ServeHTTP)
 			r.Get("/onboarding/{teamId}/payment/confirm", handlers.NewGetOnboardingPaymentConfirmHandler(teamStore, stripeSetupIntent, stripeCustomer).ServeHTTP)
-			r.Get("/dashboard/{teamId}", handlers.NewDashboardHandler(userStore, teamStore, serverStore, cellStore, deploymentStore, cellProviderForType).ServeHTTP)
+			r.Get("/dashboard/{teamId}", handlers.NewDashboardHandler(userStore, teamStore, serverStore, cellStore, deploymentStore, appStore, cellProviderForType).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/new", handlers.NewGetServersNewHandler(teamStore, serverOfferingStore).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout", handlers.NewGetServersCheckoutHandler(teamStore, serverOfferingStore, stripeCheckoutSession, stripeProduct, stripePrice, stripeMeter, c.StripePublishableKey).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout-return-url", handlers.NewGetServersCheckoutReturnHandler(teamStore, serverOfferingStore, stripeCheckoutSession, producerFulfillment).ServeHTTP)
-			r.Get("/dashboard/{teamId}/apps/new", handlers.NewGetAppsNewHandler(userStore, teamStore, serverStore, cellStore).ServeHTTP)
+			r.Get("/dashboard/{teamId}/apps/new", handlers.NewAppsNewHandler(userStore, teamStore, serverStore, cellStore).ServeHTTP)
 			r.Post("/dashboard/{teamId}/apps/new", handlers.NewPostAppsNewHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, producerDeployment).ServeHTTP)
+			r.Delete("/dashboard/{teamId}/apps/{appId}", handlers.NewDeleteAppHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, cellProviderForType).ServeHTTP)
 		})
 	})
-
-	killSig := make(chan os.Signal, 1)
-
-	signal.Notify(killSig, os.Interrupt, syscall.SIGTERM)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", c.Port),
 		Handler: r,
 	}
 
+	srvErr := make(chan error, 1)
 	go func() {
-		err := srv.ListenAndServe()
+		srvErr <- srv.ListenAndServe()
+	}()
+	slogger.Info("Server started", slog.String("port", c.Port), slog.String("env", Environment))
 
+	// Wait for interruption.
+	select {
+	case err = <-srvErr:
 		if errors.Is(err, http.ErrServerClosed) {
 			slogger.Info("Server shutdown complete")
 		} else if err != nil {
 			slogger.Error("Server error", slog.Any("err", err))
-			os.Exit(1)
 		}
-	}()
-
-	slogger.Info("Server started", slog.String("port", c.Port), slog.String("env", Environment))
-	<-killSig
+		return
+	case <-ctx.Done():
+		// Wait for first CTRL+C.
+		// Stop receiving signal notifications as soon as possible.
+		stop()
+	}
 
 	slogger.Info("Shutting down server")
 
@@ -422,7 +400,5 @@ func main() {
 		slogger.Error("Server shutdown failed", slog.Any("err", err))
 		os.Exit(1)
 	}
-
 	slogger.Info("Server shutdown complete")
-
 }

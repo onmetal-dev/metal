@@ -1,6 +1,8 @@
 package dbstore
 
 import (
+	"context"
+
 	"github.com/onmetal-dev/metal/lib/store"
 	"go.jetify.com/typeid"
 	"gorm.io/gorm"
@@ -45,9 +47,9 @@ func (s *ServerStore) UpdateProviderId(serverId string, providerId string) error
 	return s.db.Model(&store.Server{}).Where("id = ?", serverId).Update("provider_id", &providerId).Error
 }
 
-func (s *ServerStore) GetServersForTeam(teamId string) ([]store.Server, error) {
+func (s *ServerStore) GetServersForTeam(ctx context.Context, teamId string) ([]store.Server, error) {
 	var servers []store.Server
-	return servers, s.db.Where("team_id = ?", teamId).Preload("BillingStripeUsageBasedHourly").Find(&servers).Error
+	return servers, s.db.WithContext(ctx).Where("team_id = ?", teamId).Preload("BillingStripeUsageBasedHourly").Find(&servers).Error
 }
 
 func (s *ServerStore) UpdateServerBillingStripeUsageBasedHourly(serverId string, usageBasedHourly *store.ServerBillingStripeUsageBasedHourly) error {

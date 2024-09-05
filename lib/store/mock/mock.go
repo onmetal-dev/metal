@@ -1,6 +1,8 @@
 package mock
 
 import (
+	"context"
+
 	"github.com/onmetal-dev/metal/lib/store"
 
 	"github.com/stretchr/testify/mock"
@@ -55,8 +57,8 @@ func (m *TeamStoreMock) CreateTeam(name string, description string) (*store.Team
 	return args.Get(0).(*store.Team), args.Error(1)
 }
 
-func (m *TeamStoreMock) GetTeam(id string) (*store.Team, error) {
-	args := m.Called(id)
+func (m *TeamStoreMock) GetTeam(ctx context.Context, id string) (*store.Team, error) {
+	args := m.Called(ctx, id)
 	return args.Get(0).(*store.Team), args.Error(1)
 }
 
@@ -90,13 +92,13 @@ func (m *TeamStoreMock) GetInvitesForEmail(email string) ([]store.TeamMemberInvi
 	return args.Get(0).([]store.TeamMemberInvite), args.Error(1)
 }
 
-func (m *TeamStoreMock) CreateStripeCustomer(teamId string, billingEmail string) error {
-	args := m.Called(teamId, billingEmail)
+func (m *TeamStoreMock) CreateStripeCustomer(ctx context.Context, teamId string, billingEmail string) error {
+	args := m.Called(ctx, teamId, billingEmail)
 	return args.Error(0)
 }
 
-func (m *TeamStoreMock) AddPaymentMethod(teamId string, paymentMethodData store.PaymentMethod) error {
-	args := m.Called(teamId, paymentMethodData)
+func (m *TeamStoreMock) AddPaymentMethod(ctx context.Context, teamId string, paymentMethodData store.PaymentMethod) error {
+	args := m.Called(ctx, teamId, paymentMethodData)
 	return args.Error(0)
 }
 

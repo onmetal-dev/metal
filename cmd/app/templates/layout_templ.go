@@ -233,7 +233,7 @@ func footer() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div><p class=\"text-xs\">made with ❤️ in cincinnati, oh</p></div><div><p class=\"text-xs\"><a href=\"https://github.com/onmetal-dev/metal\">github</a></p></div></div></footer>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-row items-center gap-2\"><p class=\"text-xs\">made with ❤️ in cincinnati, oh</p><img src=\"/static/images/ohio.svg\" width=\"20\"></div><div><p class=\"text-xs\"><a href=\"https://github.com/onmetal-dev/metal\">github</a></p></div></div></footer>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -288,7 +288,7 @@ func nav(user *store.User) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/layout.templ`, Line: 74, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/layout.templ`, Line: 75, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {

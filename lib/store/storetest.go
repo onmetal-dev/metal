@@ -1,12 +1,14 @@
 package store
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 type TestStoresConfig struct {
+	WaitlistStore   WaitlistStore
 	UserStore       UserStore
 	TeamStore       TeamStore
 	ServerStore     ServerStore
@@ -56,12 +58,12 @@ func createCell(t *testing.T, cellStore CellStore, cell Cell) Cell {
 	return c
 }
 
-func addUserToTeam(t *testing.T, stores TestStoresConfig, userId, teamId string) {
+func addUserToTeam(t *testing.T, ctx context.Context, stores TestStoresConfig, userId, teamId string) {
 	require := require.New(t)
 	err := stores.TeamStore.AddUserToTeam(userId, teamId)
 	require.NoError(err, "Failed to add user to team")
 
-	updatedTeam, err := stores.TeamStore.GetTeam(teamId)
+	updatedTeam, err := stores.TeamStore.GetTeam(ctx, teamId)
 	require.NoError(err, "Failed to get updated team")
 	require.Equal(1, len(updatedTeam.Members), "Expected team members to be 1")
 	require.Equal(userId, updatedTeam.Members[0].UserId, "Expected user to be in team members")
@@ -70,6 +72,7 @@ func addUserToTeam(t *testing.T, stores TestStoresConfig, userId, teamId string)
 func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 	return func(t *testing.T) {
 		t.Run("User and Team Operations", func(t *testing.T) {
+			ctx := context.Background()
 			require := require.New(t)
 			email := "test@example.com"
 			password := "password123"
@@ -79,7 +82,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			teamDesc := "A team for testing"
 			team := createTeam(t, stores, teamName, teamDesc)
 
-			addUserToTeam(t, stores, user.Id, team.Id)
+			addUserToTeam(t, ctx, stores, user.Id, team.Id)
 
 			// Create a team invite
 			inviteEmail := "invite@example.com"
@@ -87,7 +90,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			require.NoError(err, "Failed to create team invite")
 
 			// Verify invite is present in the team
-			teamWithInvite, err := stores.TeamStore.GetTeam(team.Id)
+			teamWithInvite, err := stores.TeamStore.GetTeam(ctx, team.Id)
 			require.NoError(err, "Failed to get team with invite")
 			require.Equal(1, len(teamWithInvite.InvitedMembers), "Expected team invited members to be 1")
 			require.Equal(inviteEmail, teamWithInvite.InvitedMembers[0].Email, "Expected invite email to be %s, got %s", inviteEmail, teamWithInvite.InvitedMembers[0].Email)
@@ -103,7 +106,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			require.NoError(err, "Failed to delete team invite")
 
 			// Verify invite has been deleted
-			teamAfterDelete, err := stores.TeamStore.GetTeam(team.Id)
+			teamAfterDelete, err := stores.TeamStore.GetTeam(ctx, team.Id)
 			require.NoError(err, "Failed to get team after invite deletion")
 			require.Equal(0, len(teamAfterDelete.InvitedMembers), "Expected team invited members to be empty")
 
@@ -113,6 +116,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 		})
 		t.Run("Server and cell operations", func(t *testing.T) {
 			require := require.New(t)
+			ctx := context.Background()
 			email := "test@example.com"
 			password := "password123"
 			user := createUser(t, stores, email, password)
@@ -121,7 +125,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			teamDesc := "A team for testing"
 			team := createTeam(t, stores, teamName, teamDesc)
 
-			addUserToTeam(t, stores, user.Id, team.Id)
+			addUserToTeam(t, ctx, stores, user.Id, team.Id)
 
 			server := createServer(t, stores.ServerStore, Server{
 				TeamId:       team.Id,
@@ -168,6 +172,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 
 		t.Run("App and AppSettings Operations", func(t *testing.T) {
 			require := require.New(t)
+			ctx := context.Background()
 
 			// Create a user and team for the app
 			email := "apptest@example.com"
@@ -178,7 +183,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			teamDesc := "A team for testing apps"
 			team := createTeam(t, stores, teamName, teamDesc)
 
-			addUserToTeam(t, stores, user.Id, team.Id)
+			addUserToTeam(t, ctx, stores, user.Id, team.Id)
 
 			// Create an app
 			appName := "Test App"
@@ -195,13 +200,13 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			require.Equal(user.Id, app.UserId, "Expected app user id to match")
 
 			// Get the created app
-			fetchedApp, err := stores.AppStore.Get(app.Id)
+			fetchedApp, err := stores.AppStore.Get(ctx, app.Id)
 			require.NoError(err, "Failed to get app")
 			require.Equal(app.Id, fetchedApp.Id, "Expected fetched app id to match")
 			require.Equal(app.Name, fetchedApp.Name, "Expected fetched app name to match")
 
 			// Get apps for the team
-			teamApps, err := stores.AppStore.GetForTeam(team.Id)
+			teamApps, err := stores.AppStore.GetForTeam(ctx, team.Id)
 			require.NoError(err, "Failed to get apps for team")
 			require.Equal(1, len(teamApps), "Expected one app for the team")
 			require.Equal(app.Id, teamApps[0].Id, "Expected team app id to match")
@@ -248,6 +253,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 
 		t.Run("Deployment Operations", func(t *testing.T) {
 			require := require.New(t)
+			ctx := context.Background()
 
 			// Create a user and team for the deployment tests
 			email := "deploytest@example.com"
@@ -258,7 +264,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			teamDesc := "A team for testing deployments"
 			team := createTeam(t, stores, teamName, teamDesc)
 
-			addUserToTeam(t, stores, user.Id, team.Id)
+			addUserToTeam(t, ctx, stores, user.Id, team.Id)
 
 			// Test Env operations
 			t.Run("Env Operations", func(t *testing.T) {
@@ -334,7 +340,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 
 			// Test Deployment operations
 			t.Run("Deployment Operations", func(t *testing.T) {
-				// Create App, Env, AppSettings, and AppEnvVars for Deployment
+				ctx := context.Background()
 				app, _ := stores.AppStore.Create(CreateAppOptions{Name: "test-app", TeamId: team.Id, UserId: user.Id})
 				env, _ := stores.DeploymentStore.CreateEnv(CreateEnvOptions{TeamId: team.Id, Name: "test-env"})
 				appSettings, _ := stores.AppStore.CreateAppSettings(CreateAppSettingsOptions{
@@ -381,14 +387,17 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 				require.Equal(uint(2), deployment2.Id, "Expected second deployment id to be 2")
 
 				// Get Deployments for Team
-				teamDeployments, err := stores.DeploymentStore.GetForTeam(team.Id)
+				teamDeployments, err := stores.DeploymentStore.GetForTeam(ctx, team.Id)
 				require.NoError(err, "Failed to get deployments for team")
 				require.Equal(2, len(teamDeployments), "Expected two deployments for the team")
 
 				// Get Deployments for App
-				appDeployments, err := stores.DeploymentStore.GetForApp(app.Id)
+				appDeployments, err := stores.DeploymentStore.GetForApp(ctx, app.Id)
 				require.NoError(err, "Failed to get deployments for app")
 				require.Equal(2, len(appDeployments), "Expected two deployments for the app")
+
+				// Verify deployments are ordered descending by date
+				require.True(appDeployments[0].CreatedAt.After(appDeployments[1].CreatedAt), "Expected deployments to be ordered descending by date")
 
 				// Get Deployments for Env
 				envDeployments, err := stores.DeploymentStore.GetForEnv(env.Id)
@@ -408,6 +417,27 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 				_, err = stores.DeploymentStore.Get(app.Id, env.Id, deployment.Id)
 				require.Error(err, "Expected error when getting deleted deployment")
 			})
+		})
+
+		t.Run("Waitlist Operations", func(t *testing.T) {
+			require := require.New(t)
+			ctx := context.Background()
+
+			// Test adding a new email to the waitlist
+			email := "test@example.com"
+			err := stores.WaitlistStore.Add(ctx, email)
+			require.NoError(err, "Failed to add email to waitlist")
+
+			// Test adding a duplicate email to the waitlist
+			err = stores.WaitlistStore.Add(ctx, email)
+			require.Error(err, "Expected error when adding duplicate email to waitlist")
+			require.ErrorIs(err, ErrDuplicateWaitlistEntry, "Expected ErrDuplicateWaitlistEntry error")
+
+			// Test adding an invalid email to the waitlist
+			invalidEmail := "invalid-email"
+			err = stores.WaitlistStore.Add(ctx, invalidEmail)
+			require.Error(err, "Expected error when adding invalid email to waitlist")
+			require.Contains(err.Error(), "not a valid email", "Expected invalid email error message")
 		})
 	}
 }

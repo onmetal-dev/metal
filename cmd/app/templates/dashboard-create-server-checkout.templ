@@ -1,14 +1,15 @@
 package templates
 
 templ CreateServerCheckout(nonce string, stripePublishableKey string, stripeCheckoutSessionClientSecret string) {
-	<div class="flex flex-col items-center justify-start max-w-md gap-4 mx-auto">
-		<div id="checkout" class="w-full skeleton h-80"></div>
-		@templ.JSONScript("scriptData", map[string]string{
-			"stripeCheckoutSessionClientSecret": stripeCheckoutSessionClientSecret,
-			"stripePublishableKey":              stripePublishableKey,
-		}).WithNonceFromString(nonce)
-		// see https://docs.stripe.com/checkout/embedded/quickstart
-		<script nonce={ nonce }>
+	<div class="flex flex-col gap-4">
+		<div class="flex flex-col items-center justify-start max-w-md gap-4 mx-auto">
+			<div id="checkout" class="w-full skeleton h-80"></div>
+			@templ.JSONScript("scriptData", map[string]string{
+				"stripeCheckoutSessionClientSecret": stripeCheckoutSessionClientSecret,
+				"stripePublishableKey":              stripePublishableKey,
+			}).WithNonceFromString(nonce)
+			// see https://docs.stripe.com/checkout/embedded/quickstart
+			<script nonce={ nonce }>
             const scriptData = JSON.parse(document.getElementById('scriptData').textContent);
             const stripe = Stripe(scriptData.stripePublishableKey);
             initialize();
@@ -25,6 +26,7 @@ templ CreateServerCheckout(nonce string, stripePublishableKey string, stripeChec
                 checkout.mount('#checkout');
             }
         </script>
+		</div>
 	</div>
 }
 

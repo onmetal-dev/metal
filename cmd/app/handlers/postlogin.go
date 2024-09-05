@@ -42,43 +42,44 @@ func NewPostLoginHandler(
 }
 
 func (h *PostLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 	next := r.FormValue("next")
 	user, err := h.userStore.GetUser(email)
 	if err != nil || user == nil {
-		logger.FromContext(r.Context()).Error("failed to get user with email", "email", email, "error", err)
+		logger.FromContext(ctx).Error("failed to get user with email", "email", email, "error", err)
 		w.WriteHeader(http.StatusUnauthorized)
 		c := templates.LoginError()
-		c.Render(r.Context(), w)
+		c.Render(ctx, w)
 		return
 	}
 
 	passwordIsValid, err := h.passwordhash.ComparePasswordAndHash(password, user.Password)
 
 	if err != nil || !passwordIsValid {
-		logger.FromContext(r.Context()).Error("failed to compare password and hash", "email", email, "error", err)
+		logger.FromContext(ctx).Error("failed to compare password and hash", "email", email, "error", err)
 		w.WriteHeader(http.StatusUnauthorized)
 		c := templates.LoginError()
-		c.Render(r.Context(), w)
+		c.Render(ctx, w)
 		return
 	}
 
 	session, _ := h.sessionStore.Get(r, h.sessionName)
-	logger.FromContext(r.Context()).Info("user logged in", "user", user)
+	logger.FromContext(ctx).Info("user logged in", "user", user)
 	session.Values["user"] = user
 	if err := h.sessionStore.Save(r, w, session); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	logger.FromContext(r.Context()).Info("user", "user", user)
+	logger.FromContext(ctx).Info("user", "user", user)
 
 	// first log in / onboarding logic
 	if len(user.TeamMemberships) == 1 {
-		logger.FromContext(r.Context()).Info("user has one team membership", "user", user)
+		logger.FromContext(ctx).Info("user has one team membership", "user", user)
 		// check for incomplete onboarding
-		team, err := h.teamStore.GetTeam(user.TeamMemberships[0].TeamId)
+		team, err := h.teamStore.GetTeam(ctx, user.TeamMemberships[0].TeamId)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

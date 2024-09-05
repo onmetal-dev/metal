@@ -38,7 +38,7 @@ func NewGetServersNewHandler(teamStore store.TeamStore, serverOfferingStore stor
 // it returns non-nil if the user is a member of the team
 // it takes care of responding to the http request as well
 // this should probably be middleware or something... potentially cached (but that might be a headache to manage cache invalidation)
-func validateAndFetchTeams(teamStore store.TeamStore, w http.ResponseWriter, teamId string, user *store.User) (*store.Team, []store.Team) {
+func validateAndFetchTeams(ctx context.Context, teamStore store.TeamStore, w http.ResponseWriter, teamId string, user *store.User) (*store.Team, []store.Team) {
 	if !lo.ContainsBy(user.TeamMemberships, func(m store.TeamMember) bool {
 		return m.TeamId == teamId
 	}) {
@@ -46,7 +46,7 @@ func validateAndFetchTeams(teamStore store.TeamStore, w http.ResponseWriter, tea
 		return nil, nil
 	}
 
-	team, err := teamStore.GetTeam(teamId)
+	team, err := teamStore.GetTeam(ctx, teamId)
 	if err != nil {
 		http.Error(w, "error fetching team", http.StatusInternalServerError)
 		return nil, nil
@@ -57,7 +57,7 @@ func validateAndFetchTeams(teamStore store.TeamStore, w http.ResponseWriter, tea
 
 	userTeams := make([]store.Team, len(user.TeamMemberships))
 	for i, m := range user.TeamMemberships {
-		team, err := teamStore.GetTeam(m.TeamId)
+		team, err := teamStore.GetTeam(ctx, m.TeamId)
 		if err != nil || team == nil {
 			http.Error(w, "error fetching team", http.StatusInternalServerError)
 			return nil, nil
@@ -69,9 +69,10 @@ func validateAndFetchTeams(teamStore store.TeamStore, w http.ResponseWriter, tea
 }
 
 func (h *GetServersNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
-	user := middleware.GetUser(r.Context())
-	team, userTeams := validateAndFetchTeams(h.teamStore, w, teamId, user)
+	user := middleware.GetUser(ctx)
+	team, userTeams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
@@ -85,8 +86,8 @@ func (h *GetServersNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		User:          *user,
 		UserTeams:     userTeams,
 		ActiveTeam:    *team,
-		ActiveTabName: templates.TabNameCreateServer,
-	}, templates.CreateServer(teamId, serverOfferings)).Render(r.Context(), w); err != nil {
+		ActiveTabName: templates.TabNameBuyServer,
+	}, templates.CreateServer(teamId, serverOfferings)).Render(ctx, w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }
@@ -237,9 +238,10 @@ func createStripeProductsForOffering(offering store.ServerOffering, locationId s
 }
 
 func (h *GetServersCheckoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
-	user := middleware.GetUser(r.Context())
-	team, userTeams := validateAndFetchTeams(h.teamStore, w, teamId, user)
+	user := middleware.GetUser(ctx)
+	team, userTeams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
@@ -348,11 +350,11 @@ func (h *GetServersCheckoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		User:          *user,
 		UserTeams:     userTeams,
 		ActiveTeam:    *team,
-		ActiveTabName: templates.TabNameCreateServer,
+		ActiveTabName: templates.TabNameBuyServer,
 		AdditionalScripts: []templates.ScriptTag{
 			{Src: "https://js.stripe.com/v3/"},
 		},
-	}, templates.CreateServerCheckout(nonce, h.stripePublishableKey, checkoutSession.ClientSecret)).Render(r.Context(), w); err != nil {
+	}, templates.CreateServerCheckout(nonce, h.stripePublishableKey, checkoutSession.ClientSecret)).Render(ctx, w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }
@@ -374,9 +376,10 @@ func NewGetServersCheckoutReturnHandler(teamStore store.TeamStore, serverOfferin
 }
 
 func (h *GetServersCheckoutReturnHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
-	user := middleware.GetUser(r.Context())
-	team, _ := validateAndFetchTeams(h.teamStore, w, teamId, user)
+	user := middleware.GetUser(ctx)
+	team, _ := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
@@ -415,7 +418,7 @@ func (h *GetServersCheckoutReturnHandler) ServeHTTP(w http.ResponseWriter, r *ht
 		return
 	}
 
-	middleware.AddFlash(r.Context(), "success! hold tight while we spin up your new server")
+	middleware.AddFlash(ctx, "success! hold tight while we spin up your new server")
 	http.Redirect(w, r, fmt.Sprintf("/dashboard/%s", teamId), http.StatusFound)
 }
 
