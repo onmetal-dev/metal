@@ -42,7 +42,7 @@ func CSPMiddleware(next http.Handler) http.Handler {
 			Htmx:            generateRandomString(16),
 			ResponseTargets: generateRandomString(16),
 			Tw:              generateRandomString(16),
-			HtmxCssHash:     "sha256-pgn1TCGZX6O77zDvy0oTODMOxemn0oj0LeCnQTRj7Kg=",
+			HtmxCssHash:     "sha256-bsV5JivYxvGywDAZ22EZJKBFip65Ng9xoJVLbBg7bdo=",
 		}
 
 		// set nonces in context
