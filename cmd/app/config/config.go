@@ -1,6 +1,9 @@
 package config
 
-import "github.com/kelseyhightower/envconfig"
+import (
+	"github.com/kelseyhightower/envconfig"
+	"github.com/onmetal-dev/metal/lib/validate"
+)
 
 type Config struct {
 	Port                          string `envconfig:"PORT" default:"8080" required:"true"`
@@ -23,7 +26,23 @@ type Config struct {
 	TmpDirRoot                    string `envconfig:"TMP_DIR_ROOT" default:"/tmp" required:"true"`
 	CloudflareApiToken            string `envconfig:"CLOUDFLARE_API_TOKEN" required:"true"`
 	CloudflareOnmetalDotRunZoneId string `envconfig:"CLOUDFLARE_ONMETAL_DOT_RUN_ZONE_ID" required:"true"`
+	Environment                   string `envconfig:"ENVIRONMENT" required:"true" validate:"oneof=local staging production"`
 }
+
+type Environment string
+
+func (e Environment) IsProduction() bool {
+	return e == EnvironmentProduction
+}
+
+const (
+	EnvironmentLocal      Environment = "local"
+	EnvironmentStaging    Environment = "staging"
+	EnvironmentProduction Environment = "production"
+)
+
+// Set to local by default, can be overridden by loading config
+var Env Environment = EnvironmentLocal
 
 func loadConfig() (*Config, error) {
 	var cfg Config
@@ -31,6 +50,10 @@ func loadConfig() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := validate.Struct(&cfg); err != nil {
+		return nil, err
+	}
+	Env = Environment(cfg.Environment)
 	return &cfg, nil
 }
 

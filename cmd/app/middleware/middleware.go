@@ -17,10 +17,8 @@ type key string
 var NonceKey key = "nonces"
 
 type Nonces struct {
-	Htmx            string
-	ResponseTargets string
-	Tw              string
-	HtmxCssHash     string
+	Tw          string
+	HtmxCssHash string
 }
 
 func generateRandomString(length int) string {

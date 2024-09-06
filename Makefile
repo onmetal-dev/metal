@@ -1,6 +1,4 @@
 SHELL := /bin/bash
-# override this in CI to set to prod
-LDFLAGS ?= -ldflags "-X main.Environment=dev"
 
 .PHONY: templ-generate templ-watch
 templ-generate: templ
@@ -48,7 +46,7 @@ air:
 .PHONY: build
 build: templ-generate tailwind-build
 	mkdir -p bin/
-	go build $(LDFLAGS) -o ./bin/app ./cmd/app
+	go build -o ./bin/app ./cmd/app
 
 .PHONY: dev-app
 dev: bun

@@ -29,18 +29,9 @@ func TestCSPMiddleware(t *testing.T) {
 
 				nonces := GetNonces(ctx)
 				twNonce := GetTwNonce(ctx)
-				htmxNonce := GetHtmxNonce(ctx)
-				responseTargetsNonce := GetResponseTargetsNonce(ctx)
 
 				assert.Equal(nonces.Tw, twNonce)
 				assert.Len(twNonce, 32)
-
-				assert.Equal(nonces.Htmx, htmxNonce)
-				assert.Len(htmxNonce, 32)
-
-				assert.Equal(nonces.ResponseTargets, responseTargetsNonce)
-				assert.Len(responseTargetsNonce, 32)
-
 			})
 
 			middleware := CSPMiddleware(next)

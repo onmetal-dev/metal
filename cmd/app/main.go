@@ -45,16 +45,6 @@ import (
 	"github.com/stripe/stripe-go/v79/setupintent"
 )
 
-/*
-* Set to production at build time
-* used to determine what assets to load
- */
-var Environment = "local"
-
-func init() {
-	os.Setenv("env", Environment)
-}
-
 func mustCreate[T any](slogger *slog.Logger, f func() (T, error)) T {
 	v, err := f()
 	if err != nil {
@@ -372,7 +362,7 @@ func main() {
 	go func() {
 		srvErr <- srv.ListenAndServe()
 	}()
-	slogger.Info("Server started", slog.String("port", c.Port), slog.String("env", Environment))
+	slogger.Info("Server started", slog.String("port", c.Port), slog.String("env", string(config.Env)))
 
 	// Wait for interruption.
 	select {
