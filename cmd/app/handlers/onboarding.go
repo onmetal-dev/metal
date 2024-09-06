@@ -226,9 +226,8 @@ func (h *GetOnboardingPaymentConfirmHandler) ServeHTTP(w http.ResponseWriter, r 
 	}
 
 	nonce := generateNonce()
-	nonces := r.Context().Value(middleware.NonceKey).(middleware.Nonces)
 	confettiUrl := "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"
-	csp := fmt.Sprintf("script-src 'nonce-%s' %s 'nonce-%s' 'nonce-%s'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:", nonce, confettiUrl, nonces.Htmx, nonces.ResponseTargets)
+	csp := fmt.Sprintf("script-src 'nonce-%s' %s 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:", nonce, confettiUrl)
 	w.Header().Set("Content-Security-Policy", csp)
 	if err := templates.Layout(templates.OnboardingSuccess(nonce, teamId), "metal | onboarding", templates.ScriptTag{Src: confettiUrl}).Render(ctx, w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)

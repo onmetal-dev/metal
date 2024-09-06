@@ -390,7 +390,13 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 	return &cell, nil
 }
 
-func (p *TalosClusterCellProvider) ServerStats(ctx context.Context, cellId string) ([]ServerStats, error) {
+type clientSetup struct {
+	k8sClient   *kubernetes.Clientset
+	talosClient *client.Client
+	nodeIps     []string
+}
+
+func (p *TalosClusterCellProvider) setupClients(ctx context.Context, cellId string) (*clientSetup, error) {
 	cell, err := p.cellStore.Get(cellId)
 	if err != nil {
 		return nil, fmt.Errorf("error getting cell: %v", err)
@@ -414,6 +420,17 @@ func (p *TalosClusterCellProvider) ServerStats(ctx context.Context, cellId strin
 		return nil, fmt.Errorf("failed to create talos client from config: %w", err)
 	}
 
+	nodeIps := talosClientConfig.Contexts[talosClientConfig.Context].Nodes
+
+	return &clientSetup{
+		k8sClient:   k8sClient,
+		talosClient: talosClient,
+		nodeIps:     nodeIps,
+	}, nil
+}
+
+// getServerStatsWithClients retrieves server statistics using pre-initialized clients
+func (p *TalosClusterCellProvider) getServerStatsWithClients(ctx context.Context, k8sClient *kubernetes.Clientset, talosClient *client.Client, nodeIps []string) ([]ServerStats, error) {
 	var wg sync.WaitGroup
 	var nodeInfo map[string]NodeInfo
 	var nodeInfoErr error
@@ -453,7 +470,6 @@ func (p *TalosClusterCellProvider) ServerStats(ctx context.Context, cellId strin
 		return nil, fmt.Errorf("error getting memory stats: %v", memoryErr)
 	}
 
-	nodeIps := talosClientConfig.Contexts[talosClientConfig.Context].Nodes
 	result := make([]ServerStats, len(nodeIps))
 	for i, nodeIp := range nodeIps {
 		result[i].ServerIpv4 = nodeIp
@@ -484,6 +500,46 @@ func (p *TalosClusterCellProvider) ServerStats(ctx context.Context, cellId strin
 		result[i].MemoryUtilization = memUtil
 	}
 	return result, nil
+}
+
+// ServerStatsStream streams ServerStats at the specified interval
+func (p *TalosClusterCellProvider) ServerStatsStream(ctx context.Context, cellId string, interval time.Duration) <-chan ServerStatsResult {
+	resultChan := make(chan ServerStatsResult)
+
+	go func() {
+		defer close(resultChan)
+
+		// Perform one-time setup
+		setup, err := p.setupClients(ctx, cellId)
+		if err != nil {
+			resultChan <- ServerStatsResult{Error: err}
+			return
+		}
+
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				stats, err := p.getServerStatsWithClients(ctx, setup.k8sClient, setup.talosClient, setup.nodeIps)
+				resultChan <- ServerStatsResult{Stats: stats, Error: err}
+			}
+		}
+	}()
+
+	return resultChan
+}
+
+func (p *TalosClusterCellProvider) ServerStats(ctx context.Context, cellId string) ([]ServerStats, error) {
+	setup, err := p.setupClients(ctx, cellId)
+	if err != nil {
+		return nil, err
+	}
+
+	return p.getServerStatsWithClients(ctx, setup.k8sClient, setup.talosClient, setup.nodeIps)
 }
 
 func encryptYaml(data string, identity string) (string, error) {

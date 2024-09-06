@@ -1,6 +1,4 @@
 SHELL := /bin/bash
-# override this in CI to set to prod
-LDFLAGS ?= -ldflags "-X main.Environment=dev"
 
 .PHONY: templ-generate templ-watch
 templ-generate: templ
@@ -48,7 +46,7 @@ air:
 .PHONY: build
 build: templ-generate tailwind-build
 	mkdir -p bin/
-	go build $(LDFLAGS) -o ./bin/app ./cmd/app
+	go build -o ./bin/app ./cmd/app
 
 .PHONY: dev-app
 dev: bun
@@ -81,3 +79,14 @@ test-hetzner-provider:
 	  go test -race -v -timeout 30s -run ^TestHetznerProvider$$ github.com/onmetal-dev/metal/lib/serverprovider
 test:
 	bunx concurrently -s first --kill-others "make test-db" "make test-go"
+
+
+.PHONY: update-htmx
+update-htmx:
+	# note: when updating the version here, you also need to update HtmxCssHash for the CSP header in middleware.go.
+	# The hash is printed as part of the error if you update the version without updating the hash, so look in the
+	# console when you run with a new version (there's probably a better way to do this)
+	curl -s -L -o ./cmd/app/static/script/htmx.min.js https://unpkg.com/htmx.org@2.0.2/dist/htmx.min.js
+	curl -s -L -o ./cmd/app/static/script/htmx.js https://unpkg.com/htmx.org@2.0.2/dist/htmx.js
+	curl -s -L -o ./cmd/app/static/script/sse.js https://unpkg.com/htmx-ext-sse@2.2.2/sse.js
+	curl -s -L -o ./cmd/app/static/script/response-targets.js https://unpkg.com/htmx-ext-response-targets@2.0.0/response-targets.js

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/cloudflare/cloudflare-go"
@@ -44,16 +45,6 @@ import (
 	"github.com/stripe/stripe-go/v79/product"
 	"github.com/stripe/stripe-go/v79/setupintent"
 )
-
-/*
-* Set to production at build time
-* used to determine what assets to load
- */
-var Environment = "local"
-
-func init() {
-	os.Setenv("env", Environment)
-}
 
 func mustCreate[T any](slogger *slog.Logger, f func() (T, error)) T {
 	v, err := f()
@@ -320,7 +311,13 @@ func main() {
 					next.ServeHTTP(w, r.WithContext(ctx))
 				})
 			},
-			otelchi.Middleware("metal", otelchi.WithChiRoutes(r), otelchi.WithTracerProvider(tracerProvider)),
+			otelchi.Middleware("metal",
+				otelchi.WithChiRoutes(r),
+				otelchi.WithTracerProvider(tracerProvider),
+				otelchi.WithFilter(func(r *http.Request) bool {
+					return !strings.HasSuffix(r.URL.Path, "/sse")
+				}),
+			),
 		)
 
 		r.NotFound(handlers.NewNotFoundHandler().ServeHTTP)
@@ -347,13 +344,15 @@ func main() {
 
 		// logged in routes below
 		r.Group(func(r chi.Router) {
+			dashboardHandler := handlers.NewDashboardHandler(userStore, teamStore, serverStore, cellStore, deploymentStore, appStore, cellProviderForType)
 			r.Use(m.RequireLoggedInUser)
 			r.Get("/onboarding", handlers.NewGetOnboardingHandler(teamStore).ServeHTTP)
 			r.Post("/onboarding", handlers.NewPostOnboardingHandler(teamStore).ServeHTTP)
 			r.Get("/onboarding/{teamId}/payment", handlers.NewGetOnboardingPaymentHandler(teamStore, stripeCustomerSession).ServeHTTP)
 			r.Post("/onboarding/{teamId}/payment", handlers.NewPostOnboardingPaymentHandler(teamStore, stripeSetupIntent).ServeHTTP)
 			r.Get("/onboarding/{teamId}/payment/confirm", handlers.NewGetOnboardingPaymentConfirmHandler(teamStore, stripeSetupIntent, stripeCustomer).ServeHTTP)
-			r.Get("/dashboard/{teamId}", handlers.NewDashboardHandler(userStore, teamStore, serverStore, cellStore, deploymentStore, appStore, cellProviderForType).ServeHTTP)
+			r.Get("/dashboard/{teamId}", dashboardHandler.ServeHTTP)
+			r.Get("/dashboard/{teamId}/sse", dashboardHandler.ServeHTTPSSE)
 			r.Get("/dashboard/{teamId}/servers/new", handlers.NewGetServersNewHandler(teamStore, serverOfferingStore).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout", handlers.NewGetServersCheckoutHandler(teamStore, serverOfferingStore, stripeCheckoutSession, stripeProduct, stripePrice, stripeMeter, c.StripePublishableKey).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout-return-url", handlers.NewGetServersCheckoutReturnHandler(teamStore, serverOfferingStore, stripeCheckoutSession, producerFulfillment).ServeHTTP)
@@ -372,7 +371,7 @@ func main() {
 	go func() {
 		srvErr <- srv.ListenAndServe()
 	}()
-	slogger.Info("Server started", slog.String("port", c.Port), slog.String("env", Environment))
+	slogger.Info("Server started", slog.String("port", c.Port), slog.String("env", string(config.Env)))
 
 	// Wait for interruption.
 	select {
