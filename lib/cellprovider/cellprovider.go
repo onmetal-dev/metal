@@ -3,6 +3,7 @@ package cellprovider
 
 import (
 	"context"
+	"time"
 
 	"github.com/onmetal-dev/metal/lib/store"
 )
@@ -28,9 +29,15 @@ type AdvanceDeploymentResult struct {
 	StatusReason string
 }
 
+type ServerStatsResult struct {
+	Stats []ServerStats
+	Error error
+}
+
 type CellProvider interface {
 	CreateCell(ctx context.Context, opts CreateCellOptions) (*store.Cell, error)
 	ServerStats(ctx context.Context, cellId string) ([]ServerStats, error)
+	ServerStatsStream(ctx context.Context, cellId string, interval time.Duration) <-chan ServerStatsResult
 	AdvanceDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error)
 	DestroyDeployments(ctx context.Context, cellId string, deployments []store.Deployment) error
 }

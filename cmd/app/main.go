@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/cloudflare/cloudflare-go"
@@ -310,7 +311,13 @@ func main() {
 					next.ServeHTTP(w, r.WithContext(ctx))
 				})
 			},
-			otelchi.Middleware("metal", otelchi.WithChiRoutes(r), otelchi.WithTracerProvider(tracerProvider)),
+			otelchi.Middleware("metal",
+				otelchi.WithChiRoutes(r),
+				otelchi.WithTracerProvider(tracerProvider),
+				otelchi.WithFilter(func(r *http.Request) bool {
+					return !strings.HasSuffix(r.URL.Path, "/sse")
+				}),
+			),
 		)
 
 		r.NotFound(handlers.NewNotFoundHandler().ServeHTTP)

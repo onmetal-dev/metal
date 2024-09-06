@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -87,18 +88,6 @@ func (h *DashboardHandler) ServeHTTPSSE(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	getStats := func() ([]cellprovider.ServerStats, error) {
-		var stats []cellprovider.ServerStats
-		for _, cell := range cells {
-			cellStats, err := h.cellProviderForType(cell.Type).ServerStats(ctx, cell.Id)
-			if err != nil {
-				return nil, fmt.Errorf("error fetching server stats: %v", err)
-			}
-			stats = append(stats, cellStats...)
-		}
-		return stats, nil
-	}
-
 	// Set headers for SSE
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -108,45 +97,59 @@ func (h *DashboardHandler) ServeHTTPSSE(w http.ResponseWriter, r *http.Request) 
 	// Create a channel for sending events
 	events := make(chan *SseEvent)
 
-	// Close the channel when the client disconnects
+	// Create a context that cancels when the client disconnects
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	go func() {
 		<-r.Context().Done()
 		logger.FromContext(r.Context()).Info("client disconnected")
+		cancel()
+	}()
+
+	// Start a goroutine for each cell to stream server stats
+	var wg sync.WaitGroup
+	for _, cell := range cells {
+		wg.Add(1)
+		go func(cell store.Cell) {
+			defer wg.Done()
+			statsChan := h.cellProviderForType(cell.Type).ServerStatsStream(ctx, cell.Id, 5*time.Second)
+			for result := range statsChan {
+				if result.Error != nil {
+					logger.FromContext(ctx).Error("error fetching server stats", "error", result.Error, "cellId", cell.Id)
+					continue
+				}
+				for _, stat := range result.Stats {
+					for _, event := range serverStatToEvents(ctx, stat) {
+						select {
+						case events <- event:
+						case <-ctx.Done():
+							return
+						}
+					}
+				}
+			}
+		}(cell)
+	}
+
+	// Start a goroutine to close the events channel when all cell streams are done
+	go func() {
+		wg.Wait()
 		close(events)
 	}()
 
-	// Send an event every 5 seconds
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				stats, err := getStats()
-				if err != nil {
-					logger.FromContext(r.Context()).Error("error fetching server stats", "error", err)
-					continue
-				}
-				for _, stat := range stats {
-					for _, event := range serverStatToEvents(ctx, stat) {
-						events <- event
-					}
-				}
-			case <-r.Context().Done():
+	// Send events to the client
+	for event := range events {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			_, err := fmt.Fprint(w, event.String())
+			if err != nil {
+				logger.FromContext(ctx).Error("error writing event to response", "error", err)
 				return
 			}
-		}
-	}()
-
-	// Send events to the client
-	for {
-		select {
-		case event := <-events:
-			fmt.Fprint(w, event.String())
 			w.(http.Flusher).Flush()
-		case <-r.Context().Done():
-			return
 		}
 	}
 }
