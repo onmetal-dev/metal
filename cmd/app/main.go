@@ -337,13 +337,15 @@ func main() {
 
 		// logged in routes below
 		r.Group(func(r chi.Router) {
+			dashboardHandler := handlers.NewDashboardHandler(userStore, teamStore, serverStore, cellStore, deploymentStore, appStore, cellProviderForType)
 			r.Use(m.RequireLoggedInUser)
 			r.Get("/onboarding", handlers.NewGetOnboardingHandler(teamStore).ServeHTTP)
 			r.Post("/onboarding", handlers.NewPostOnboardingHandler(teamStore).ServeHTTP)
 			r.Get("/onboarding/{teamId}/payment", handlers.NewGetOnboardingPaymentHandler(teamStore, stripeCustomerSession).ServeHTTP)
 			r.Post("/onboarding/{teamId}/payment", handlers.NewPostOnboardingPaymentHandler(teamStore, stripeSetupIntent).ServeHTTP)
 			r.Get("/onboarding/{teamId}/payment/confirm", handlers.NewGetOnboardingPaymentConfirmHandler(teamStore, stripeSetupIntent, stripeCustomer).ServeHTTP)
-			r.Get("/dashboard/{teamId}", handlers.NewDashboardHandler(userStore, teamStore, serverStore, cellStore, deploymentStore, appStore, cellProviderForType).ServeHTTP)
+			r.Get("/dashboard/{teamId}", dashboardHandler.ServeHTTP)
+			r.Get("/dashboard/{teamId}/sse", dashboardHandler.ServeHTTPSSE)
 			r.Get("/dashboard/{teamId}/servers/new", handlers.NewGetServersNewHandler(teamStore, serverOfferingStore).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout", handlers.NewGetServersCheckoutHandler(teamStore, serverOfferingStore, stripeCheckoutSession, stripeProduct, stripePrice, stripeMeter, c.StripePublishableKey).ServeHTTP)
 			r.Get("/dashboard/{teamId}/servers/checkout-return-url", handlers.NewGetServersCheckoutReturnHandler(teamStore, serverOfferingStore, stripeCheckoutSession, producerFulfillment).ServeHTTP)

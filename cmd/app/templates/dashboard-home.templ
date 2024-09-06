@@ -196,12 +196,36 @@ func totalResourcesForApp(deployments []store.Deployment, app store.App) (float6
 	return cpu, mem
 }
 
-templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, serverStats []cellprovider.ServerStats, deployments []store.Deployment, apps []store.App) {
-	<div>
+func ServerStatsCpuSseEventName(serverId string) string {
+	return fmt.Sprintf("serverstats-cpu-%s", serverId)
+}
+
+func ServerStatsMemSseEventName(serverId string) string {
+	return fmt.Sprintf("serverstats-mem-%s", serverId)
+}
+
+templ ServerStatsCpu(stats *cellprovider.ServerStats) {
+	if (stats == nil) {
+		<span class="text-bold text-success">-</span>
+	} else {
+		<span class={ "text-bold", cssColorClassForUtilization(stats.CpuUtilization) }>{ humanizePercent(stats.CpuUtilization) }</span>
+	}
+}
+
+templ ServerStatsMem(stats *cellprovider.ServerStats) {
+	if (stats == nil) {
+		<span class="text-bold text-success">-</span>
+	} else {
+		<span class={ "text-bold", cssColorClassForUtilization(stats.MemoryUtilization) }>{ humanizePercent(stats.MemoryUtilization) }</span>
+	}
+}
+
+templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, deployments []store.Deployment, apps []store.App) {
+	<div hx-ext="sse" sse-connect={ "/dashboard/" + teamId + "/sse" }>
 		@flashes(middleware.GetFlashes(ctx))
 		<div class="flex flex-col items-center justify-start w-full h-full gap-4">
 			<div class="divider">Servers</div>
-			<table class="table table-xs" id="servers-table" hx-trigger="every 30s [document.visibilityState=='visible']" hx-get={ "/dashboard/" + teamId } hx-swap="outerHTML" hx-select="#servers-table">
+			<table class="table table-xs" id="servers-table">
 				<thead>
 					<tr>
 						<th>id</th>
@@ -241,8 +265,12 @@ templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, s
 									(none)
 								}
 							</td>
-							<td class={ "text-bold", cssColorClassForUtilization(serverStatById(serverStats, server.Id).CpuUtilization) }>{ humanizePercent(serverStatById(serverStats, server.Id).CpuUtilization) }</td>
-							<td class={ "text-bold", cssColorClassForUtilization(serverStatById(serverStats, server.Id).MemoryUtilization) }>{ humanizePercent(serverStatById(serverStats, server.Id).MemoryUtilization) }</td>
+							<td sse-swap={ ServerStatsCpuSseEventName(server.Id) } class="min-w-16">
+								@ServerStatsCpu(nil)
+							</td>
+							<td sse-swap={ ServerStatsMemSseEventName(server.Id) } class="min-w-16">
+								@ServerStatsMem(nil)
+							</td>
 							if server.CellId != nil {
 								<td>{ cellById(cells, *server.CellId).Name }</td>
 							} else {
