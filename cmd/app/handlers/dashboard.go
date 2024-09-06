@@ -105,6 +105,11 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		UserTeams:     userTeams,
 		ActiveTeam:    *team,
 		ActiveTabName: templates.TabNameHome,
+		AdditionalScripts: []templates.ScriptTag{
+			templates.ScriptTag{
+				Src: "/static/script/sse.js",
+			},
+		},
 	}, templates.DashboardHome(teamId, servers, cells, serverStats, deployments, apps)).Render(ctx, w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}

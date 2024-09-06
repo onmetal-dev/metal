@@ -18,8 +18,8 @@ templ header(title string, additionalScripts ...ScriptTag) {
 		<meta name="description" content="Metal. The fastest and easiest way to run on bare metal."/>
 		<meta name="keywords" content="metal, cloud, infrastructure, bare metal, cloud computing, infrastructure as a service, iaas, paas"/>
 		<meta name="author" content="Metal"/>
-		<script src="/static/script/htmx.min.js" nonce={ middleware.GetHtmxNonce(ctx) }></script>
-		<script src="/static/script/response-targets.js" nonce={ middleware.GetResponseTargetsNonce(ctx) }></script>
+		<script src="/static/script/htmx.min.js"></script>
+		<script src="/static/script/response-targets.js"></script>
 		for _, script := range additionalScripts {
 			<script src={ script.Src }></script>
 		}
