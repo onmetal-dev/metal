@@ -93,6 +93,6 @@ jobs:
           sudo dpkg -i railway-v3.12.2-amd64.deb
 
       - name: Deploy
-        run: railway up --ci --service app --environment prod
+        run: railway up --ci --service app --environment production
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_PROD }}

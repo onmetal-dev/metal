@@ -2,9 +2,11 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 )
 
 type TestStoresConfig struct {
@@ -424,7 +426,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			ctx := context.Background()
 
 			// Test adding a new email to the waitlist
-			email := "test@example.com"
+			email := fmt.Sprintf("test%d@example.com", rand.Intn(10000))
 			err := stores.WaitlistStore.Add(ctx, email)
 			require.NoError(err, "Failed to add email to waitlist")
 
