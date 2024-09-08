@@ -227,6 +227,7 @@ func (s *DeploymentStore) GetForTeam(ctx context.Context, teamId string) ([]stor
 	var deployments []store.Deployment
 	err := s.preloadDeployment(s.db).WithContext(ctx).
 		Where(&store.Deployment{TeamId: teamId}).
+		Order("created_at DESC").
 		Find(&deployments).Error
 	if err != nil {
 		return nil, err

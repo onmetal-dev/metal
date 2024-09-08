@@ -425,7 +425,7 @@ type Deployment struct {
 	Id            uint   `gorm:"primarykey"`
 	EnvId         string `gorm:"primaryKey;index"`
 	AppId         string `gorm:"primaryKey;index:idx_app_createdat"`
-	TeamId        string `gorm:"index"`
+	TeamId        string `gorm:"index:idx_team_createdat"`
 	Env           Env    `gorm:"foreignKey:EnvId"`
 	App           App    `gorm:"foreignKey:AppId"`
 	Type          DeploymentType
@@ -437,7 +437,7 @@ type Deployment struct {
 	AppEnvVarsId  string
 	AppEnvVars    AppEnvVars `gorm:"foreignKey:AppEnvVarsId"`
 	Cells         []Cell     `gorm:"many2many:deployment_cells;"`
-	CreatedAt     time.Time  `gorm:"index:idx_app_createdat"`
+	CreatedAt     time.Time  `gorm:"index:idx_app_createdat;index:idx_team_createdat"`
 	UpdatedAt     time.Time
 	DeletedAt     gorm.DeletedAt `gorm:"index"`
 }

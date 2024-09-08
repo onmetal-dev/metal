@@ -3,6 +3,7 @@ package cellprovider
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/onmetal-dev/metal/lib/store"
@@ -40,4 +41,5 @@ type CellProvider interface {
 	ServerStatsStream(ctx context.Context, cellId string, interval time.Duration) <-chan ServerStatsResult
 	AdvanceDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error)
 	DestroyDeployments(ctx context.Context, cellId string, deployments []store.Deployment) error
+	DeploymentLogs(ctx context.Context, cellId string, deployment *store.Deployment) (io.ReadCloser, error)
 }
