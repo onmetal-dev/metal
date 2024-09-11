@@ -1,0 +1,99 @@
+package templates
+
+import (
+	"github.com/onmetal-dev/metal/lib/cellprovider"
+	"github.com/onmetal-dev/metal/lib/form"
+	"github.com/onmetal-dev/metal/lib/store"
+)
+
+type LogsFormData struct {
+	Since        string `validate:"omitempty,duration"`
+	Query        string
+	TimezoneName string
+}
+
+templ option(selected bool, value string, label string) {
+	if (selected) {
+		<option selected value={ value }>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
+}
+
+templ LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldErrors, submitError error, logs []cellprovider.LogEntry, hxTriggerOnLoad bool) {
+	<div class="flex flex-col gap-2" id="logs-form">
+		<form
+			novalidate
+			hx-post={ thisUrl }
+			hx-disabled-elt="find input[type='text']"
+			hx-trigger={ cls("submit,", "keyup[keyCode==13],", hxTriggerOnLoad, "load,") }
+			hx-indicator="find .loading"
+			hx-target="#logs-form"
+			hx-swap="outerHTML"
+			class="flex flex-row gap-2 mt-4 text-xs"
+		>
+			<div class="w-24">
+				<select name="Since" class={ selectClass(fieldErrors.Get("Since")) }>
+					@option(formData.Since == "15m", "15m", "15 mins")
+					@option(formData.Since == "1h", "1h", "1 hour")
+					@option(formData.Since == "1d", "1d", "1 day")
+					@option(formData.Since == "7d", "1w", "1 week")
+				</select>
+			</div>
+			<input type="text" name="Query" class={ inputClass(fieldErrors.Get("Query")) } placeholder="Search" value={ form.InputValue(formData.Query) }/>
+			<input type="hidden" name="TimezoneName" id="timezoneName" value={ formData.TimezoneName }/>
+			<span class="htmx-indicator loading loading-ring loading-sm"></span>
+			if submitError != nil {
+				<div class="text-error">{ submitError.Error() }</div>
+			}
+		</form>
+		<table class="table font-mono table-xs">
+			<thead>
+				<tr>
+					<th class="w-52">timestamp <span id="timezoneOffset"></span></th>
+					<th>message</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, log := range logs {
+					@LogEntry(log)
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+templ LogEntry(log cellprovider.LogEntry) {
+	<tr>
+		<td>{ log.Timestamp.Format("Jan 02 15:04:05") }</td>
+		<td>{ log.Message }</td>
+	</tr>
+}
+
+func LogEntrySseEventName() string {
+	return "log-entry"
+}
+
+templ DeploymentLogs(deployment store.Deployment, thisUrl string, formData LogsFormData, fieldErrors form.FieldErrors, submitError error, logs []cellprovider.LogEntry) {
+	<div class="overflow-x-auto">
+		@LogsForm(thisUrl, formData, fieldErrors, submitError, logs, true)
+		<script>
+        document.body.addEventListener('htmx:configRequest', function(evt) {
+            console.log("HTMX CONFIG REQUEST", evt)
+            //evt.detail.parameters['auth_token'] = getAuthToken(); // add a new parameter into the mix
+        });
+
+        // Calculate the time zone offset in minutes and convert to hours
+        // then format the GMT offset as GMT±X
+        const now = new Date();
+        const tzOffset = now.getTimezoneOffset(); // in minutes
+        const hoursOffset = -tzOffset / 60;
+        const timezoneOffset = `(GMT${hoursOffset >= 0 ? '+' : ''}${hoursOffset})`;
+        //document.getElementById('timezoneOffset').innerText = timezoneOffset;
+        document.getElementById('timezoneOffset').innerText = "Africa/Accra";
+
+        // Update the hidden input with the timezone name
+        document.getElementById('timezoneName').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    </script>
+	</div>
+}

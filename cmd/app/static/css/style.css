@@ -3350,6 +3350,10 @@ input.tab:checked + .tab-content,
   height: 100%;
 }
 
+.w-24 {
+  width: 6rem;
+}
+
 .w-3 {
   width: 0.75rem;
 }
@@ -3360,6 +3364,10 @@ input.tab:checked + .tab-content,
 
 .w-48 {
   width: 12rem;
+}
+
+.w-52 {
+  width: 13rem;
 }
 
 .w-96 {
@@ -3442,6 +3450,10 @@ input.tab:checked + .tab-content,
   gap: 1rem;
 }
 
+.overflow-x-auto {
+  overflow-x: auto;
+}
+
 .rounded-box {
   border-radius: var(--rounded-box, 1rem);
 }
@@ -3519,6 +3531,10 @@ input.tab:checked + .tab-content,
 
 .text-center {
   text-align: center;
+}
+
+.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .text-4xl {

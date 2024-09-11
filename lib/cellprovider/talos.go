@@ -1,6 +1,7 @@
 package cellprovider
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -776,8 +778,213 @@ func (p *TalosClusterCellProvider) handleDeployingDeployment(ctx context.Context
 	}, nil
 }
 
-func (p *TalosClusterCellProvider) DeploymentLogs(ctx context.Context, cellId string, deployment *store.Deployment) (io.ReadCloser, error) {
-	return nil, nil
+func (p *TalosClusterCellProvider) DeploymentLogs(ctx context.Context, cellId string, deployment *store.Deployment, opts ...DeploymentLogsOption) ([]LogEntry, error) {
+	options := processDeploymentLogsOptions(opts...)
+
+	clientset, err := p.initializeK8sClientForCell(cellId)
+	if err != nil {
+		return nil, err
+	}
+
+	ns := deployment.Env.Name
+	k8sDeployment, err := clientset.AppsV1().Deployments(ns).Get(ctx, deployment.App.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error getting deployment: %v", err)
+	}
+	if err := validateK8sDeploymentMatch(k8sDeployment, deployment); err != nil {
+		return nil, err
+	}
+
+	pods, err := clientset.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{
+		LabelSelector: metav1.FormatLabelSelector(k8sDeployment.Spec.Selector),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing pods: %v", err)
+	}
+
+	var allLogs []LogEntry
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, pod := range pods.Items {
+		wg.Add(1)
+		go func(pod corev1.Pod) {
+			defer wg.Done()
+
+			podLogOptions := &corev1.PodLogOptions{
+				Timestamps: true,
+			}
+			if options.Since != nil {
+				podLogOptions.SinceTime = &metav1.Time{Time: time.Now().Add(-*options.Since)}
+			} else {
+				podLogOptions.SinceTime = &metav1.Time{Time: time.Now().Add(-1 * time.Hour)}
+			}
+
+			req := clientset.CoreV1().Pods(ns).GetLogs(pod.Name, podLogOptions)
+
+			podLogs, err := req.Stream(ctx)
+			if err != nil {
+				mu.Lock()
+				allLogs = append(allLogs, LogEntry{
+					Timestamp: time.Now(),
+					Message:   fmt.Sprintf("error fetching logs for pod %s: %v", pod.Name, err),
+				})
+				mu.Unlock()
+				return
+			}
+			defer podLogs.Close()
+
+			r := bufio.NewReader(podLogs)
+			for {
+				bytes, err := r.ReadBytes('\n')
+				if len(bytes) > 0 {
+					logLine := string(bytes)
+					parts := strings.SplitN(logLine, " ", 2)
+					if len(parts) < 2 {
+						continue
+					}
+					timestamp, err := time.Parse(time.RFC3339Nano, parts[0])
+					if err != nil {
+						timestamp = time.Now()
+					}
+
+					mu.Lock()
+					allLogs = append(allLogs, LogEntry{
+						Timestamp: timestamp,
+						Message:   parts[1],
+					})
+					mu.Unlock()
+				}
+				if err != nil {
+					if err != io.EOF {
+						mu.Lock()
+						allLogs = append(allLogs, LogEntry{
+							Timestamp: time.Now(),
+							Message:   fmt.Sprintf("error reading logs for pod %s: %v", pod.Name, err),
+						})
+						mu.Unlock()
+					}
+					break
+				}
+			}
+		}(pod)
+	}
+
+	wg.Wait()
+
+	// Sort logs by timestamp
+	sort.Slice(allLogs, func(i, j int) bool {
+		return allLogs[i].Timestamp.Before(allLogs[j].Timestamp)
+	})
+
+	return allLogs, nil
+}
+
+func (p *TalosClusterCellProvider) DeploymentLogsStream(ctx context.Context, cellId string, deployment *store.Deployment, opts ...DeploymentLogsOption) <-chan DeploymentLogsResult {
+	options := processDeploymentLogsOptions(opts...)
+
+	logs := make(chan DeploymentLogsResult)
+	go func() (returnError error) {
+		defer func() {
+			if returnError != nil {
+				logs <- DeploymentLogsResult{
+					Logs:  nil,
+					Error: returnError,
+				}
+			}
+			close(logs)
+		}()
+
+		clientset, err := p.initializeK8sClientForCell(cellId)
+		if err != nil {
+			returnError = err
+			return
+		}
+
+		ns := deployment.Env.Name
+		k8sDeployment, err := clientset.AppsV1().Deployments(ns).Get(ctx, deployment.App.Name, metav1.GetOptions{})
+		if err != nil {
+			returnError = fmt.Errorf("error getting deployment: %v", err)
+			return
+		}
+		if err := validateK8sDeploymentMatch(k8sDeployment, deployment); err != nil {
+			returnError = err
+			return
+		}
+
+		pods, err := clientset.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{
+			LabelSelector: metav1.FormatLabelSelector(k8sDeployment.Spec.Selector),
+		})
+		if err != nil {
+			returnError = fmt.Errorf("error listing pods: %v", err)
+			return
+		}
+
+		var wg sync.WaitGroup
+		var errLock sync.Mutex
+		for _, pod := range pods.Items {
+			wg.Add(1)
+			go func(pod corev1.Pod) {
+				defer wg.Done()
+
+				podLogOptions := &corev1.PodLogOptions{
+					Timestamps: true,
+					Follow:     true,
+				}
+				if options.Since != nil {
+					podLogOptions.SinceTime = &metav1.Time{Time: time.Now().Add(-*options.Since)}
+				} else {
+					podLogOptions.SinceTime = &metav1.Time{Time: time.Now().Add(-1 * time.Hour)}
+				}
+
+				req := clientset.CoreV1().Pods(ns).GetLogs(pod.Name, podLogOptions)
+
+				podLogs, err := req.Stream(ctx)
+				if err != nil {
+					errLock.Lock()
+					returnError = fmt.Errorf("error fetching logs for pod %s: %v", pod.Name, err)
+					errLock.Unlock()
+					return
+				}
+				defer podLogs.Close()
+
+				r := bufio.NewReader(podLogs)
+				for {
+					bytes, err := r.ReadBytes('\n')
+					if len(bytes) > 0 {
+						logLine := string(bytes)
+						parts := strings.SplitN(logLine, " ", 2)
+						if len(parts) < 2 {
+							continue
+						}
+						timestamp, err := time.Parse(time.RFC3339Nano, parts[0])
+						if err != nil {
+							timestamp = time.Now()
+						}
+
+						logs <- DeploymentLogsResult{
+							Logs: []LogEntry{{
+								Timestamp: timestamp,
+								Message:   parts[1],
+							}},
+						}
+					}
+					if err != nil {
+						if err != io.EOF {
+							errLock.Lock()
+							returnError = fmt.Errorf("error reading logs for pod %s: %v", pod.Name, err)
+							errLock.Unlock()
+							return
+						}
+						break
+					}
+				}
+			}(pod)
+		}
+		wg.Wait()
+		return nil
+	}()
+	return logs
 }
 
 func (p *TalosClusterCellProvider) initializeK8sClientForCell(cellId string) (*kubernetes.Clientset, error) {

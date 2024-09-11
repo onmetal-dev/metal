@@ -359,6 +359,9 @@ func main() {
 			r.Get("/dashboard/{teamId}/apps/new", handlers.NewAppsNewHandler(userStore, teamStore, serverStore, cellStore).ServeHTTP)
 			r.Post("/dashboard/{teamId}/apps/new", handlers.NewPostAppsNewHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, producerDeployment).ServeHTTP)
 			r.Delete("/dashboard/{teamId}/apps/{appId}", handlers.NewDeleteAppHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, cellProviderForType).ServeHTTP)
+			logsHandler := handlers.NewGetDeploymentLogsHandler(teamStore, deploymentStore, cellProviderForType)
+			r.Get("/dashboard/{teamId}/apps/{appId}/envs/{envId}/deployments/{deploymentId}/logs", logsHandler.ServeHTTP)
+			r.Post("/dashboard/{teamId}/apps/{appId}/envs/{envId}/deployments/{deploymentId}/logs", logsHandler.ServeHTTP)
 		})
 	})
 

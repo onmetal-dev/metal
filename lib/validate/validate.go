@@ -4,6 +4,7 @@ package validate
 import (
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
@@ -16,6 +17,8 @@ func init() {
 	validate = validator.New(validator.WithRequiredStructEnabled())
 	validate.RegisterValidation("lowercasealphanumhyphen", isLowercaseAlphaNumHyphen)
 	validate.RegisterValidation("dotenvformat", isDotenvFormat)
+	validate.RegisterValidation("duration", isDuration)
+
 }
 
 var lowerCaseAlphaNumHyphenRegex = regexp.MustCompile(`^[a-z0-9-]+$`)
@@ -27,6 +30,11 @@ func isLowercaseAlphaNumHyphen(fl validator.FieldLevel) bool {
 func isDotenvFormat(fl validator.FieldLevel) bool {
 	input := fl.Field().String()
 	_, err := godotenv.Parse(strings.NewReader(input))
+	return err == nil
+}
+
+func isDuration(fl validator.FieldLevel) bool {
+	_, err := time.ParseDuration(fl.Field().String())
 	return err == nil
 }
 

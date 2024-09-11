@@ -11,13 +11,14 @@ import (
 	"github.com/go-playground/form/v4"
 	"github.com/go-playground/validator/v10"
 	"github.com/onmetal-dev/metal/lib/validate"
+	"github.com/samber/lo"
 )
 
 type FieldErrors struct {
 	errors map[string]error
 }
 
-func (e *FieldErrors) NotNil() bool {
+func (e FieldErrors) NotNil() bool {
 	return e.errors != nil
 }
 
@@ -28,11 +29,20 @@ func (e *FieldErrors) Set(field string, err error) {
 	e.errors[field] = err
 }
 
-func (e *FieldErrors) Get(field string) error {
+func (e FieldErrors) Get(field string) error {
 	if e.errors == nil {
 		return nil
 	}
 	return e.errors[field]
+}
+
+func (e FieldErrors) Fields() []string {
+	if e.errors == nil {
+		return []string{}
+	}
+	return lo.MapToSlice(e.errors, func(key string, _ error) string {
+		return key
+	})
 }
 
 // DecodeFormData parses form data from a request. It uses the go-playground/form
@@ -41,13 +51,13 @@ func (e *FieldErrors) Get(field string) error {
 // It returns two error types: FieldErrors for specific field-level errors, and a
 // generic error for any other errors that occurred during parsing or validation.
 func Decode[T any](formData *T, r *http.Request) (FieldErrors, error) {
-	var formErrors FieldErrors
+	var fieldErrors FieldErrors
 	if err := r.ParseForm(); err != nil {
-		return formErrors, err
+		return fieldErrors, err
 	}
 	decoder := form.NewDecoder()
 	if err := decoder.Decode(formData, r.Form); err != nil {
-		return formErrors, err
+		return fieldErrors, err
 	}
 
 	if err := validate.Struct(formData); err != nil {
@@ -55,17 +65,17 @@ func Decode[T any](formData *T, r *http.Request) (FieldErrors, error) {
 			field := err.Field()
 			switch err.Tag() {
 			case "required":
-				formErrors.Set(field, errors.New("this is required"))
+				fieldErrors.Set(field, errors.New("this is required"))
 			case "lowercasealphanumhyphen":
-				formErrors.Set(field, errors.New("must consist of lowercase alphanumeric characters and/or hyphens"))
+				fieldErrors.Set(field, errors.New("must consist of lowercase alphanumeric characters and/or hyphens"))
 			case "dotenvformat":
-				formErrors.Set(field, errors.New("must be in dotenv format"))
+				fieldErrors.Set(field, errors.New("must be in dotenv format"))
 			default:
-				formErrors.Set(field, err)
+				fieldErrors.Set(field, err)
 			}
 		}
 	}
-	return formErrors, nil
+	return fieldErrors, nil
 }
 
 // InputValue converts a value to a string that can be used as the value of an input element.

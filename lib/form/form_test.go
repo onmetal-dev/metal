@@ -1,11 +1,13 @@
 package form
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type TestForm struct {
@@ -13,6 +15,7 @@ type TestForm struct {
 	Email    string `form:"email" validate:"required,email"`
 	Username string `form:"username" validate:"required,lowercasealphanumhyphen"`
 	EnvVars  string `form:"env_vars" validate:"dotenvformat"`
+	Duration string `form:"duration" validate:"required,duration"`
 }
 
 func TestDecode(t *testing.T) {
@@ -22,6 +25,7 @@ func TestDecode(t *testing.T) {
 			"email":    {"john@example.com"},
 			"username": {"john-doe"},
 			"env_vars": {"KEY=value\nANOTHER_KEY=another_value"},
+			"duration": {"1h"},
 		}
 
 		req, _ := http.NewRequest("POST", "/", nil)
@@ -29,13 +33,17 @@ func TestDecode(t *testing.T) {
 
 		var form TestForm
 		fieldErrors, err := Decode(&form, req)
-
-		assert.Nil(t, err)
-		assert.False(t, fieldErrors.NotNil())
+		if fieldErrors.NotNil() {
+			for _, field := range fieldErrors.Fields() {
+				assert.NoError(t, fieldErrors.Get(field), fmt.Sprintf("%s: %s", field, fieldErrors.Get(field).Error()))
+			}
+		}
+		assert.NoError(t, err)
 		assert.Equal(t, "John Doe", form.Name)
 		assert.Equal(t, "john@example.com", form.Email)
 		assert.Equal(t, "john-doe", form.Username)
 		assert.Equal(t, "KEY=value\nANOTHER_KEY=another_value", form.EnvVars)
+		assert.Equal(t, "1h", form.Duration)
 	})
 
 	t.Run("Missing required field", func(t *testing.T) {
@@ -50,9 +58,9 @@ func TestDecode(t *testing.T) {
 		var form TestForm
 		fieldErrors, err := Decode(&form, req)
 
-		assert.Nil(t, err)
-		assert.True(t, fieldErrors.NotNil())
-		assert.Equal(t, "this is required", fieldErrors.Get("Name").Error())
+		require.Nil(t, err)
+		require.True(t, fieldErrors.NotNil())
+		require.Equal(t, "this is required", fieldErrors.Get("Name").Error())
 	})
 
 	t.Run("Invalid email", func(t *testing.T) {

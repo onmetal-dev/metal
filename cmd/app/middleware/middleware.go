@@ -43,7 +43,7 @@ func CSPMiddleware(next http.Handler) http.Handler {
 
 		// set nonces in context
 		ctx := context.WithValue(r.Context(), NonceKey, nonceSet)
-		cspHeader := fmt.Sprintf("default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'nonce-%s' '%s'; img-src 'self' data:;",
+		cspHeader := fmt.Sprintf("default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com; style-src 'self' 'nonce-%s' '%s'; img-src 'self' data:;",
 			nonceSet.Tw,
 			nonceSet.HtmxCssHash,
 		)

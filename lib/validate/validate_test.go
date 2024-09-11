@@ -76,3 +76,40 @@ func TestDotenvFormat(t *testing.T) {
 		})
 	}
 }
+
+func TestDuration(t *testing.T) {
+	type TestStruct struct {
+		Field string `validate:"duration"`
+	}
+
+	v := Validator()
+
+	testCases := []struct {
+		name  string
+		input string
+		valid bool
+	}{
+		{"valid seconds", "30s", true},
+		{"valid minutes", "5m", true},
+		{"valid hours", "2h", true},
+		{"valid complex duration", "1h30m45s", true},
+		{"invalid format", "2 hours", false},
+		{"empty string", "", false},
+		{"negative duration", "-1h", true}, // Note: negative durations are valid in Go
+		{"invalid unit", "5y", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := TestStruct{Field: tc.input}
+			err := v.Struct(ts)
+
+			if tc.valid && err != nil {
+				t.Errorf("Test case '%s': Expected valid input '%s', but got error: %v", tc.name, tc.input, err)
+			}
+			if !tc.valid && err == nil {
+				t.Errorf("Test case '%s': Expected invalid input '%s', but got no error", tc.name, tc.input)
+			}
+		})
+	}
+}
