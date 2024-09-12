@@ -18,15 +18,15 @@ type CreateAppFormData struct {
 }
 
 func inputClass(error error) string {
-	return cls("max-w-xs input input-xs", error, "input-error")
+	return cls("input input-xs", error, "input-error")
 }
 
 func textareaClass(error error) string {
-	return cls("max-w-xs textarea textarea-xs", error, "textarea-error")
+	return cls("textarea textarea-xs", error, "textarea-error")
 }
 
 func selectClass(error error) string {
-	return cls("w-full max-w-xs py-0 select select-xs", error, "select-error")
+	return cls("py-0 select select-xs", error, "select-error")
 }
 
 templ CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, errors form.FieldErrors, submitError error) {
@@ -44,7 +44,7 @@ templ CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, e
 			<input
 				type="text"
 				name="AppName"
-				class={ inputClass(errors.Get("AppName")) }
+				class={ cls(inputClass(errors.Get("AppName")), "max-w-xs") }
 				placeholder="my-app"
 				value={ form.InputValue(data.AppName) }
 				required
@@ -55,35 +55,35 @@ templ CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, e
 		</div>
 		<label class="flex items-center justify-end">container image</label>
 		<div class="flex items-center justify-start gap-2">
-			<input type="text" name="ContainerImage" class={ inputClass(errors.Get("ContainerImage")) } placeholder="nginx:latest" value={ form.InputValue(data.ContainerImage) } required/>
+			<input type="text" name="ContainerImage" class={ cls(inputClass(errors.Get("ContainerImage")), "max-w-xs") } placeholder="nginx:latest" value={ form.InputValue(data.ContainerImage) } required/>
 			if errors.Get("ContainerImage") != nil {
 				<div class="text-error">{ errors.Get("ContainerImage").Error() }</div>
 			}
 		</div>
 		<label class="flex items-center justify-end">replicas</label>
 		<div class="flex items-center justify-start gap-2">
-			<input type="number" name="Replicas" class={ inputClass(errors.Get("Replicas")) } placeholder="1" min="1" value={ form.InputValue(data.Replicas) } required/>
+			<input type="number" name="Replicas" class={ cls(inputClass(errors.Get("Replicas")), "max-w-xs") } placeholder="1" min="1" value={ form.InputValue(data.Replicas) } required/>
 			if errors.Get("Replicas") != nil {
 				<div class="text-error">{ errors.Get("Replicas").Error() }</div>
 			}
 		</div>
 		<label class="flex items-center justify-end">container port</label>
 		<div class="flex items-center justify-start gap-2">
-			<input type="number" name="ContainerPort" class={ inputClass(errors.Get("ContainerPort")) } placeholder="80" min="1" max="65535" value={ form.InputValue(data.ContainerPort) } required/>
+			<input type="number" name="ContainerPort" class={ cls(inputClass(errors.Get("ContainerPort")), "max-w-xs") } placeholder="80" min="1" max="65535" value={ form.InputValue(data.ContainerPort) } required/>
 			if errors.Get("ContainerPort") != nil {
 				<div class="text-error">{ errors.Get("ContainerPort").Error() }</div>
 			}
 		</div>
 		<label class="flex items-center justify-end">cpu limit (cores)</label>
 		<div class="flex items-center justify-start gap-2">
-			<input type="number" name="CpuLimit" class={ inputClass(errors.Get("CpuLimit")) } placeholder="0.5" step="0.1" min="0.1" value={ form.InputValue(data.CpuLimit) } required/>
+			<input type="number" name="CpuLimit" class={ cls(inputClass(errors.Get("CpuLimit")), "max-w-xs") } placeholder="0.5" step="0.1" min="0.1" value={ form.InputValue(data.CpuLimit) } required/>
 			if errors.Get("CpuLimit") != nil {
 				<div class="text-error">{ errors.Get("CpuLimit").Error() }</div>
 			}
 		</div>
 		<label class="flex items-center justify-end">memory limit (Mi)</label>
 		<div class="flex items-center justify-start gap-2">
-			<input type="number" name="MemoryLimit" class={ inputClass(errors.Get("MemoryLimit")) } placeholder="256" step="32" min="32" value={ form.InputValue(data.MemoryLimit) } required/>
+			<input type="number" name="MemoryLimit" class={ cls(inputClass(errors.Get("MemoryLimit")), "max-w-xs") } placeholder="256" step="32" min="32" value={ form.InputValue(data.MemoryLimit) } required/>
 			if errors.Get("MemoryLimit") != nil {
 				<div class="text-error">{ errors.Get("MemoryLimit").Error() }</div>
 			}
@@ -92,7 +92,7 @@ templ CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, e
 		<div class="flex items-center justify-start gap-2">
 			<textarea
 				name="EnvVars"
-				class={ textareaClass(errors.Get("EnvVars")) }
+				class={ cls(textareaClass(errors.Get("EnvVars")), "max-w-xs") }
 				placeholder="KEY=value
 ANOTHER_KEY=another_value"
 			>{ form.InputValue(data.EnvVars) }</textarea>
@@ -102,7 +102,7 @@ ANOTHER_KEY=another_value"
 		</div>
 		<label class="flex items-center justify-end">cell</label>
 		<div class="flex items-center justify-start gap-2">
-			<select name="CellId" class={ selectClass(errors.Get("CellId")) } required>
+			<select name="CellId" class={ cls(selectClass(errors.Get("CellId")), "max-w-xs") } required>
 				if len(cells) > 0 {
 					<option value={ cells[0].Id } selected>{ cells[0].Name }</option>
 					for _, cell := range cells[1:] {

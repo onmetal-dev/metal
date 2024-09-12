@@ -19,9 +19,9 @@ templ header(title string, additionalScripts ...ScriptTag) {
 		<meta name="keywords" content="metal, cloud, infrastructure, bare metal, cloud computing, infrastructure as a service, iaas, paas"/>
 		<meta name="author" content="Metal"/>
 		if config.Env.IsProduction() {
-			<script src="/static/script/htmx.js"></script>
-		} else {
 			<script src="/static/script/htmx.min.js"></script>
+		} else {
+			<script src="/static/script/htmx.js"></script>
 		}
 		<script src="/static/script/response-targets.js"></script>
 		for _, script := range additionalScripts {

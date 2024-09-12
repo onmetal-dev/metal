@@ -3350,6 +3350,10 @@ input.tab:checked + .tab-content,
   height: 100%;
 }
 
+.w-1\/2 {
+  width: 50%;
+}
+
 .w-24 {
   width: 6rem;
 }
@@ -3388,6 +3392,10 @@ input.tab:checked + .tab-content,
 
 .max-w-md {
   max-width: 28rem;
+}
+
+.max-w-xl {
+  max-width: 36rem;
 }
 
 .max-w-xs {

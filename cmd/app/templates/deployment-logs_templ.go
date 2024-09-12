@@ -17,7 +17,7 @@ import (
 type LogsFormData struct {
 	Since        string `validate:"omitempty,duration"`
 	Query        string
-	TimezoneName string
+	TimezoneName string `validate:"tzlocation"`
 }
 
 func option(selected bool, value string, label string) templ.Component {
@@ -105,7 +105,7 @@ func option(selected bool, value string, label string) templ.Component {
 	})
 }
 
-func LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldErrors, submitError error, logs []cellprovider.LogEntry, hxTriggerOnLoad bool) templ.Component {
+func LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldErrors, submitError error, logs []cellprovider.LogEntry, hxTriggerOnLoad bool, warning string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -141,24 +141,32 @@ func LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldError
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(cls("submit,", "keyup[keyCode==13],", hxTriggerOnLoad, "load,"))
+		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(func() string {
+			trigger := "submit, keyup[keyCode==13], change from:#since"
+			// on first load, we want this form to submit and get logs
+			// but when that submit returns the new html (including this form) we don't want to trigger another submit
+			if hxTriggerOnLoad {
+				trigger += ", load"
+			}
+			return trigger
+		}())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 29, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 37, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\" hx-indicator=\"find .loading\" hx-target=\"#logs-form\" hx-swap=\"outerHTML\" class=\"flex flex-row gap-2 mt-4 text-xs\"><div class=\"w-24\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\" hx-indicator=\"find .loading\" hx-target=\"#logs-form\" hx-swap=\"outerHTML\" class=\"flex flex-row gap-2 mt-4 text-xs\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var9 = []any{selectClass(fieldErrors.Get("Since"))}
+		var templ_7745c5c3_Var9 = []any{cls(selectClass(fieldErrors.Get("Since")), "w-24")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var9...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<select name=\"Since\" class=\"")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<select id=\"since\" name=\"Since\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -183,19 +191,19 @@ func LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldError
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = option(formData.Since == "1d", "1d", "1 day").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = option(formData.Since == "24h", "24h", "1 day").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = option(formData.Since == "7d", "1w", "1 week").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = option(formData.Since == "168h", "168h", "1 week").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</select></div>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</select> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var11 = []any{inputClass(fieldErrors.Get("Query"))}
+		var templ_7745c5c3_Var11 = []any{cls(inputClass(fieldErrors.Get("Query")), "w-1/2 max-w-xl")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var11...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -220,7 +228,7 @@ func LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldError
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(form.InputValue(formData.Query))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 43, Col: 142}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 49, Col: 165}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -233,13 +241,23 @@ func LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldError
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(formData.TimezoneName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 44, Col: 91}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 50, Col: 91}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\"> <span class=\"htmx-indicator loading loading-ring loading-sm\"></span> ")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\"> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if formData.TimezoneName == "" {
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<script>\n                    document.getElementById('timezoneName').value = Intl.DateTimeFormat().resolvedOptions().timeZone;\n                </script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<span class=\"htmx-indicator loading loading-ring loading-sm\"></span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -251,7 +269,7 @@ func LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldError
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(submitError.Error())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 47, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 58, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -262,7 +280,51 @@ func LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldError
 				return templ_7745c5c3_Err
 			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</form><table class=\"table font-mono table-xs\"><thead><tr><th class=\"w-52\">timestamp <span id=\"timezoneOffset\"></span></th><th>message</th></tr></thead> <tbody>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</form><div class=\"flex flex-col gap-2\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if fieldErrors.NotNil() {
+			for _, field := range fieldErrors.Fields() {
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-xs text-error\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var16 string
+				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(fieldErrors.Get(field).Error())
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 64, Col: 69}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+		}
+		if warning != "" {
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"text-xs text-warning\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var17 string
+			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(warning)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 68, Col: 47}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div><table class=\"table font-mono table-xs\"><thead><tr><th class=\"w-52\">timestamp <span id=\"timezoneOffset\"></span></th><script>\n                        // Calculate the time zone offset in minutes and convert to hours\n                        // then format the GMT offset as GMT±X\n                        // can't use var here because it'll lead to an error about the variable already being declared\n                        now = new Date();\n                        tzOffset = now.getTimezoneOffset(); // in minutes\n                        hoursOffset = -tzOffset / 60;\n                        timezoneOffset = `(GMT${hoursOffset >= 0 ? '+' : ''}${hoursOffset})`;\n                        document.getElementById('timezoneOffset').innerText = timezoneOffset;\n                    </script><th>message</th></tr></thead> <tbody>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -293,21 +355,21 @@ func LogEntry(log cellprovider.LogEntry) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var16 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var16 == nil {
-			templ_7745c5c3_Var16 = templ.NopComponent
+		templ_7745c5c3_Var18 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var18 == nil {
+			templ_7745c5c3_Var18 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<tr><td>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var17 string
-		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(log.Timestamp.Format("Jan 02 15:04:05"))
+		var templ_7745c5c3_Var19 string
+		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(log.Timestamp.Format("Jan 02 15:04:05"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 68, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 99, Col: 47}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -315,12 +377,12 @@ func LogEntry(log cellprovider.LogEntry) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var18 string
-		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(log.Message)
+		var templ_7745c5c3_Var20 string
+		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(log.Message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 69, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 100, Col: 19}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -330,10 +392,6 @@ func LogEntry(log cellprovider.LogEntry) templ.Component {
 		}
 		return templ_7745c5c3_Err
 	})
-}
-
-func LogEntrySseEventName() string {
-	return "log-entry"
 }
 
 func DeploymentLogs(deployment store.Deployment, thisUrl string, formData LogsFormData, fieldErrors form.FieldErrors, submitError error, logs []cellprovider.LogEntry) templ.Component {
@@ -349,20 +407,20 @@ func DeploymentLogs(deployment store.Deployment, thisUrl string, formData LogsFo
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var19 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var19 == nil {
-			templ_7745c5c3_Var19 = templ.NopComponent
+		templ_7745c5c3_Var21 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var21 == nil {
+			templ_7745c5c3_Var21 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"overflow-x-auto\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = LogsForm(thisUrl, formData, fieldErrors, submitError, logs, true).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = LogsForm(thisUrl, formData, fieldErrors, submitError, logs, true, "").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<script>\n        document.body.addEventListener('htmx:configRequest', function(evt) {\n            console.log(\"HTMX CONFIG REQUEST\", evt)\n            //evt.detail.parameters['auth_token'] = getAuthToken(); // add a new parameter into the mix\n        });\n\n        // Calculate the time zone offset in minutes and convert to hours\n        // then format the GMT offset as GMT±X\n        const now = new Date();\n        const tzOffset = now.getTimezoneOffset(); // in minutes\n        const hoursOffset = -tzOffset / 60;\n        const timezoneOffset = `(GMT${hoursOffset >= 0 ? '+' : ''}${hoursOffset})`;\n        //document.getElementById('timezoneOffset').innerText = timezoneOffset;\n        document.getElementById('timezoneOffset').innerText = \"Africa/Accra\";\n\n        // Update the hidden input with the timezone name\n        document.getElementById('timezoneName').value = Intl.DateTimeFormat().resolvedOptions().timeZone;\n    </script></div>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

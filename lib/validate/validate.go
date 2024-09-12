@@ -18,7 +18,7 @@ func init() {
 	validate.RegisterValidation("lowercasealphanumhyphen", isLowercaseAlphaNumHyphen)
 	validate.RegisterValidation("dotenvformat", isDotenvFormat)
 	validate.RegisterValidation("duration", isDuration)
-
+	validate.RegisterValidation("tzlocation", isTZLocation)
 }
 
 var lowerCaseAlphaNumHyphenRegex = regexp.MustCompile(`^[a-z0-9-]+$`)
@@ -35,6 +35,14 @@ func isDotenvFormat(fl validator.FieldLevel) bool {
 
 func isDuration(fl validator.FieldLevel) bool {
 	_, err := time.ParseDuration(fl.Field().String())
+	return err == nil
+}
+
+func isTZLocation(fl validator.FieldLevel) bool {
+	if fl.Field().String() == "" {
+		return false
+	}
+	_, err := time.LoadLocation(fl.Field().String())
 	return err == nil
 }
 

@@ -9,7 +9,7 @@ import (
 type LogsFormData struct {
 	Since        string `validate:"omitempty,duration"`
 	Query        string
-	TimezoneName string
+	TimezoneName string `validate:"tzlocation"`
 }
 
 templ option(selected bool, value string, label string) {
@@ -20,37 +20,68 @@ templ option(selected bool, value string, label string) {
 	}
 }
 
-templ LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldErrors, submitError error, logs []cellprovider.LogEntry, hxTriggerOnLoad bool) {
+templ LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldErrors, submitError error, logs []cellprovider.LogEntry, hxTriggerOnLoad bool, warning string) {
 	<div class="flex flex-col gap-2" id="logs-form">
 		<form
 			novalidate
 			hx-post={ thisUrl }
 			hx-disabled-elt="find input[type='text']"
-			hx-trigger={ cls("submit,", "keyup[keyCode==13],", hxTriggerOnLoad, "load,") }
+			hx-trigger={ func() string {
+                trigger := "submit, keyup[keyCode==13], change from:#since"
+                // on first load, we want this form to submit and get logs
+                // but when that submit returns the new html (including this form) we don't want to trigger another submit
+                if hxTriggerOnLoad {
+                    trigger += ", load"
+                }
+                return trigger
+            }() }
 			hx-indicator="find .loading"
 			hx-target="#logs-form"
 			hx-swap="outerHTML"
 			class="flex flex-row gap-2 mt-4 text-xs"
 		>
-			<div class="w-24">
-				<select name="Since" class={ selectClass(fieldErrors.Get("Since")) }>
-					@option(formData.Since == "15m", "15m", "15 mins")
-					@option(formData.Since == "1h", "1h", "1 hour")
-					@option(formData.Since == "1d", "1d", "1 day")
-					@option(formData.Since == "7d", "1w", "1 week")
-				</select>
-			</div>
-			<input type="text" name="Query" class={ inputClass(fieldErrors.Get("Query")) } placeholder="Search" value={ form.InputValue(formData.Query) }/>
+			<select id="since" name="Since" class={ cls(selectClass(fieldErrors.Get("Since")), "w-24") }>
+				@option(formData.Since == "15m", "15m", "15 mins")
+				@option(formData.Since == "1h", "1h", "1 hour")
+				@option(formData.Since == "24h", "24h", "1 day")
+				@option(formData.Since == "168h", "168h", "1 week")
+			</select>
+			<input type="text" name="Query" class={ cls(inputClass(fieldErrors.Get("Query")), "w-1/2 max-w-xl") } placeholder="Search" value={ form.InputValue(formData.Query) }/>
 			<input type="hidden" name="TimezoneName" id="timezoneName" value={ formData.TimezoneName }/>
+			if formData.TimezoneName == "" {
+				<script>
+                    document.getElementById('timezoneName').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                </script>
+			}
 			<span class="htmx-indicator loading loading-ring loading-sm"></span>
 			if submitError != nil {
 				<div class="text-error">{ submitError.Error() }</div>
 			}
 		</form>
+		<div class="flex flex-col gap-2">
+			if fieldErrors.NotNil() {
+				for _, field := range fieldErrors.Fields() {
+					<div class="text-xs text-error">{ fieldErrors.Get(field).Error() }</div>
+				}
+			}
+			if warning != "" {
+				<div class="text-xs text-warning">{ warning }</div>
+			}
+		</div>
 		<table class="table font-mono table-xs">
 			<thead>
 				<tr>
 					<th class="w-52">timestamp <span id="timezoneOffset"></span></th>
+					<script>
+                        // Calculate the time zone offset in minutes and convert to hours
+                        // then format the GMT offset as GMT±X
+                        // can't use var here because it'll lead to an error about the variable already being declared
+                        now = new Date();
+                        tzOffset = now.getTimezoneOffset(); // in minutes
+                        hoursOffset = -tzOffset / 60;
+                        timezoneOffset = `(GMT${hoursOffset >= 0 ? '+' : ''}${hoursOffset})`;
+                        document.getElementById('timezoneOffset').innerText = timezoneOffset;
+                    </script>
 					<th>message</th>
 				</tr>
 			</thead>
@@ -70,30 +101,8 @@ templ LogEntry(log cellprovider.LogEntry) {
 	</tr>
 }
 
-func LogEntrySseEventName() string {
-	return "log-entry"
-}
-
 templ DeploymentLogs(deployment store.Deployment, thisUrl string, formData LogsFormData, fieldErrors form.FieldErrors, submitError error, logs []cellprovider.LogEntry) {
 	<div class="overflow-x-auto">
-		@LogsForm(thisUrl, formData, fieldErrors, submitError, logs, true)
-		<script>
-        document.body.addEventListener('htmx:configRequest', function(evt) {
-            console.log("HTMX CONFIG REQUEST", evt)
-            //evt.detail.parameters['auth_token'] = getAuthToken(); // add a new parameter into the mix
-        });
-
-        // Calculate the time zone offset in minutes and convert to hours
-        // then format the GMT offset as GMT±X
-        const now = new Date();
-        const tzOffset = now.getTimezoneOffset(); // in minutes
-        const hoursOffset = -tzOffset / 60;
-        const timezoneOffset = `(GMT${hoursOffset >= 0 ? '+' : ''}${hoursOffset})`;
-        //document.getElementById('timezoneOffset').innerText = timezoneOffset;
-        document.getElementById('timezoneOffset').innerText = "Africa/Accra";
-
-        // Update the hidden input with the timezone name
-        document.getElementById('timezoneName').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    </script>
+		@LogsForm(thisUrl, formData, fieldErrors, submitError, logs, true, "")
 	</div>
 }

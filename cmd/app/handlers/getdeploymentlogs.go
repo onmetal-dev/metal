@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -13,7 +14,10 @@ import (
 	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/form"
 	"github.com/onmetal-dev/metal/lib/store"
+	"github.com/samber/lo"
 )
+
+const MaxLogsBeforeUiGetsWeird = 10000
 
 type GetDeploymentLogsHandler struct {
 	teamStore           store.TeamStore
@@ -82,6 +86,12 @@ func (h *GetDeploymentLogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		sort.Slice(logs, func(i, j int) bool {
 			return logs[i].Timestamp.After(logs[j].Timestamp)
 		})
+		// searching logs is my passion
+		if fd.Query != "" {
+			logs = lo.Filter(logs, func(log cellprovider.LogEntry, _ int) bool {
+				return strings.Contains(strings.ToLower(log.Message), strings.ToLower(fd.Query))
+			})
+		}
 		return logs, nil
 	}
 
@@ -91,7 +101,7 @@ func (h *GetDeploymentLogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 		fieldErrs, err := form.Decode(&f, r)
 		if fieldErrs.NotNil() || err != nil {
 			// send back the form html w/ errors
-			if err := templates.LogsForm(r.URL.Path, f, fieldErrs, err, []cellprovider.LogEntry{}, false).Render(ctx, w); err != nil {
+			if err := templates.LogsForm(r.URL.Path, f, fieldErrs, err, []cellprovider.LogEntry{}, false, "").Render(ctx, w); err != nil {
 				http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 			}
 			return
@@ -101,7 +111,12 @@ func (h *GetDeploymentLogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if err := templates.LogsForm(r.URL.Path, f, fieldErrs, err, logs, false).Render(ctx, w); err != nil {
+		warning := ""
+		if len(logs) > MaxLogsBeforeUiGetsWeird {
+			logs = logs[:MaxLogsBeforeUiGetsWeird]
+			warning = fmt.Sprintf("search limit exceeded. only showing the most recent %d logs", MaxLogsBeforeUiGetsWeird)
+		}
+		if err := templates.LogsForm(r.URL.Path, f, fieldErrs, err, logs, false, warning).Render(ctx, w); err != nil {
 			http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 			return
 		}

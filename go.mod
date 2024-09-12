@@ -6,6 +6,7 @@ toolchain go1.23.0
 
 require (
 	filippo.io/age v1.2.0
+	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/a-h/templ v0.2.747
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/budimanjojo/talhelper/v3 v3.0.5
@@ -84,7 +85,6 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.0-alpha.3-proton // indirect
 	github.com/ProtonMail/go-mime v0.0.0-20230322103455-7d82a3887f2f // indirect
 	github.com/ProtonMail/gopenpgp/v2 v2.7.5 // indirect
-	github.com/PuerkitoBio/goquery v1.10.0 // indirect
 	github.com/a-h/parse v0.0.0-20240121214402-3caf7543159a // indirect
 	github.com/a-h/protocol v0.0.0-20240704131721-1e461c188041 // indirect
 	github.com/a8m/envsubst v1.4.2 // indirect

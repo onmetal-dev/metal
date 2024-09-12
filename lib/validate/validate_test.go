@@ -113,3 +113,37 @@ func TestDuration(t *testing.T) {
 		})
 	}
 }
+
+func TestTZLocation(t *testing.T) {
+	type TestStruct struct {
+		Field string `validate:"tzlocation"`
+	}
+
+	v := Validator()
+
+	testCases := []struct {
+		name  string
+		input string
+		valid bool
+	}{
+		{"valid IANA time zone", "America/New_York", true},
+		{"valid UTC", "UTC", true},
+		{"valid GMT", "GMT", true},
+		{"invalid time zone", "Invalid/TimeZone", false},
+		{"empty string", "", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := TestStruct{Field: tc.input}
+			err := v.Struct(ts)
+
+			if tc.valid && err != nil {
+				t.Errorf("Test case '%s': Expected valid input '%s', but got error: %v", tc.name, tc.input, err)
+			}
+			if !tc.valid && err == nil {
+				t.Errorf("Test case '%s': Expected invalid input '%s', but got no error", tc.name, tc.input)
+			}
+		})
+	}
+}
