@@ -50,6 +50,8 @@ func TestDB(t *testing.T) {
 		})
 	})
 
+	apiTokenStore := dbstore.NewApiTokenStore(db)
+
 	testSuite := store.NewStoreTestSuite(store.TestStoresConfig{
 		WaitlistStore:   waitlistStore,
 		UserStore:       userStore,
@@ -58,6 +60,7 @@ func TestDB(t *testing.T) {
 		CellStore:       cellStore,
 		AppStore:        appStore,
 		DeploymentStore: deploymentStore,
+		ApiTokenStore:   apiTokenStore,
 	})
 	testSuite(t)
 }

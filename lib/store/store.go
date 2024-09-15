@@ -73,6 +73,7 @@ type Team struct {
 	Apps        []App        `gorm:"foreignKey:TeamId"`
 	Envs        []Env        `gorm:"foreignKey:TeamId"`
 	Deployments []Deployment `gorm:"foreignKey:TeamId"`
+	ApiTokens   []ApiToken   `gorm:"foreignKey:TeamId"`
 }
 
 type PaymentMethod struct {
@@ -502,4 +503,32 @@ type DeploymentStore interface {
 	GetForCell(cellId string) ([]Deployment, error)
 	DeleteDeployment(appId string, envId string, id uint) error
 	UpdateDeploymentStatus(appId string, envId string, id uint, status DeploymentStatus, statusReason string) error
+}
+
+// ApiTokenScope represents the access level of an API token
+type ApiTokenScope string
+
+const (
+	ApiTokenScopeAdmin ApiTokenScope = "admin"
+)
+
+// ApiToken represents an API token for a team
+type ApiToken struct {
+	Common
+	TeamId    string        `json:"team_id" gorm:"index"`
+	CreatorId string        `json:"creator_id"`
+	Name      string        `json:"name"`
+	Token     string        `json:"token" gorm:"uniqueIndex"`
+	Scope     ApiTokenScope `json:"scope"`
+	LastUsed  *time.Time    `json:"last_used"`
+}
+
+// ApiTokenStore interface for managing API tokens
+type ApiTokenStore interface {
+	Create(teamId string, creatorId string, name string, scope ApiTokenScope) (*ApiToken, error)
+	Get(id string) (*ApiToken, error)
+	GetByToken(token string) (*ApiToken, error)
+	List(teamId string) ([]ApiToken, error)
+	Delete(id string) error
+	UpdateLastUsed(id string, lastUsed time.Time) error
 }

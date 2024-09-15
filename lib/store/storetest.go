@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
@@ -16,7 +17,8 @@ type TestStoresConfig struct {
 	ServerStore     ServerStore
 	CellStore       CellStore
 	AppStore        AppStore
-	DeploymentStore DeploymentStore // Add this line
+	DeploymentStore DeploymentStore
+	ApiTokenStore   ApiTokenStore
 }
 
 func createUser(t *testing.T, stores TestStoresConfig, email, password string) User {
@@ -425,8 +427,11 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			require := require.New(t)
 			ctx := context.Background()
 
+			// Seed the random number generator
+			rand.Seed(uint64(time.Now().UnixNano()))
+
 			// Test adding a new email to the waitlist
-			email := fmt.Sprintf("test%d@example.com", rand.Intn(10000))
+			email := fmt.Sprintf("test%d@example.com", rand.Int())
 			err := stores.WaitlistStore.Add(ctx, email)
 			require.NoError(err, "Failed to add email to waitlist")
 
@@ -440,6 +445,58 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			err = stores.WaitlistStore.Add(ctx, invalidEmail)
 			require.Error(err, "Expected error when adding invalid email to waitlist")
 			require.Contains(err.Error(), "not a valid email", "Expected invalid email error message")
+		})
+
+		t.Run("ApiToken Operations", func(t *testing.T) {
+			require := require.New(t)
+
+			// Create a team for the API tokens
+			team := createTeam(t, stores, "API Token Team", "A team for testing API tokens")
+
+			// Create an API token
+			tokenName := "Test Token"
+			creatorId := "user123"
+			apiToken, err := stores.ApiTokenStore.Create(team.Id, creatorId, tokenName, ApiTokenScopeAdmin)
+			require.NoError(err, "Failed to create API token")
+			require.NotEmpty(apiToken.Id, "Expected API token id to be present")
+			require.Equal(tokenName, apiToken.Name, "Expected API token name to match")
+			require.Equal(team.Id, apiToken.TeamId, "Expected API token team id to match")
+			require.Equal(creatorId, apiToken.CreatorId, "Expected API token creator id to match")
+
+			// Get the created API token by ID
+			fetchedToken, err := stores.ApiTokenStore.Get(apiToken.Id)
+			require.NoError(err, "Failed to get API token")
+			require.Equal(apiToken.Id, fetchedToken.Id, "Expected fetched API token id to match")
+			require.Equal(apiToken.Name, fetchedToken.Name, "Expected fetched API token name to match")
+
+			// Get the created API token by token string
+			fetchedByToken, err := stores.ApiTokenStore.GetByToken(apiToken.Token)
+			require.NoError(err, "Failed to get API token by token string")
+			require.Equal(apiToken.Id, fetchedByToken.Id, "Expected fetched API token id to match")
+
+			// List API tokens for the team
+			tokenList, err := stores.ApiTokenStore.List(team.Id)
+			require.NoError(err, "Failed to list API tokens")
+			require.Equal(1, len(tokenList), "Expected one API token for the team")
+			require.Equal(apiToken.Id, tokenList[0].Id, "Expected listed API token id to match")
+
+			// Update last used time
+			newLastUsed := time.Now()
+			err = stores.ApiTokenStore.UpdateLastUsed(apiToken.Id, newLastUsed)
+			require.NoError(err, "Failed to update last used time")
+
+			// Verify last used time was updated
+			updatedToken, err := stores.ApiTokenStore.Get(apiToken.Id)
+			require.NoError(err, "Failed to get updated API token")
+			require.Equal(newLastUsed.Unix(), updatedToken.LastUsed.Unix(), "Expected last used time to be updated")
+
+			// Delete the API token
+			err = stores.ApiTokenStore.Delete(apiToken.Id)
+			require.NoError(err, "Failed to delete API token")
+
+			// Verify API token is deleted
+			_, err = stores.ApiTokenStore.Get(apiToken.Id)
+			require.Error(err, "Expected error when getting deleted API token")
 		})
 	}
 }
