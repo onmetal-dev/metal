@@ -365,7 +365,7 @@ func main() {
 			r.Get("/dashboard/{teamId}/apps/{appId}/envs/{envId}/deployments/{deploymentId}/logs", logsHandler.ServeHTTP)
 			r.Post("/dashboard/{teamId}/apps/{appId}/envs/{envId}/deployments/{deploymentId}/logs", logsHandler.ServeHTTP)
 			r.Get("/dashboard/{teamId}/settings", handlers.NewGetTeamSettingsHandler(userStore, teamStore, apiTokenStore).ServeHTTP)
-			r.Post("/dashboard/{teamId}/invites", handlers.NewPostInviteHandler(teamStore, c.LoopsApiKey, c.LoopsTxAddedToTeamNewUser).ServeHTTP)
+			r.Post("/dashboard/{teamId}/invites", handlers.NewPostInviteHandler(userStore, teamStore, c.LoopsApiKey, c.LoopsTxAddedToTeamNewUser, c.LoopsTxAddedToTeamExistingUser).ServeHTTP)
 			r.Delete("/dashboard/{teamId}/invites/{email}", handlers.NewDeleteInviteHandler(teamStore).ServeHTTP)
 		})
 	})
