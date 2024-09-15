@@ -103,6 +103,7 @@ type TeamMemberInvite struct {
 
 type TeamMember struct {
 	UserId    string    `gorm:"primaryKey" json:"user_id"`
+	User      User      `gorm:"foreignKey:UserId"`
 	TeamId    string    `gorm:"primaryKey" json:"team_id"`
 	Role      TeamRole  `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
@@ -515,12 +516,12 @@ const (
 // ApiToken represents an API token for a team
 type ApiToken struct {
 	Common
-	TeamId    string        `json:"team_id" gorm:"index"`
-	CreatorId string        `json:"creator_id"`
-	Name      string        `json:"name"`
-	Token     string        `json:"token" gorm:"uniqueIndex"`
-	Scope     ApiTokenScope `json:"scope"`
-	LastUsed  *time.Time    `json:"last_used"`
+	TeamId     string        `json:"team_id" gorm:"index"`
+	CreatorId  string        `json:"creator_id"`
+	Name       string        `json:"name"`
+	Token      string        `json:"token" gorm:"uniqueIndex"`
+	Scope      ApiTokenScope `json:"scope"`
+	LastUsedAt *time.Time    `json:"last_used"`
 }
 
 // ApiTokenStore interface for managing API tokens
@@ -530,5 +531,5 @@ type ApiTokenStore interface {
 	GetByToken(token string) (*ApiToken, error)
 	List(teamId string) ([]ApiToken, error)
 	Delete(id string) error
-	UpdateLastUsed(id string, lastUsed time.Time) error
+	UpdateLastUsedAt(id string, lastUsedAt time.Time) error
 }

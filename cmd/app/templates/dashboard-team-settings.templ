@@ -1,0 +1,193 @@
+package templates
+
+import (
+	"fmt"
+	"github.com/onmetal-dev/metal/lib/form"
+	"github.com/onmetal-dev/metal/lib/store"
+	"time"
+)
+
+type InviteFormData struct {
+	Email string         `validate:"required,email"`
+	Role  store.TeamRole `validate:"required,oneof=admin member"`
+}
+
+templ InviteForm(teamId string, data InviteFormData, errors form.FieldErrors, submitError error) {
+	<div id="invite-form">
+		<button class="absolute btn btn-sm btn-circle btn-ghost right-2 top-2" onclick="invite.close()">✕</button>
+		<form
+			hx-post={ fmt.Sprintf("/dashboard/%s/invites", teamId) }
+			hx-target="#invite-form"
+			hx-swap="outerHTML"
+			class="grid grid-cols-[auto,1fr] gap-4 text-xs mt-4"
+			novalidate
+		>
+			<label for="email" class="flex items-center justify-end">email</label>
+			<div class="flex items-center justify-start gap-3">
+				<input
+					type="email"
+					id="email"
+					name="Email"
+					placeholder="friend@yourco.com"
+					value={ data.Email }
+					class={ cls(inputClass(errors.Get("Email")), "w-full") }
+				/>
+				if errors.Get("Email") != nil {
+					<div class="text-error">{ errors.Get("Email").Error() }</div>
+				}
+			</div>
+			<label for="role" class="flex items-center justify-end">role</label>
+			<div class="flex items-center justify-start gap-3">
+				<select
+					id="role"
+					name="Role"
+					class={ selectClass(errors.Get("Role")) }
+					required
+				>
+					<option value="member" selected?={ data.Role == "member" }>Member</option>
+					<option value="admin" selected?={ data.Role == "admin" }>Admin</option>
+				</select>
+				if errors.Get("Role") != nil {
+					<div class="text-error">{ errors.Get("Role").Error() }</div>
+				}
+			</div>
+			<div></div>
+			<div class="flex items-center justify-start gap-3">
+				<button type="submit" class="btn btn-primary btn-sm">invite</button>
+				<span class="htmx-indicator loading loading-ring loading-sm"></span>
+			</div>
+			<div></div>
+			if submitError != nil {
+				<div class="text-error">{ submitError.Error() }</div>
+			}
+		</form>
+	</div>
+}
+
+templ TeamSettings(teamId string, team store.Team, apiTokens []store.ApiToken) {
+	<div class="flex flex-col gap-8">
+		<div>
+			<h2 class="mb-4 text-xl font-bold">team members</h2>
+			<table class="table table-xs">
+				<thead>
+					<tr>
+						<th class="pl-0">email</th>
+						<th>role</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, member := range team.Members {
+						<tr>
+							<td class="pl-0">{ member.User.Email }</td>
+							<td>{ string(member.Role) }</td>
+							<td>
+								<ul class="p-0 menu menu-horizontal menu-xs rounded-box">
+									<li>
+										if !(member.Role == store.TeamRoleAdmin && countAdmins(team.Members) == 1) {
+											<a class="tooltip" data-tip="remove">
+												<button
+													hx-delete={ fmt.Sprintf("/dashboard/%s/members/%s", teamId, member.UserId) }
+													hx-confirm="are you sure you want to remove this team member?"
+													class="w-4 h-4"
+												>
+													@iconTrash()
+												</button>
+											</a>
+										}
+									</li>
+								</ul>
+							</td>
+						</tr>
+					}
+					for _, invite := range team.InvitedMembers {
+						<tr>
+							<td class="pl-0 italic">{ invite.Email + " (invited)" }</td>
+							<td>{ string(invite.Role) }</td>
+							<td>
+								<ul class="p-0 menu menu-horizontal menu-xs rounded-box">
+									<li>
+										<a class="tooltip" data-tip="delete">
+											<button
+												hx-delete={ fmt.Sprintf("/dashboard/%s/invites/%s", teamId, invite.Email) }
+												hx-confirm="are you sure you want to remove this invite?"
+												class="w-4 h-4"
+											>
+												@iconTrash()
+											</button>
+										</a>
+									</li>
+								</ul>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<button class="mt-4 btn btn-primary btn-sm" onclick="invite.showModal()">invite teammate</button>
+			<dialog id="invite" class="modal">
+				<div class="modal-box">
+					<h3 class="font-bold">invite teammate</h3>
+					@InviteForm(teamId, InviteFormData{}, form.FieldErrors{}, nil)
+				</div>
+			</dialog>
+		</div>
+		<div>
+			<h2 class="mb-4 text-xl font-bold">API Tokens</h2>
+			if len(apiTokens) > 0 {
+				<table class="table table-xs">
+					<thead>
+						<tr>
+							<th class="pl-0">name</th>
+							<th>created at</th>
+							<th>last used</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, token := range apiTokens {
+							<tr>
+								<td class="pl-0">{ token.Name }</td>
+								<td>{ token.CreatedAt.Format(time.RFC3339) }</td>
+								<td>
+									if token.LastUsedAt != nil {
+										{ token.LastUsedAt.Format(time.RFC3339) }
+									} else {
+										never
+									}
+								</td>
+								<td>
+									<ul class="p-0 menu menu-horizontal menu-xs rounded-box">
+										<li>
+											<a class="tooltip" data-tip="Delete">
+												<button
+													hx-delete={ fmt.Sprintf("/dashboard/%s/api-tokens/%s", teamId, token.Id) }
+													hx-confirm="Are you sure you want to delete this API token?"
+													class="w-4 h-4"
+												>
+													@iconTrash()
+												</button>
+											</a>
+										</li>
+									</ul>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			} else {
+				<p>No API tokens... yet</p>
+			}
+			<button class="mt-4 btn btn-primary btn-sm">add token</button>
+		</div>
+	</div>
+}
+
+func countAdmins(members []store.TeamMember) int {
+	count := 0
+	for _, member := range members {
+		if member.Role == store.TeamRoleAdmin {
+			count++
+		}
+	}
+	return count
+}

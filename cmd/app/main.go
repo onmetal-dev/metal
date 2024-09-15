@@ -174,6 +174,8 @@ func main() {
 		)
 	})
 
+	apiTokenStore := dbstore.NewApiTokenStore(db)
+
 	// api clients
 	hrobotClient := hrobot.NewClient(hrobot.WithToken(fmt.Sprintf("%s:%s", c.HetznerRobotUsername, c.HetznerRobotPassword)))
 
@@ -333,7 +335,7 @@ func main() {
 		r.Post("/waitlist", handlers.NewPostWaitlistHandler(handlers.PostWaitlistHandlerParams{
 			WaitlistStore: waitlistStore,
 		}).ServeHTTP)
-		r.Get("/signup", handlers.NewGetSignUpHandler(inviteStore).ServeHTTP)
+		r.Get("/signup", handlers.NewGetSignUpHandler(inviteStore, teamStore).ServeHTTP)
 		r.Post("/signup", handlers.NewPostSignUpHandler(userStore, inviteStore, teamStore).ServeHTTP)
 		r.Get("/login", handlers.NewGetLoginHandler().ServeHTTP)
 		r.Post("/login", handlers.NewPostLoginHandler(userStore, teamStore, passwordhash, sessionStore, c.SessionName).ServeHTTP)
@@ -362,6 +364,9 @@ func main() {
 			logsHandler := handlers.NewGetDeploymentLogsHandler(teamStore, deploymentStore, cellProviderForType)
 			r.Get("/dashboard/{teamId}/apps/{appId}/envs/{envId}/deployments/{deploymentId}/logs", logsHandler.ServeHTTP)
 			r.Post("/dashboard/{teamId}/apps/{appId}/envs/{envId}/deployments/{deploymentId}/logs", logsHandler.ServeHTTP)
+			r.Get("/dashboard/{teamId}/settings", handlers.NewGetTeamSettingsHandler(userStore, teamStore, apiTokenStore).ServeHTTP)
+			r.Post("/dashboard/{teamId}/invites", handlers.NewPostInviteHandler(teamStore, c.LoopsApiKey, c.LoopsTxAddedToTeamNewUser).ServeHTTP)
+			r.Delete("/dashboard/{teamId}/invites/{email}", handlers.NewDeleteInviteHandler(teamStore).ServeHTTP)
 		})
 	})
 

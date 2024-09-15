@@ -71,6 +71,7 @@ func addUserToTeam(t *testing.T, ctx context.Context, stores TestStoresConfig, u
 	require.NoError(err, "Failed to get updated team")
 	require.Equal(1, len(updatedTeam.Members), "Expected team members to be 1")
 	require.Equal(userId, updatedTeam.Members[0].UserId, "Expected user to be in team members")
+	require.Equal(userId, updatedTeam.Members[0].User.Id, "Expected user to be in team members")
 }
 
 func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
@@ -481,14 +482,14 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			require.Equal(apiToken.Id, tokenList[0].Id, "Expected listed API token id to match")
 
 			// Update last used time
-			newLastUsed := time.Now()
-			err = stores.ApiTokenStore.UpdateLastUsed(apiToken.Id, newLastUsed)
+			newLastUsedAt := time.Now()
+			err = stores.ApiTokenStore.UpdateLastUsedAt(apiToken.Id, newLastUsedAt)
 			require.NoError(err, "Failed to update last used time")
 
 			// Verify last used time was updated
 			updatedToken, err := stores.ApiTokenStore.Get(apiToken.Id)
 			require.NoError(err, "Failed to get updated API token")
-			require.Equal(newLastUsed.Unix(), updatedToken.LastUsed.Unix(), "Expected last used time to be updated")
+			require.Equal(newLastUsedAt.Unix(), updatedToken.LastUsedAt.Unix(), "Expected last used time to be updated")
 
 			// Delete the API token
 			err = stores.ApiTokenStore.Delete(apiToken.Id)

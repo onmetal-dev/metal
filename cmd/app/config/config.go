@@ -16,6 +16,8 @@ type Config struct {
 	DatabaseName                  string `envconfig:"DATABASE_NAME" default:"metal" required:"true"`
 	DatabaseSslMode               string `envconfig:"DATABASE_SSL_MODE" default:"disable" required:"true"`
 	LoopsWaitlistFormUrl          string `envconfig:"LOOPS_WAITLIST_FORM_URL" required:"true"`
+	LoopsApiKey                   string `envconfig:"LOOPS_API_KEY" required:"true"`
+	LoopsTxAddedToTeamNewUser     string `envconfig:"LOOPS_TX_ADDED_TO_TEAM_NEW_USER" required:"true"`
 	StripePublishableKey          string `envconfig:"STRIPE_PUBLISHABLE_KEY" required:"true"`
 	StripeSecretKey               string `envconfig:"STRIPE_SECRET_KEY" required:"true"`
 	HetznerRobotUsername          string `envconfig:"HETZNER_ROBOT_USERNAME" required:"true"`

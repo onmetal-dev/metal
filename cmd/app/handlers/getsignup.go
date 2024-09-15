@@ -9,11 +9,13 @@ import (
 
 type GetSignUpHandler struct {
 	inviteStore store.InviteStore
+	teamStore   store.TeamStore
 }
 
-func NewGetSignUpHandler(inviteStore store.InviteStore) *GetSignUpHandler {
+func NewGetSignUpHandler(inviteStore store.InviteStore, teamStore store.TeamStore) *GetSignUpHandler {
 	return &GetSignUpHandler{
 		inviteStore: inviteStore,
+		teamStore:   teamStore,
 	}
 }
 
@@ -27,6 +29,14 @@ func (h *GetSignUpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		allowed = invitedUser != nil
+		if !allowed {
+			invites, err := h.teamStore.GetInvitesForEmail(email)
+			if err != nil {
+				http.Error(w, "Error fetching invites", http.StatusInternalServerError)
+				return
+			}
+			allowed = len(invites) > 0
+		}
 	}
 
 	c := templates.SignUpPage(allowed)
