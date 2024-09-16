@@ -64,6 +64,59 @@ templ InviteForm(teamId string, data InviteFormData, errors form.FieldErrors, su
 	</div>
 }
 
+type ApiTokenFormData struct {
+	Name  string              `validate:"required,min=5"`
+	Scope store.ApiTokenScope `validate:"required,oneof=admin"`
+}
+
+templ ApiTokenForm(teamId string, data ApiTokenFormData, errors form.FieldErrors, submitError error) {
+	<div id="apitoken-form">
+		<button class="absolute btn btn-sm btn-circle btn-ghost right-2 top-2" onclick="apitoken.close()">✕</button>
+		<form
+			hx-post={ fmt.Sprintf("/dashboard/%s/apitokens", teamId) }
+			hx-target="#apitoken-form"
+			hx-swap="outerHTML"
+			class="grid grid-cols-[auto,1fr] gap-4 text-xs mt-4"
+			novalidate
+		>
+			<label for="name" class="flex items-center justify-end">name</label>
+			<div class="flex items-center justify-start gap-3">
+				<input
+					type="text"
+					name="Name"
+					placeholder="worlds best api token"
+					value={ data.Name }
+					class={ cls(inputClass(errors.Get("Name")), "w-full") }
+				/>
+				if errors.Get("Name") != nil {
+					<div class="text-error">{ errors.Get("Name").Error() }</div>
+				}
+			</div>
+			<label for="scope" class="flex items-center justify-end">scope</label>
+			<div class="flex items-center justify-start gap-3">
+				<select
+					name="Scope"
+					class={ selectClass(errors.Get("Scope")) }
+				>
+					<option value="admin" selected?={ data.Scope == "admin" }>admin</option>
+				</select>
+				if errors.Get("Scope") != nil {
+					<div class="text-error">{ errors.Get("Scope").Error() }</div>
+				}
+			</div>
+			<div></div>
+			<div class="flex items-center justify-start gap-3">
+				<button type="submit" class="btn btn-primary btn-sm">create</button>
+				<span class="htmx-indicator loading loading-ring loading-sm"></span>
+			</div>
+			<div></div>
+			if submitError != nil {
+				<div class="text-error">{ submitError.Error() }</div>
+			}
+		</form>
+	</div>
+}
+
 templ TeamSettings(teamId string, team store.Team, apiTokens []store.ApiToken) {
 	<div class="flex flex-col gap-8">
 		<div>
@@ -140,6 +193,7 @@ templ TeamSettings(teamId string, team store.Team, apiTokens []store.ApiToken) {
 							<th class="pl-0">name</th>
 							<th>created at</th>
 							<th>last used</th>
+							<th>token</th>
 							<th></th>
 						</tr>
 					</thead>
@@ -156,11 +210,29 @@ templ TeamSettings(teamId string, team store.Team, apiTokens []store.ApiToken) {
 									}
 								</td>
 								<td>
+									<span>{ "**************" + token.Token[len(token.Token)-4:] } </span>
+								</td>
+								<td>
 									<ul class="p-0 menu menu-horizontal menu-xs rounded-box">
 										<li>
-											<a class="tooltip" data-tip="Delete">
+											<a id={ token.Id + "-tooltip" } class="tooltip" data-tip="copy">
 												<button
-													hx-delete={ fmt.Sprintf("/dashboard/%s/api-tokens/%s", teamId, token.Id) }
+													id={ token.Id }
+													class="w-4 h-4"
+												>
+													<div id={ token.Id + "-copy" }>
+														@iconClipboardCopy()
+													</div>
+													<div id={ token.Id + "-check" } class="hidden">
+														@iconClipboardCheck()
+													</div>
+												</button>
+											</a>
+										</li>
+										<li>
+											<a class="tooltip" data-tip="delete">
+												<button
+													hx-delete={ fmt.Sprintf("/dashboard/%s/apitokens/%s", teamId, token.Id) }
 													hx-confirm="Are you sure you want to delete this API token?"
 													class="w-4 h-4"
 												>
@@ -177,8 +249,30 @@ templ TeamSettings(teamId string, team store.Team, apiTokens []store.ApiToken) {
 			} else {
 				<p>No API tokens... yet</p>
 			}
-			<button class="mt-4 btn btn-primary btn-sm">add token</button>
+			<button class="mt-4 btn btn-primary btn-sm" onclick="apitoken.showModal()">add API token</button>
+			<dialog id="apitoken" class="modal">
+				<div class="modal-box">
+					<h3 class="font-bold">add API token</h3>
+					@ApiTokenForm(teamId, ApiTokenFormData{}, form.FieldErrors{}, nil)
+				</div>
+			</dialog>
 		</div>
+		@templ.JSONScript("scriptData", map[string]interface{}{
+			"apiTokens": apiTokens,
+		})
+		<script>
+            // for each api token, add a button listener that copies it to the clipboard
+            const scriptData = JSON.parse(document.getElementById('scriptData').textContent);
+            scriptData.apiTokens.forEach(token => {
+                const button = document.getElementById(token.id);
+                button.addEventListener('click', () => {
+                    navigator.clipboard.writeText(token.token);
+                    document.getElementById(token.id + "-copy").classList.add("hidden");
+                    document.getElementById(token.id + "-check").classList.remove("hidden");
+                    document.getElementById(token.id + "-tooltip").setAttribute("data-tip", "copied!");
+                });
+            });
+        </script>
 	</div>
 }
 

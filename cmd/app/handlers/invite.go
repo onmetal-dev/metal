@@ -124,7 +124,13 @@ func NewDeleteInviteHandler(teamStore store.TeamStore) *DeleteInviteHandler {
 }
 
 func (h *DeleteInviteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
+	user := middleware.GetUser(ctx)
+	team, _ := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
+	if team == nil {
+		return
+	}
 	email := chi.URLParam(r, "email")
 
 	if err := h.teamStore.DeleteTeamInvite(email, teamId); err != nil {

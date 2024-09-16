@@ -222,7 +222,7 @@ func footer() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-row items-center gap-2\"><p class=\"text-xs\">made with ❤️ in cincinnati, oh</p><img src=\"/static/images/ohio.svg\" width=\"20\"></div><div><p class=\"text-xs\"><a href=\"https://github.com/onmetal-dev/metal\">github</a></p></div></div></footer>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-row items-center gap-2\"><p class=\"text-xs\">made with ❤️ in cincinnati, oh</p><img src=\"/static/images/ohio.svg\" width=\"20\"></div><div><p class=\"text-xs\"><a href=\"https://github.com/onmetal-dev/metal\" target=\"_blank\" rel=\"noopener noreferrer\">github</a></p></div></div></footer>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
