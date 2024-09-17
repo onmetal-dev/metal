@@ -19,6 +19,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/onmetal-dev/metal/cmd/app/config"
 	"github.com/onmetal-dev/metal/cmd/app/handlers"
+	"github.com/onmetal-dev/metal/cmd/app/handlers/api"
 	"github.com/onmetal-dev/metal/cmd/app/hash/passwordhash"
 	m "github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/lib/background"
@@ -369,6 +370,12 @@ func main() {
 			r.Delete("/dashboard/{teamId}/invites/{email}", handlers.NewDeleteInviteHandler(teamStore).ServeHTTP)
 			r.Post("/dashboard/{teamId}/apitokens", handlers.NewPostApiTokenHandler(teamStore, apiTokenStore).ServeHTTP)
 			r.Delete("/dashboard/{teamId}/apitokens/{apiTokenId}", handlers.NewDeleteApiTokenHandler(teamStore, apiTokenStore).ServeHTTP)
+		})
+
+		// API routes
+		r.Group(func(r chi.Router) {
+			r.Use(m.ApiAuthMiddleware(apiTokenStore))
+			r.Get("/api/whoami", api.NewWhoamiHandler(apiTokenStore, teamStore).ServeHTTP)
 		})
 	})
 

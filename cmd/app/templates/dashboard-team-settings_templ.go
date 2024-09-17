@@ -531,7 +531,7 @@ func TeamSettings(teamId string, team store.Team, apiTokens []store.ApiToken) te
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div></dialog></div><div><h2 class=\"mb-4 text-xl font-bold\">API Tokens</h2>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div></dialog></div><div><h2 class=\"mb-4 text-xl font-bold\">API tokens</h2>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
+	"github.com/onmetal-dev/metal/lib/cli/whoami"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -16,7 +19,21 @@ var rootCmd = &cobra.Command{
 	Use:   "metal",
 	Short: "Bare metal PaaS",
 	Long: `Metal is platform for depoying applications on bare metal.
-The CLI can be used to interact with the platform.`,
+The CLI can be used to interact with the platform.
+
+Certain flags to the CLI can be configured via environment variables or config file values. 
+E.g., instead of --api-token you can use METAL_API_TOKEN or put api-token: ... in a config file.
+
+The default location of the config file is $HOME/.metal/config.yaml, but can be overridden with the --config flag.
+
+Precedence order: CLI flags > environment variables > config file > default value.`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		apiToken := viper.GetString("api-token")
+		if apiToken == "" {
+			return fmt.Errorf("apitoken is not set. Please provide it via CLI flag or config file")
+		}
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -31,22 +48,14 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.metal/config.yaml)")
+	rootCmd.PersistentFlags().String("api-base-url", "https://www.onmetal.dev", "API base URL")
+	rootCmd.PersistentFlags().String("api-token", "", "Token for authentication")
+	rootCmd.PersistentFlags().VisitAll(func(flag *pflag.Flag) {
+		viper.BindPFlag(flag.Name, flag)
+	})
 
-	// Change ApiToken to token
-	rootCmd.PersistentFlags().String("token", "", "Token for authentication")
-	viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-
-	// Add the "up" command
-	rootCmd.AddCommand(NewCmdUp())
+	rootCmd.AddCommand(whoami.NewCmd())
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -65,10 +74,12 @@ func initConfig() {
 		viper.SetConfigName("config")
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
+	viper.SetEnvPrefix("METAL")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.AutomaticEnv()
 
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error reading config file:", err)
+		os.Exit(1)
 	}
 }
