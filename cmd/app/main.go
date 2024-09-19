@@ -29,6 +29,7 @@ import (
 	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/dnsprovider"
 	"github.com/onmetal-dev/metal/lib/logger"
+	"github.com/onmetal-dev/metal/lib/oapi"
 	"github.com/onmetal-dev/metal/lib/serverprovider"
 	"github.com/onmetal-dev/metal/lib/store"
 	database "github.com/onmetal-dev/metal/lib/store/db"
@@ -373,10 +374,14 @@ func main() {
 		})
 
 		// API routes
-		r.Group(func(r chi.Router) {
-			r.Use(m.ApiAuthMiddleware(apiTokenStore))
-			r.Get("/api/whoami", api.NewWhoamiHandler(apiTokenStore, teamStore).ServeHTTP)
-		})
+		oapi.HandlerWithOptions(
+			oapi.NewStrictHandler(api.New(apiTokenStore, appStore, teamStore), []oapi.StrictMiddlewareFunc{}),
+			oapi.ChiServerOptions{
+				BaseRouter: r,
+				Middlewares: []oapi.MiddlewareFunc{
+					m.ApiAuthMiddleware(apiTokenStore),
+				},
+			})
 	})
 
 	srv := &http.Server{

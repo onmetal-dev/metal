@@ -1,39 +1,29 @@
 package whoami
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/onmetal-dev/metal/lib/cli/style"
+	"github.com/onmetal-dev/metal/lib/oapi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-type apiConfig struct {
-	baseUrl string
-	token   string
-}
-
-type WhoamiResponse struct {
-	TokenID   string `json:"token_id"`
-	TeamID    string `json:"team_id"`
-	TeamName  string `json:"team_name"`
-	CreatedAt string `json:"created_at"`
-}
-
 type WhoamiMsg struct {
-	Success *WhoamiResponse
+	Success *oapi.WhoAmI
 	Error   error
 }
 
 type model struct {
 	width, height int
-	apiConfig     *apiConfig
+	apiClient     oapi.ClientWithResponsesInterface
 	whoamiMsg     *WhoamiMsg
 }
 
@@ -46,8 +36,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		return m, nil
-	case apiConfig:
-		m.apiConfig = &msg
+	case oapi.ClientWithResponsesInterface:
+		m.apiClient = msg
 		return m, m.fetchWhoamiInfoCmd
 	case WhoamiMsg:
 		m.whoamiMsg = &msg
@@ -72,10 +62,10 @@ func (m model) View() string {
 
 	whoami := m.whoamiMsg.Success
 	rows := [][]string{
-		{"Token ID", whoami.TokenID},
-		{"Team ID", whoami.TeamID},
+		{"Token ID", whoami.TokenId},
+		{"Team ID", whoami.TeamId},
 		{"Team Name", whoami.TeamName},
-		{"Token Created At", whoami.CreatedAt},
+		{"Token Created At", whoami.CreatedAt.Format(time.RFC3339)},
 	}
 
 	baseStyle := lipgloss.NewStyle().Foreground(style.Primary)
@@ -106,40 +96,28 @@ func NewCmd() *cobra.Command {
 
 func runWhoami(cmd *cobra.Command, args []string) {
 	p := tea.NewProgram(model{})
-	go p.Send(apiConfig{
-		baseUrl: viper.GetString("api-base-url"),
-		token:   viper.GetString("api-token"),
-	})
-	_, err := p.Run()
+	client, err := oapi.NewClientWithResponses(viper.GetString("api-base-url"),
+		oapi.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+			req.Header.Set("Authorization", "Bearer "+viper.GetString("api-token"))
+			return nil
+		}))
 	if err != nil {
+		fmt.Println("error creating client:", err)
+		os.Exit(1)
+	}
+	go p.Send(client)
+	if _, err := p.Run(); err != nil {
 		fmt.Println("could not start program:", err)
 		os.Exit(1)
 	}
 }
 
 func (m model) fetchWhoamiInfoCmd() tea.Msg {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", m.apiConfig.baseUrl+"/api/whoami", nil)
-	if err != nil {
-		return WhoamiMsg{Error: fmt.Errorf("error creating request: %w", err)}
-	}
-
-	req.Header.Set("Authorization", "Bearer "+m.apiConfig.token)
-
-	resp, err := client.Do(req)
+	resp, err := m.apiClient.WhoAmIWithResponse(context.Background())
 	if err != nil {
 		return WhoamiMsg{Error: fmt.Errorf("error making request: %w", err)}
+	} else if resp.StatusCode() != http.StatusOK {
+		return WhoamiMsg{Error: fmt.Errorf("API returned non-200 status: %d: %s", resp.StatusCode(), string(resp.Body))}
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return WhoamiMsg{Error: fmt.Errorf("API returned non-200 status: %d", resp.StatusCode)}
-	}
-
-	var whoamiResp WhoamiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&whoamiResp); err != nil {
-		return WhoamiMsg{Error: fmt.Errorf("error decoding response: %w", err)}
-	}
-
-	return WhoamiMsg{Success: &whoamiResp}
+	return WhoamiMsg{Success: resp.JSON200}
 }

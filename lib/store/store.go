@@ -357,7 +357,7 @@ type AppSettings struct {
 }
 
 type CreateAppOptions struct {
-	Name   string `validate:"required"`
+	Name   string `validate:"required,lowercasealphanumhyphen"`
 	TeamId string `validate:"required"`
 	UserId string `validate:"required"`
 }
@@ -370,6 +370,8 @@ type CreateAppSettingsOptions struct {
 	ExternalPorts ExternalPorts `validate:"required"`
 	Resources     Resources     `validate:"required"`
 }
+
+var ErrAppNotFound = errors.New("app not found")
 
 type AppStore interface {
 	Create(opts CreateAppOptions) (App, error)

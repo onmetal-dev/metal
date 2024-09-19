@@ -44,6 +44,13 @@ func (s *AppStore) Create(opts store.CreateAppOptions) (store.App, error) {
 
 func (s *AppStore) Get(ctx context.Context, id string) (store.App, error) {
 	var app store.App
+	err := s.db.WithContext(ctx).Where("id = ?", id).First(&app).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return store.App{}, store.ErrAppNotFound
+		}
+		return store.App{}, err
+	}
 	return app, s.db.WithContext(ctx).Where("id = ?", id).First(&app).Error
 }
 
