@@ -483,6 +483,8 @@ type CreateDeploymentOptions struct {
 	Replicas      int            `validate:"required"`
 }
 
+var ErrEnvNotFound = errors.New("env not found")
+
 // DeploymentStore allows for
 // - creating, retrieving (by teamId), and deleting environments
 // - creating, retrieving (by teamId, appId, envId), and deleting AppEnvVars

@@ -46,6 +46,19 @@ type App struct {
 // Apps defines model for Apps.
 type Apps = []App
 
+// Env defines model for Env.
+type Env struct {
+	CreatedAt time.Time `json:"created_at"`
+
+	// Id A string with a prefix, underscore, and 26 alphanumeric characters (type ID)
+	Id        Id        `json:"id"`
+	Name      string    `json:"name"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Envs defines model for Envs.
+type Envs = []Env
+
 // Error defines model for Error.
 type Error struct {
 	Code  *string `json:"code,omitempty"`
@@ -81,8 +94,16 @@ type CreateAppJSONBody struct {
 	Name string `json:"name"`
 }
 
+// CreateEnvJSONBody defines parameters for CreateEnv.
+type CreateEnvJSONBody struct {
+	Name string `json:"name"`
+}
+
 // CreateAppJSONRequestBody defines body for CreateApp for application/json ContentType.
 type CreateAppJSONRequestBody CreateAppJSONBody
+
+// CreateEnvJSONRequestBody defines body for CreateEnv for application/json ContentType.
+type CreateEnvJSONRequestBody CreateEnvJSONBody
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -171,6 +192,20 @@ type ClientInterface interface {
 
 	CreateApp(ctx context.Context, appId Id, body CreateAppJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetEnvs request
+	GetEnvs(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteEnv request
+	DeleteEnv(ctx context.Context, envId Id, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetEnv request
+	GetEnv(ctx context.Context, envId Id, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateEnvWithBody request with any body
+	CreateEnvWithBody(ctx context.Context, envId Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateEnv(ctx context.Context, envId Id, body CreateEnvJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// WhoAmI request
 	WhoAmI(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
@@ -225,6 +260,66 @@ func (c *Client) CreateAppWithBody(ctx context.Context, appId Id, contentType st
 
 func (c *Client) CreateApp(ctx context.Context, appId Id, body CreateAppJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateAppRequest(c.Server, appId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetEnvs(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetEnvsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteEnv(ctx context.Context, envId Id, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteEnvRequest(c.Server, envId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetEnv(ctx context.Context, envId Id, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetEnvRequest(c.Server, envId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateEnvWithBody(ctx context.Context, envId Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateEnvRequestWithBody(c.Server, envId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateEnv(ctx context.Context, envId Id, body CreateEnvJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateEnvRequest(c.Server, envId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -389,6 +484,148 @@ func NewCreateAppRequestWithBody(server string, appId Id, contentType string, bo
 	return req, nil
 }
 
+// NewGetEnvsRequest generates requests for GetEnvs
+func NewGetEnvsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/envs")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteEnvRequest generates requests for DeleteEnv
+func NewDeleteEnvRequest(server string, envId Id) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "envId", runtime.ParamLocationPath, envId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/envs/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetEnvRequest generates requests for GetEnv
+func NewGetEnvRequest(server string, envId Id) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "envId", runtime.ParamLocationPath, envId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/envs/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateEnvRequest calls the generic CreateEnv builder with application/json body
+func NewCreateEnvRequest(server string, envId Id, body CreateEnvJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateEnvRequestWithBody(server, envId, "application/json", bodyReader)
+}
+
+// NewCreateEnvRequestWithBody generates requests for CreateEnv with any type of body
+func NewCreateEnvRequestWithBody(server string, envId Id, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "envId", runtime.ParamLocationPath, envId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/envs/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewWhoAmIRequest generates requests for WhoAmI
 func NewWhoAmIRequest(server string) (*http.Request, error) {
 	var err error
@@ -472,6 +709,20 @@ type ClientWithResponsesInterface interface {
 	CreateAppWithBodyWithResponse(ctx context.Context, appId Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAppResponse, error)
 
 	CreateAppWithResponse(ctx context.Context, appId Id, body CreateAppJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAppResponse, error)
+
+	// GetEnvsWithResponse request
+	GetEnvsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetEnvsResponse, error)
+
+	// DeleteEnvWithResponse request
+	DeleteEnvWithResponse(ctx context.Context, envId Id, reqEditors ...RequestEditorFn) (*DeleteEnvResponse, error)
+
+	// GetEnvWithResponse request
+	GetEnvWithResponse(ctx context.Context, envId Id, reqEditors ...RequestEditorFn) (*GetEnvResponse, error)
+
+	// CreateEnvWithBodyWithResponse request with any body
+	CreateEnvWithBodyWithResponse(ctx context.Context, envId Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateEnvResponse, error)
+
+	CreateEnvWithResponse(ctx context.Context, envId Id, body CreateEnvJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateEnvResponse, error)
 
 	// WhoAmIWithResponse request
 	WhoAmIWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*WhoAmIResponse, error)
@@ -571,6 +822,100 @@ func (r CreateAppResponse) StatusCode() int {
 	return 0
 }
 
+type GetEnvsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Envs
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetEnvsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetEnvsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteEnvResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON404      *NotFound
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteEnvResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteEnvResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetEnvResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Env
+	JSON404      *NotFound
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetEnvResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetEnvResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateEnvResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *Env
+	JSON400      *BadRequest
+	JSON500      *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateEnvResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateEnvResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type WhoAmIResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -636,6 +981,50 @@ func (c *ClientWithResponses) CreateAppWithResponse(ctx context.Context, appId I
 		return nil, err
 	}
 	return ParseCreateAppResponse(rsp)
+}
+
+// GetEnvsWithResponse request returning *GetEnvsResponse
+func (c *ClientWithResponses) GetEnvsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetEnvsResponse, error) {
+	rsp, err := c.GetEnvs(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetEnvsResponse(rsp)
+}
+
+// DeleteEnvWithResponse request returning *DeleteEnvResponse
+func (c *ClientWithResponses) DeleteEnvWithResponse(ctx context.Context, envId Id, reqEditors ...RequestEditorFn) (*DeleteEnvResponse, error) {
+	rsp, err := c.DeleteEnv(ctx, envId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteEnvResponse(rsp)
+}
+
+// GetEnvWithResponse request returning *GetEnvResponse
+func (c *ClientWithResponses) GetEnvWithResponse(ctx context.Context, envId Id, reqEditors ...RequestEditorFn) (*GetEnvResponse, error) {
+	rsp, err := c.GetEnv(ctx, envId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetEnvResponse(rsp)
+}
+
+// CreateEnvWithBodyWithResponse request with arbitrary body returning *CreateEnvResponse
+func (c *ClientWithResponses) CreateEnvWithBodyWithResponse(ctx context.Context, envId Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateEnvResponse, error) {
+	rsp, err := c.CreateEnvWithBody(ctx, envId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateEnvResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateEnvWithResponse(ctx context.Context, envId Id, body CreateEnvJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateEnvResponse, error) {
+	rsp, err := c.CreateEnv(ctx, envId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateEnvResponse(rsp)
 }
 
 // WhoAmIWithResponse request returning *WhoAmIResponse
@@ -793,6 +1182,152 @@ func ParseCreateAppResponse(rsp *http.Response) (*CreateAppResponse, error) {
 	return response, nil
 }
 
+// ParseGetEnvsResponse parses an HTTP response from a GetEnvsWithResponse call
+func ParseGetEnvsResponse(rsp *http.Response) (*GetEnvsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetEnvsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Envs
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteEnvResponse parses an HTTP response from a DeleteEnvWithResponse call
+func ParseDeleteEnvResponse(rsp *http.Response) (*DeleteEnvResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteEnvResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetEnvResponse parses an HTTP response from a GetEnvWithResponse call
+func ParseGetEnvResponse(rsp *http.Response) (*GetEnvResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetEnvResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Env
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateEnvResponse parses an HTTP response from a CreateEnvWithResponse call
+func ParseCreateEnvResponse(rsp *http.Response) (*CreateEnvResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateEnvResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Env
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseWhoAmIResponse parses an HTTP response from a WhoAmIWithResponse call
 func ParseWhoAmIResponse(rsp *http.Response) (*WhoAmIResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -841,6 +1376,18 @@ type ServerInterface interface {
 	// (PUT /api/apps/{appId})
 	CreateApp(w http.ResponseWriter, r *http.Request, appId Id)
 
+	// (GET /api/envs)
+	GetEnvs(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /api/envs/{envId})
+	DeleteEnv(w http.ResponseWriter, r *http.Request, envId Id)
+
+	// (GET /api/envs/{envId})
+	GetEnv(w http.ResponseWriter, r *http.Request, envId Id)
+
+	// (PUT /api/envs/{envId})
+	CreateEnv(w http.ResponseWriter, r *http.Request, envId Id)
+
 	// (GET /api/whoami)
 	WhoAmI(w http.ResponseWriter, r *http.Request)
 }
@@ -866,6 +1413,26 @@ func (_ Unimplemented) GetApp(w http.ResponseWriter, r *http.Request, appId Id) 
 
 // (PUT /api/apps/{appId})
 func (_ Unimplemented) CreateApp(w http.ResponseWriter, r *http.Request, appId Id) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/envs)
+func (_ Unimplemented) GetEnvs(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/envs/{envId})
+func (_ Unimplemented) DeleteEnv(w http.ResponseWriter, r *http.Request, envId Id) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/envs/{envId})
+func (_ Unimplemented) GetEnv(w http.ResponseWriter, r *http.Request, envId Id) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/envs/{envId})
+func (_ Unimplemented) CreateEnv(w http.ResponseWriter, r *http.Request, envId Id) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -975,6 +1542,107 @@ func (siw *ServerInterfaceWrapper) CreateApp(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateApp(w, r, appId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetEnvs operation middleware
+func (siw *ServerInterfaceWrapper) GetEnvs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEnvs(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// DeleteEnv operation middleware
+func (siw *ServerInterfaceWrapper) DeleteEnv(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "envId" -------------
+	var envId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "envId", chi.URLParam(r, "envId"), &envId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "envId", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteEnv(w, r, envId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetEnv operation middleware
+func (siw *ServerInterfaceWrapper) GetEnv(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "envId" -------------
+	var envId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "envId", chi.URLParam(r, "envId"), &envId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "envId", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEnv(w, r, envId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CreateEnv operation middleware
+func (siw *ServerInterfaceWrapper) CreateEnv(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "envId" -------------
+	var envId Id
+
+	err = runtime.BindStyledParameterWithOptions("simple", "envId", chi.URLParam(r, "envId"), &envId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "envId", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateEnv(w, r, envId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1127,6 +1795,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/api/apps/{appId}", wrapper.CreateApp)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/envs", wrapper.GetEnvs)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/envs/{envId}", wrapper.DeleteEnv)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/envs/{envId}", wrapper.GetEnv)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/envs/{envId}", wrapper.CreateEnv)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/whoami", wrapper.WhoAmI)
 	})
 
@@ -1277,6 +1957,144 @@ func (response CreateApp500JSONResponse) VisitCreateAppResponse(w http.ResponseW
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetEnvsRequestObject struct {
+}
+
+type GetEnvsResponseObject interface {
+	VisitGetEnvsResponse(w http.ResponseWriter) error
+}
+
+type GetEnvs200JSONResponse Envs
+
+func (response GetEnvs200JSONResponse) VisitGetEnvsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvs500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetEnvs500JSONResponse) VisitGetEnvsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteEnvRequestObject struct {
+	EnvId Id `json:"envId"`
+}
+
+type DeleteEnvResponseObject interface {
+	VisitDeleteEnvResponse(w http.ResponseWriter) error
+}
+
+type DeleteEnv204Response struct {
+}
+
+func (response DeleteEnv204Response) VisitDeleteEnvResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteEnv404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteEnv404JSONResponse) VisitDeleteEnvResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteEnv500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response DeleteEnv500JSONResponse) VisitDeleteEnvResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvRequestObject struct {
+	EnvId Id `json:"envId"`
+}
+
+type GetEnvResponseObject interface {
+	VisitGetEnvResponse(w http.ResponseWriter) error
+}
+
+type GetEnv200JSONResponse Env
+
+func (response GetEnv200JSONResponse) VisitGetEnvResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnv404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetEnv404JSONResponse) VisitGetEnvResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnv500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetEnv500JSONResponse) VisitGetEnvResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateEnvRequestObject struct {
+	EnvId Id `json:"envId"`
+	Body  *CreateEnvJSONRequestBody
+}
+
+type CreateEnvResponseObject interface {
+	VisitCreateEnvResponse(w http.ResponseWriter) error
+}
+
+type CreateEnv201JSONResponse Env
+
+func (response CreateEnv201JSONResponse) VisitCreateEnvResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateEnv400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateEnv400JSONResponse) VisitCreateEnvResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateEnv500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response CreateEnv500JSONResponse) VisitCreateEnvResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type WhoAmIRequestObject struct {
 }
 
@@ -1318,6 +2136,18 @@ type StrictServerInterface interface {
 
 	// (PUT /api/apps/{appId})
 	CreateApp(ctx context.Context, request CreateAppRequestObject) (CreateAppResponseObject, error)
+
+	// (GET /api/envs)
+	GetEnvs(ctx context.Context, request GetEnvsRequestObject) (GetEnvsResponseObject, error)
+
+	// (DELETE /api/envs/{envId})
+	DeleteEnv(ctx context.Context, request DeleteEnvRequestObject) (DeleteEnvResponseObject, error)
+
+	// (GET /api/envs/{envId})
+	GetEnv(ctx context.Context, request GetEnvRequestObject) (GetEnvResponseObject, error)
+
+	// (PUT /api/envs/{envId})
+	CreateEnv(ctx context.Context, request CreateEnvRequestObject) (CreateEnvResponseObject, error)
 
 	// (GET /api/whoami)
 	WhoAmI(ctx context.Context, request WhoAmIRequestObject) (WhoAmIResponseObject, error)
@@ -1461,6 +2291,115 @@ func (sh *strictHandler) CreateApp(w http.ResponseWriter, r *http.Request, appId
 	}
 }
 
+// GetEnvs operation middleware
+func (sh *strictHandler) GetEnvs(w http.ResponseWriter, r *http.Request) {
+	var request GetEnvsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEnvs(ctx, request.(GetEnvsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEnvs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEnvsResponseObject); ok {
+		if err := validResponse.VisitGetEnvsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteEnv operation middleware
+func (sh *strictHandler) DeleteEnv(w http.ResponseWriter, r *http.Request, envId Id) {
+	var request DeleteEnvRequestObject
+
+	request.EnvId = envId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteEnv(ctx, request.(DeleteEnvRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteEnv")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteEnvResponseObject); ok {
+		if err := validResponse.VisitDeleteEnvResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetEnv operation middleware
+func (sh *strictHandler) GetEnv(w http.ResponseWriter, r *http.Request, envId Id) {
+	var request GetEnvRequestObject
+
+	request.EnvId = envId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEnv(ctx, request.(GetEnvRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEnv")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEnvResponseObject); ok {
+		if err := validResponse.VisitGetEnvResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateEnv operation middleware
+func (sh *strictHandler) CreateEnv(w http.ResponseWriter, r *http.Request, envId Id) {
+	var request CreateEnvRequestObject
+
+	request.EnvId = envId
+
+	var body CreateEnvJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateEnv(ctx, request.(CreateEnvRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateEnv")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateEnvResponseObject); ok {
+		if err := validResponse.VisitCreateEnvResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // WhoAmI operation middleware
 func (sh *strictHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 	var request WhoAmIRequestObject
@@ -1488,22 +2427,24 @@ func (sh *strictHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"40JlrMiVdelFcpHQelj/GwAA//+ujHnPkhYAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

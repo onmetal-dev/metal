@@ -7,28 +7,32 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
+	"github.com/onmetal-dev/metal/lib/cli/common"
 	"github.com/onmetal-dev/metal/lib/cli/style"
 	"github.com/onmetal-dev/metal/lib/oapi"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-type WhoamiMsg struct {
+type Msg struct {
 	Success *oapi.WhoAmI
 	Error   error
 }
 
 type model struct {
 	width, height int
+	loading       spinner.Model
 	apiClient     oapi.ClientWithResponsesInterface
-	whoamiMsg     *WhoamiMsg
+	whoamiMsg     *Msg
 }
 
+var _ tea.Model = (*model)(nil)
+
 func (m model) Init() tea.Cmd {
-	return nil
+	return tea.Batch(m.loading.Tick, FetchWhoamiInfoCmd(m.apiClient))
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -36,10 +40,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		return m, nil
-	case oapi.ClientWithResponsesInterface:
-		m.apiClient = msg
-		return m, m.fetchWhoamiInfoCmd
-	case WhoamiMsg:
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.loading, cmd = m.loading.Update(msg)
+		return m, cmd
+	case Msg:
 		m.whoamiMsg = &msg
 		return m, tea.Quit
 	case tea.KeyMsg:
@@ -53,7 +58,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	if m.whoamiMsg == nil {
-		return "Loading..."
+		return fmt.Sprintf("\n %s %s\n\n", m.loading.View(), lipgloss.NewStyle().Foreground(style.BaseLight).Render("loading..."))
 	}
 
 	if m.whoamiMsg.Error != nil {
@@ -88,36 +93,32 @@ func (m model) View() string {
 
 func NewCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "whoami",
-		Short: "Display information about the current API token",
-		Run:   runWhoami,
+		Use:    "whoami",
+		Short:  "Display information about the current API token",
+		PreRun: common.CheckToken,
+		Run:    runWhoami,
 	}
 }
 
 func runWhoami(cmd *cobra.Command, args []string) {
-	p := tea.NewProgram(model{})
-	client, err := oapi.NewClientWithResponses(viper.GetString("api-base-url"),
-		oapi.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-			req.Header.Set("Authorization", "Bearer "+viper.GetString("api-token"))
-			return nil
-		}))
-	if err != nil {
-		fmt.Println("error creating client:", err)
-		os.Exit(1)
-	}
-	go p.Send(client)
+	p := tea.NewProgram(model{
+		loading:   common.NewSpinner(),
+		apiClient: common.MustApiClient(),
+	})
 	if _, err := p.Run(); err != nil {
 		fmt.Println("could not start program:", err)
 		os.Exit(1)
 	}
 }
 
-func (m model) fetchWhoamiInfoCmd() tea.Msg {
-	resp, err := m.apiClient.WhoAmIWithResponse(context.Background())
-	if err != nil {
-		return WhoamiMsg{Error: fmt.Errorf("error making request: %w", err)}
-	} else if resp.StatusCode() != http.StatusOK {
-		return WhoamiMsg{Error: fmt.Errorf("API returned non-200 status: %d: %s", resp.StatusCode(), string(resp.Body))}
+func FetchWhoamiInfoCmd(apiClient oapi.ClientWithResponsesInterface) func() tea.Msg {
+	return func() tea.Msg {
+		resp, err := apiClient.WhoAmIWithResponse(context.Background())
+		if err != nil {
+			return Msg{Error: fmt.Errorf("error making request: %w", err)}
+		} else if resp.StatusCode() != http.StatusOK {
+			return Msg{Error: fmt.Errorf("API returned non-200 status: %d: %s", resp.StatusCode(), string(resp.Body))}
+		}
+		return Msg{Success: resp.JSON200}
 	}
-	return WhoamiMsg{Success: resp.JSON200}
 }

@@ -375,7 +375,7 @@ func main() {
 
 		// API routes
 		oapi.HandlerWithOptions(
-			oapi.NewStrictHandler(api.New(apiTokenStore, appStore, teamStore), []oapi.StrictMiddlewareFunc{}),
+			oapi.NewStrictHandler(api.New(apiTokenStore, appStore, deploymentStore, teamStore), []oapi.StrictMiddlewareFunc{}),
 			oapi.ChiServerOptions{
 				BaseRouter: r,
 				Middlewares: []oapi.MiddlewareFunc{

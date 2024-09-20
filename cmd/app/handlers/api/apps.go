@@ -29,12 +29,10 @@ func appsFromStore(apps []store.App) []oapi.App {
 
 func (a api) GetApps(ctx context.Context, request oapi.GetAppsRequestObject) (oapi.GetAppsResponseObject, error) {
 	token := middleware.MustGetApiToken(ctx)
-
 	apps, err := a.appStore.GetForTeam(ctx, token.TeamId)
 	if err != nil {
 		return oapi.GetApps500JSONResponse{InternalServerErrorJSONResponse: oapi.InternalServerErrorJSONResponse{Error: err.Error()}}, nil
 	}
-
 	return oapi.GetApps200JSONResponse(appsFromStore(apps)), nil
 }
 
@@ -93,12 +91,5 @@ func (a api) CreateApp(ctx context.Context, request oapi.CreateAppRequestObject)
 		return oapi.CreateApp500JSONResponse{InternalServerErrorJSONResponse: oapi.InternalServerErrorJSONResponse{Error: err.Error()}}, nil
 	}
 
-	return oapi.CreateApp201JSONResponse{
-		Id:        app.Id,
-		Name:      app.Name,
-		CreatedAt: app.CreatedAt,
-		UpdatedAt: app.UpdatedAt,
-		CreatorId: app.UserId,
-		TeamId:    app.TeamId,
-	}, nil
+	return oapi.CreateApp201JSONResponse(appFromStore(app)), nil
 }

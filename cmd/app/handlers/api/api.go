@@ -8,18 +8,21 @@ import (
 func New(
 	apiTokenStore store.ApiTokenStore,
 	appStore store.AppStore,
+	deploymentStore store.DeploymentStore,
 	teamStore store.TeamStore) oapi.StrictServerInterface {
 	return api{
-		apiTokenStore: apiTokenStore,
-		appStore:      appStore,
-		teamStore:     teamStore,
+		apiTokenStore:   apiTokenStore,
+		appStore:        appStore,
+		deploymentStore: deploymentStore,
+		teamStore:       teamStore,
 	}
 }
 
 type api struct {
-	apiTokenStore store.ApiTokenStore
-	appStore      store.AppStore
-	teamStore     store.TeamStore
+	apiTokenStore   store.ApiTokenStore
+	appStore        store.AppStore
+	deploymentStore store.DeploymentStore
+	teamStore       store.TeamStore
 }
 
 var _ oapi.StrictServerInterface = api{}

@@ -56,7 +56,13 @@ func (s *DeploymentStore) CreateEnv(opts store.CreateEnvOptions) (store.Env, err
 
 func (s *DeploymentStore) GetEnv(id string) (store.Env, error) {
 	env := store.Env{Common: store.Common{Id: id}}
-	return env, s.db.First(&env).Error
+	if err := s.db.First(&env).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return store.Env{}, store.ErrEnvNotFound
+		}
+		return store.Env{}, err
+	}
+	return env, nil
 }
 
 func (s *DeploymentStore) GetEnvsForTeam(teamId string) ([]store.Env, error) {

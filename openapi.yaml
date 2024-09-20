@@ -107,6 +107,28 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/App"
+    Env:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        name:
+          type: string
+      required:
+        - id
+        - created_at
+        - updated_at
+        - name
+    Envs:
+      type: array
+      items:
+        $ref: "#/components/schemas/Env"
 paths:
   /api/whoami:
     get:
@@ -203,6 +225,91 @@ paths:
       responses:
         "204":
           description: App successfully deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/envs:
+    get:
+      operationId: GetEnvs
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Retrieve all environments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envs"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/envs/{envId}:
+    get:
+      operationId: GetEnv
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: envId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Retrieve an environment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Env"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: CreateEnv
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: envId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  format: lowercasealphanumhyphen
+              required:
+                - name
+      responses:
+        "201":
+          description: Create an environment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Env"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: DeleteEnv
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: envId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "204":
+          description: Environment successfully deleted
         "404":
           $ref: "#/components/responses/NotFound"
         "500":

@@ -6,6 +6,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/onmetal-dev/metal/lib/cli/up"
 	"github.com/onmetal-dev/metal/lib/cli/whoami"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -56,6 +57,7 @@ func init() {
 	})
 
 	rootCmd.AddCommand(whoami.NewCmd())
+	rootCmd.AddCommand(up.NewCmd())
 }
 
 // initConfig reads in config file and ENV variables if set.

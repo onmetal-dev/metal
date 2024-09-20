@@ -271,6 +271,7 @@ require (
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
+	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/samber/slog-multi v1.1.0 // indirect
 	github.com/schollz/progressbar/v3 v3.14.6 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
