@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"time"
 
 	"github.com/onmetal-dev/metal/lib/store"
 
@@ -110,4 +111,162 @@ func (m *TeamStoreMock) RemovePaymentMethod(teamId string, paymentMethodId strin
 func (m *TeamStoreMock) GetPaymentMethods(teamId string) ([]store.PaymentMethod, error) {
 	args := m.Called(teamId)
 	return args.Get(0).([]store.PaymentMethod), args.Error(1)
+}
+
+type AppStoreMock struct {
+	mock.Mock
+}
+
+var _ store.AppStore = &AppStoreMock{}
+
+func (m *AppStoreMock) Create(opts store.CreateAppOptions) (store.App, error) {
+	args := m.Called(opts)
+	return args.Get(0).(store.App), args.Error(1)
+}
+
+func (m *AppStoreMock) Get(ctx context.Context, id string) (store.App, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(store.App), args.Error(1)
+}
+
+func (m *AppStoreMock) Delete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *AppStoreMock) GetForTeam(ctx context.Context, teamId string) ([]store.App, error) {
+	args := m.Called(ctx, teamId)
+	return args.Get(0).([]store.App), args.Error(1)
+}
+
+func (m *AppStoreMock) CreateAppSettings(opts store.CreateAppSettingsOptions) (store.AppSettings, error) {
+	args := m.Called(opts)
+	return args.Get(0).(store.AppSettings), args.Error(1)
+}
+
+func (m *AppStoreMock) GetAppSettings(id string) (store.AppSettings, error) {
+	args := m.Called(id)
+	return args.Get(0).(store.AppSettings), args.Error(1)
+}
+
+type DeploymentStoreMock struct {
+	mock.Mock
+}
+
+var _ store.DeploymentStore = &DeploymentStoreMock{}
+
+func (m *DeploymentStoreMock) CreateEnv(opts store.CreateEnvOptions) (store.Env, error) {
+	args := m.Called(opts)
+	return args.Get(0).(store.Env), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) GetEnv(id string) (store.Env, error) {
+	args := m.Called(id)
+	return args.Get(0).(store.Env), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) GetEnvsForTeam(teamId string) ([]store.Env, error) {
+	args := m.Called(teamId)
+	return args.Get(0).([]store.Env), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) DeleteEnv(id string) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
+func (m *DeploymentStoreMock) CreateAppEnvVars(opts store.CreateAppEnvVarOptions) (store.AppEnvVars, error) {
+	args := m.Called(opts)
+	return args.Get(0).(store.AppEnvVars), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) GetAppEnvVars(id string) (store.AppEnvVars, error) {
+	args := m.Called(id)
+	return args.Get(0).(store.AppEnvVars), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) GetAppEnvVarsForAppEnv(appId string, envId string) ([]store.AppEnvVars, error) {
+	args := m.Called(appId, envId)
+	return args.Get(0).([]store.AppEnvVars), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) DeleteAppEnvVars(id string) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
+func (m *DeploymentStoreMock) Create(opts store.CreateDeploymentOptions) (store.Deployment, error) {
+	args := m.Called(opts)
+	return args.Get(0).(store.Deployment), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) Get(appId string, envId string, id uint) (store.Deployment, error) {
+	args := m.Called(appId, envId, id)
+	return args.Get(0).(store.Deployment), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) GetForTeam(ctx context.Context, teamId string) ([]store.Deployment, error) {
+	args := m.Called(ctx, teamId)
+	return args.Get(0).([]store.Deployment), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) GetForApp(ctx context.Context, appId string) ([]store.Deployment, error) {
+	args := m.Called(ctx, appId)
+	return args.Get(0).([]store.Deployment), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) GetForEnv(envId string) ([]store.Deployment, error) {
+	args := m.Called(envId)
+	return args.Get(0).([]store.Deployment), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) GetForCell(cellId string) ([]store.Deployment, error) {
+	args := m.Called(cellId)
+	return args.Get(0).([]store.Deployment), args.Error(1)
+}
+
+func (m *DeploymentStoreMock) DeleteDeployment(appId string, envId string, id uint) error {
+	args := m.Called(appId, envId, id)
+	return args.Error(0)
+}
+
+func (m *DeploymentStoreMock) UpdateDeploymentStatus(appId string, envId string, id uint, status store.DeploymentStatus, statusReason string) error {
+	args := m.Called(appId, envId, id, status, statusReason)
+	return args.Error(0)
+}
+
+type ApiTokenStoreMock struct {
+	mock.Mock
+}
+
+var _ store.ApiTokenStore = &ApiTokenStoreMock{}
+
+func (m *ApiTokenStoreMock) Create(teamId string, creatorId string, name string, scope store.ApiTokenScope) (*store.ApiToken, error) {
+	args := m.Called(teamId, creatorId, name, scope)
+	return args.Get(0).(*store.ApiToken), args.Error(1)
+}
+
+func (m *ApiTokenStoreMock) Get(id string) (*store.ApiToken, error) {
+	args := m.Called(id)
+	return args.Get(0).(*store.ApiToken), args.Error(1)
+}
+
+func (m *ApiTokenStoreMock) GetByToken(token string) (*store.ApiToken, error) {
+	args := m.Called(token)
+	return args.Get(0).(*store.ApiToken), args.Error(1)
+}
+
+func (m *ApiTokenStoreMock) List(teamId string) ([]store.ApiToken, error) {
+	args := m.Called(teamId)
+	return args.Get(0).([]store.ApiToken), args.Error(1)
+}
+
+func (m *ApiTokenStoreMock) Delete(id string) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
+func (m *ApiTokenStoreMock) UpdateLastUsedAt(id string, lastUsedAt time.Time) error {
+	args := m.Called(id, lastUsedAt)
+	return args.Error(0)
 }

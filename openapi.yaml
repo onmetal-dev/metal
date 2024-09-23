@@ -314,3 +314,41 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /api/up:
+    post:
+      operationId: Up
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                env_id:
+                  $ref: "#/components/schemas/Id"
+                app_id:
+                  $ref: "#/components/schemas/Id"
+                archive:
+                  type: string
+                  format: binary
+              required:
+                - env_id
+                - app_id
+                - archive
+      responses:
+        "200":
+          description: Upload received successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  build_id:
+                    $ref: "#/components/schemas/Id"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"

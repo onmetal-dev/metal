@@ -241,3 +241,7 @@ func MustGetApiToken(ctx context.Context) store.ApiToken {
 	}
 	return token
 }
+
+func WithApiToken(ctx context.Context, token store.ApiToken) context.Context {
+	return context.WithValue(ctx, apiTokenContextKey, token)
+}

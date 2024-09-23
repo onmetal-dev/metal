@@ -1,13 +1,18 @@
 package up
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -82,6 +87,54 @@ func getEnvsCmd(client oapi.ClientWithResponsesInterface) tea.Cmd {
 	}
 }
 
+type upMsg struct {
+	Result oapi.Up200JSONResponse
+	Error  error
+}
+
+type upProgressMsg struct {
+	Progress float64
+}
+
+func upCmd(client oapi.ClientWithResponsesInterface, path string, envId string, appId string) tea.Cmd {
+	return func() tea.Msg {
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+
+		if err := writer.WriteField("env_id", envId); err != nil {
+			return upMsg{Error: fmt.Errorf("error writing env_id: %w", err)}
+		}
+		if err := writer.WriteField("app_id", appId); err != nil {
+			return upMsg{Error: fmt.Errorf("error writing app_id: %w", err)}
+		}
+		part, err := writer.CreateFormFile("archive", "archive.tar.gz")
+		if err != nil {
+			return upMsg{Error: fmt.Errorf("error creating form file: %w", err)}
+		}
+
+		progressTargzipper, err := NewProgressTargzipper(path, part, func(progress float64) {
+			p.Send(upProgressMsg{Progress: progress})
+		})
+		if err != nil {
+			return upMsg{Error: fmt.Errorf("error creating progress targzipper: %w", err)}
+		}
+		if err := progressTargzipper.Start(); err != nil {
+			return upMsg{Error: fmt.Errorf("error starting progress targzipper: %w", err)}
+		}
+		if err := writer.Close(); err != nil {
+			return upMsg{Error: fmt.Errorf("error closing writer: %w", err)}
+		}
+
+		resp, err := client.UpWithBodyWithResponse(context.Background(), writer.FormDataContentType(), &body)
+		if err != nil {
+			return upMsg{Error: fmt.Errorf("error making request: %w", err)}
+		} else if resp.StatusCode() != http.StatusOK {
+			return upMsg{Error: fmt.Errorf("API returned non-200 status: %d: %s", resp.StatusCode(), string(resp.Body))}
+		}
+		return upMsg{Result: *resp.JSON200}
+	}
+}
+
 type model struct {
 	flags     flags
 	args      args
@@ -99,6 +152,9 @@ type model struct {
 	envs        *getEnvsMsg
 	selectedEnv *oapi.Env
 	envList     *list.Model
+
+	upProgress *progress.Model
+	up         *upMsg
 }
 
 var _ tea.Model = (*model)(nil)
@@ -112,6 +168,17 @@ const (
 	createNewEnv = "+ create a new env"
 )
 
+const (
+	padding  = 2
+	maxWidth = 80
+)
+
+func finalPause() tea.Cmd {
+	return tea.Tick(time.Millisecond*750, func(_ time.Time) tea.Msg {
+		return nil
+	})
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -121,6 +188,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.appList.SetSize(msg.Width-h, msg.Height-v)
 		} else if m.envList != nil {
 			m.envList.SetSize(msg.Width-h, msg.Height-v)
+		} else if m.upProgress != nil {
+			m.upProgress.Width = msg.Width - padding*2 - 4
+			if m.upProgress.Width > maxWidth {
+				m.upProgress.Width = maxWidth
+			}
 		}
 		return m, nil
 	case spinner.TickMsg:
@@ -134,6 +206,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case getAppsMsg:
+		// list of apps received from API, render and wait for user to select one
 		m.apps = &msg
 		items := appsToItems(m.apps.Apps)
 		items = append(items, item{
@@ -148,6 +221,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.appList = &appList
 		return m, nil
 	case getEnvsMsg:
+		// list of envs received from API, render and wait for user to select one
 		m.envs = &msg
 		items := envsToItems(m.envs.Envs)
 		items = append(items, item{
@@ -160,6 +234,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		envList.Title = "pick which env to deploy into"
 		envList.SetStatusBarItemName("option", "options")
 		m.envList = &envList
+	case upProgressMsg:
+		return m, m.upProgress.SetPercent(msg.Progress)
+	case progress.FrameMsg:
+		pm, cmd := m.upProgress.Update(msg)
+		m.upProgress = lo.ToPtr(pm.(progress.Model))
+		return m, cmd
+	case upMsg:
+		m.up = &msg
+		return m, tea.Sequence(finalPause(), tea.Quit)
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -195,7 +278,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.selectedEnv = &env
 					m.envList = nil
-					return m, tea.Quit
+					m.upProgress = lo.ToPtr(progress.New(progress.WithGradient(string(style.Secondary), string(style.Primary))))
+					return m, upCmd(m.apiClient, m.args.path, m.selectedEnv.Id, m.selectedApp.Id)
 				}
 			}
 		}
@@ -262,8 +346,28 @@ func (m model) View() string {
 		envSelection = m.envList.View()
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, appSelection, envSelection)
+	// don't continue unless env is selected
+	if m.selectedEnv == nil {
+		return lipgloss.JoinVertical(lipgloss.Left, appSelection, envSelection)
+	}
 
+	// we have an app and env selected, time to upload the archive
+	var upResult string
+	if m.upProgress == nil {
+		upResult = renderError(fmt.Errorf("unexpected nil upProgress"))
+	} else if m.upProgress != nil && m.up == nil {
+		pad := strings.Repeat(" ", padding)
+		upResult = lipgloss.JoinVertical(lipgloss.Left, textStyle.Render(fmt.Sprintf("uploading %s...", m.args.path)), "\n"+
+			pad+m.upProgress.View()+"\n\n")
+	} else if m.up != nil && m.up.Error != nil {
+		upResult = renderError(m.up.Error)
+	} else if m.up != nil {
+		pad := strings.Repeat(" ", padding)
+		upResult = lipgloss.JoinVertical(lipgloss.Left, textStyle.Render(fmt.Sprintf("uploaded %s!", m.args.path)), "\n"+
+			pad+m.upProgress.View()+"\n\n")
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, appSelection, envSelection, upResult)
 }
 
 func NewCmd() *cobra.Command {
@@ -289,12 +393,23 @@ type args struct {
 	path string
 }
 
+// make this global so we can send messages to it from cmds
+var p *tea.Program
+
 func runUp(cmd *cobra.Command, argss []string) {
 	path := "."
 	if len(argss) > 0 {
 		path = argss[0]
 	}
-	p := tea.NewProgram(model{
+	// convert path to absolute path
+	var err error
+	path, err = filepath.Abs(path)
+	if err != nil {
+		fmt.Println("error getting absolute path:", err)
+		os.Exit(1)
+	}
+
+	p = tea.NewProgram(model{
 		flags: flags{
 			app: cmd.Flags().Lookup("app").Value.String(),
 			env: cmd.Flags().Lookup("env").Value.String(),

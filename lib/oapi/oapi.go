@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
@@ -21,6 +22,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/oapi-codegen/runtime"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -99,11 +101,24 @@ type CreateEnvJSONBody struct {
 	Name string `json:"name"`
 }
 
+// UpMultipartBody defines parameters for Up.
+type UpMultipartBody struct {
+	// AppId A string with a prefix, underscore, and 26 alphanumeric characters (type ID)
+	AppId   Id                 `json:"app_id"`
+	Archive openapi_types.File `json:"archive"`
+
+	// EnvId A string with a prefix, underscore, and 26 alphanumeric characters (type ID)
+	EnvId Id `json:"env_id"`
+}
+
 // CreateAppJSONRequestBody defines body for CreateApp for application/json ContentType.
 type CreateAppJSONRequestBody CreateAppJSONBody
 
 // CreateEnvJSONRequestBody defines body for CreateEnv for application/json ContentType.
 type CreateEnvJSONRequestBody CreateEnvJSONBody
+
+// UpMultipartRequestBody defines body for Up for multipart/form-data ContentType.
+type UpMultipartRequestBody UpMultipartBody
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -205,6 +220,9 @@ type ClientInterface interface {
 	CreateEnvWithBody(ctx context.Context, envId Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	CreateEnv(ctx context.Context, envId Id, body CreateEnvJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpWithBody request with any body
+	UpWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// WhoAmI request
 	WhoAmI(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -320,6 +338,18 @@ func (c *Client) CreateEnvWithBody(ctx context.Context, envId Id, contentType st
 
 func (c *Client) CreateEnv(ctx context.Context, envId Id, body CreateEnvJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateEnvRequest(c.Server, envId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -626,6 +656,35 @@ func NewCreateEnvRequestWithBody(server string, envId Id, contentType string, bo
 	return req, nil
 }
 
+// NewUpRequestWithBody generates requests for Up with any type of body
+func NewUpRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/up")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewWhoAmIRequest generates requests for WhoAmI
 func NewWhoAmIRequest(server string) (*http.Request, error) {
 	var err error
@@ -723,6 +782,9 @@ type ClientWithResponsesInterface interface {
 	CreateEnvWithBodyWithResponse(ctx context.Context, envId Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateEnvResponse, error)
 
 	CreateEnvWithResponse(ctx context.Context, envId Id, body CreateEnvJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateEnvResponse, error)
+
+	// UpWithBodyWithResponse request with any body
+	UpWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpResponse, error)
 
 	// WhoAmIWithResponse request
 	WhoAmIWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*WhoAmIResponse, error)
@@ -916,6 +978,34 @@ func (r CreateEnvResponse) StatusCode() int {
 	return 0
 }
 
+type UpResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// BuildId A string with a prefix, underscore, and 26 alphanumeric characters (type ID)
+		BuildId *Id     `json:"build_id,omitempty"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON400 *BadRequest
+	JSON500 *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r UpResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type WhoAmIResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1025,6 +1115,15 @@ func (c *ClientWithResponses) CreateEnvWithResponse(ctx context.Context, envId I
 		return nil, err
 	}
 	return ParseCreateEnvResponse(rsp)
+}
+
+// UpWithBodyWithResponse request with arbitrary body returning *UpResponse
+func (c *ClientWithResponses) UpWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpResponse, error) {
+	rsp, err := c.UpWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpResponse(rsp)
 }
 
 // WhoAmIWithResponse request returning *WhoAmIResponse
@@ -1328,6 +1427,50 @@ func ParseCreateEnvResponse(rsp *http.Response) (*CreateEnvResponse, error) {
 	return response, nil
 }
 
+// ParseUpResponse parses an HTTP response from a UpWithResponse call
+func ParseUpResponse(rsp *http.Response) (*UpResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// BuildId A string with a prefix, underscore, and 26 alphanumeric characters (type ID)
+			BuildId *Id     `json:"build_id,omitempty"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseWhoAmIResponse parses an HTTP response from a WhoAmIWithResponse call
 func ParseWhoAmIResponse(rsp *http.Response) (*WhoAmIResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1388,6 +1531,9 @@ type ServerInterface interface {
 	// (PUT /api/envs/{envId})
 	CreateEnv(w http.ResponseWriter, r *http.Request, envId Id)
 
+	// (POST /api/up)
+	Up(w http.ResponseWriter, r *http.Request)
+
 	// (GET /api/whoami)
 	WhoAmI(w http.ResponseWriter, r *http.Request)
 }
@@ -1433,6 +1579,11 @@ func (_ Unimplemented) GetEnv(w http.ResponseWriter, r *http.Request, envId Id) 
 
 // (PUT /api/envs/{envId})
 func (_ Unimplemented) CreateEnv(w http.ResponseWriter, r *http.Request, envId Id) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/up)
+func (_ Unimplemented) Up(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1652,6 +1803,23 @@ func (siw *ServerInterfaceWrapper) CreateEnv(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// Up operation middleware
+func (siw *ServerInterfaceWrapper) Up(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Up(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // WhoAmI operation middleware
 func (siw *ServerInterfaceWrapper) WhoAmI(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -1805,6 +1973,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/envs/{envId}", wrapper.CreateEnv)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/up", wrapper.Up)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/whoami", wrapper.WhoAmI)
@@ -2095,6 +2266,47 @@ func (response CreateEnv500JSONResponse) VisitCreateEnvResponse(w http.ResponseW
 	return json.NewEncoder(w).Encode(response)
 }
 
+type UpRequestObject struct {
+	Body *multipart.Reader
+}
+
+type UpResponseObject interface {
+	VisitUpResponse(w http.ResponseWriter) error
+}
+
+type Up200JSONResponse struct {
+	// BuildId A string with a prefix, underscore, and 26 alphanumeric characters (type ID)
+	BuildId *Id     `json:"build_id,omitempty"`
+	Message *string `json:"message,omitempty"`
+}
+
+func (response Up200JSONResponse) VisitUpResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type Up400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response Up400JSONResponse) VisitUpResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type Up500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response Up500JSONResponse) VisitUpResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type WhoAmIRequestObject struct {
 }
 
@@ -2148,6 +2360,9 @@ type StrictServerInterface interface {
 
 	// (PUT /api/envs/{envId})
 	CreateEnv(ctx context.Context, request CreateEnvRequestObject) (CreateEnvResponseObject, error)
+
+	// (POST /api/up)
+	Up(ctx context.Context, request UpRequestObject) (UpResponseObject, error)
 
 	// (GET /api/whoami)
 	WhoAmI(ctx context.Context, request WhoAmIRequestObject) (WhoAmIResponseObject, error)
@@ -2400,6 +2615,37 @@ func (sh *strictHandler) CreateEnv(w http.ResponseWriter, r *http.Request, envId
 	}
 }
 
+// Up operation middleware
+func (sh *strictHandler) Up(w http.ResponseWriter, r *http.Request) {
+	var request UpRequestObject
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Up(ctx, request.(UpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Up")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpResponseObject); ok {
+		if err := validResponse.VisitUpResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // WhoAmI operation middleware
 func (sh *strictHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 	var request WhoAmIRequestObject
@@ -2427,24 +2673,26 @@ func (sh *strictHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+xX32/bNhD+VwiuDxumWkqWBpme5izZYGArihTDHgIvYMRzxFQiWZKy6wb634cj5R+K",
-	"5R/BbLcF9mRLOt4dv/vuPvKJZqrUSoJ0lqZP1IDVSlrwD5eM38DHCqzDp0xJB9L/ZVoXImNOKBk/WiXx",
-	"nc1yKBn+e2VgRFP6XbxwHYevNr42Rhla13VEOdjMCI1OaIqxyCxYHdGBdGAkK96DGYMJqw6ewywoCVFJ",
-	"YxjRt8r9pirJD5/CW+VICIXfGnP01tcaf7RRGowToUCZAeaA3zGfzkiZEv9Rzhy8dqIEGlE31UBTap0R",
-	"8gH34tcocyf4tiQHHO13tZOsBLRcCeiAlTtHqzR/4Y7qiBr4WAkDnKa3mG60jEvL5SKZFg5N8sO5b3X/",
-	"CJnnYV9rj7RwUNptW8Aa1XMnzBg2xedrOd5P6f5zKQ6N7loYr+V4dxgRry4YZ0PgGZCKd28WZvabtxTM",
-	"upIeeLjb/dknwQ2ZCJcTRrSBkfgUkUpyMDZTBiLCJCen54QVOmeyKsGIjGQ5MyxzYCz5HgORwdUPNKLw",
-	"iZW6wLCVBXOXnJx9eHhzzrMEJiN7xh/Go8cLff/ZYmU0czieaEr/uWWvPw9/vMOf5PXPw6fT8/pVF2H+",
-	"zlW/HOyHfC9qY2+8fiKoDyB39PWsWvOly628iNYi52pNcaRCVhnhpu8xRkDjHpgB069cvlrvS/+N+LC0",
-	"GcjoMaxZ4JQ7p8M8F3KkZjrBMg8wlEwUiECltTLuFyVLcKzocQhEF85T4E98SfrvBjSiYzA2ZJD0kt4J",
-	"mikNkmlBU/pTL+klgRG530HMtIhZM6oewAfFentpQhrT38H5URa1Ff40Sfamad5/h6TdgDMCxkBYUZAl",
-	"9xY39SYk0OV3nmjcdRhYriVNb9tVvB3WQzSY4xI/Ma0HvA4FLsDBKkRX/j3OcETWsBKwXb1vgftAtGcz",
-	"LqXeH10mpzMVRDti5Zk9XCnGWcfA0ZrYKsvA2lFVFFMS0vdddhYWbAZvfnY5LNrRJt59OUT3Su/N7JbL",
-	"5P76yqOrjvL86qflsSvkT/mXik9fVJy2hM3EZS5ehZqAyZiFme7mU537ob1Z/9ecWepg1yLTyaHJFMrR",
-	"SaUdmLF0XTvOZIXmVLeu8/2p74At6f1vUxyQY2FQcfGGezxc4ieQ450UB4+7u3Sf93cExbleAPaNK88X",
-	"RXavNN+mPEsk/6aU59gV+l951pBpoTwrVPoalWeSK1aKtdrT3HsP2JNNhE1tiRdBZIhQkrB7VTniciCs",
-	"cjlIh1GBN/fKA2O2zQI/o8PQfe3dvDOKV5nfw183f9CIVqZorrs2jePJZNJr32afO7iCMRRKezV57iGN",
-	"40JlrMiVdelFcpHQelj/GwAA//+ujHnPkhYAAA==",
+	"H4sIAAAAAAAC/+xYb2/bthP+KgR/ffEbplhKlgaZXs1ZssHAVhQpgr0IvOAsniOmEsmSlFw30HcfSPqf",
+	"Ytlx1jhNgb2yJR3vjs89vIfkPc1kqaRAYQ1N76lGo6Qw6B/OgF3ipwqNdU+ZFBaF/wtKFTwDy6WI74wU",
+	"7p3JcizB/XujcUxT+r946ToOX018obXUtGmaiDI0mebKOaGpi0XmwZqIDoRFLaD4gLpGHUbtPYd5UBKi",
+	"kplhRN9J+5usBNt/Cu+kJSGU+zYzd976SrkfpaVCbXkoUKYRLLIb8OmMpS7dP8rA4oHlJdKI2qlCmlJj",
+	"NRe3bi5+jNQ3nD2W5IA5+13tBJToLNcCWoRy52iVYk+cURNRjZ8qrpHR9NqlG63i0nK5TKaFwyz54cK3",
+	"HN1h5nnYV8ojzS2W5rEpuBo1CyegNUzd84Won6d0X12KfaO7EcYLUe8Oo8OrC8Z5E3gApGTdk8W5/fYp",
+	"BbOupAce7vb67JPghky4zQkQpXHMP0ekEgy1yaTGiIBg5OiEQKFyEFWJmmcky0FDZlEb8n8XiAzOf6AR",
+	"xc9QqsKFrQzqm+Tw+OPt2xOWJTgZm2N2W4/vTtXoi3GVUWBde6Ip/fsaDr4Mf7xxP8nBz8P7o5PmTRdh",
+	"/splvxw8D/metIy98eaOID+i2NHXg2othq4u5WW0FjnXa+paKmaV5nb6wcUIaIwQNOp+ZfP1ep/5b8SH",
+	"pbOG7DyGMUuccmtV6OdcjOVcJyDzAGMJvHAIVEpJbX+RokQLRY9hIDq3ngJ/upek/35AI1qjNiGDpJf0",
+	"Dp2ZVChAcZrSn3pJLwmMyP0MYlA8hlmrukUf1NXbS5OjMf0drW9lUVvhj5Lk2TTN+++QtEu0mmONBIqC",
+	"rLg3blJvQwJdfheJxl2bgdVa0vS6XcXrYTN0Bgtc4ntQasCaUOACLa5DdO7fux7ukNVQoluu3jd383Bo",
+	"z3tcSr0/ukpOqyuMdsTKM3u4VozjjoajFDFVlqEx46oopiSk71fZcRiwHbzF3mW/aEfbePftEH1Wem9n",
+	"t1gl9+srj6o6yvOr75YvXSG/yz+TbPqk4rQlbC4uC/Eq5AR1BgbnuptPVe6b9nb937BnaYJdi0yH+yZT",
+	"KEcnlXZgxspx7WU6K852dZtWvt/17XFJev+PKQ6KmmunuO6E+3K4xPco6p0Ux213d1l93t8LKM7FErDv",
+	"XHm+KbLPSvPHlGeF5N+V8rx0hf5Tng1kWirPGpVeo/JU4TJMmg5mXSm6rdRlVViuQNvYFfCAgYVt1Qal",
+	"dj71gs5yXrfJMeIC9LTrQI2i/ndn4NnAaJ7bMvBuZEq+gvyjihdsZ0BKNAZusfsSZi3Th5y8UoUERjRm",
+	"yGtkLTF6vdSc5BJKvnFbNLuS2aNczCJsUwwuAj+5FARGsrLE5kigsjkK66Iim1157BmzxyzcZ+cwCEN7",
+	"Nu+1ZFXm53B1+QeNaKWL2U2MSeN4Mpn02hctDx2cY42FVH6j89BDGseFzKDIpbHpaXKa0GbY/BMAAP//",
+	"pY0WRy0ZAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
