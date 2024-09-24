@@ -1,0 +1,9 @@
+packages:
+  - iconUrl: https://avatars.githubusercontent.com/u/22860722
+    latestVersion: v1.15.2+1
+    name: rook-ceph
+    shortDescription: File, Block, and Object Storage Services for your Cloud-Native Environment
+  - iconUrl: https://avatars.githubusercontent.com/u/22860722
+    latestVersion: v1.15.2+1
+    name: rook-ceph-cluster
+    shortDescription: Manages a single Ceph cluster namespace for Rook
