@@ -1,0 +1,196 @@
+# yaml-language-server: $schema=https://glasskube.dev/schemas/v1/package-manifest.json
+name: rook-ceph
+shortDescription: File, Block, and Object Storage Services for your Cloud-Native Environment
+longDescription: A Helm chart for rook-ceph
+iconUrl: https://avatars.githubusercontent.com/u/22860722
+defaultNamespace: rook-ceph
+helm:
+  chartName: rook-ceph
+  chartVersion: 1.15.2
+  repositoryUrl: https://charts.rook.io/release
+  values:
+    # zero-out requests for resources to avoid resource starvation. Keep defaults for resource limits
+    resources:
+      limits:
+        memory: 512Mi
+      requests:
+        cpu: 0m
+        memory: 0Mi
+    csiRBDProvisionerResource: |
+      - name : csi-provisioner
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-resizer
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-attacher
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-snapshotter
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-rbdplugin
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 1Gi
+      - name : csi-omap-generator
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 1Gi
+      - name : liveness-prometheus
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+    csiRBDPluginResource: |
+      - name : driver-registrar
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-rbdplugin
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 1Gi
+      - name : liveness-prometheus
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+    csiCephFSProvisionerResource: |
+      - name : csi-provisioner
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-resizer
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-attacher
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-snapshotter
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-cephfsplugin
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 1Gi
+      - name : liveness-prometheus
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+    csiCephFSPluginResource: |
+      - name : driver-registrar
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-cephfsplugin
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 1Gi
+      - name : liveness-prometheus
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+    csiNFSProvisionerResource: |
+      - name : csi-provisioner
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-nfsplugin
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 1Gi
+      - name : csi-attacher
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 1Gi
+    csiNFSPluginResource: |
+      - name : driver-registrar
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 256Mi
+      - name : csi-nfsplugin
+        resource:
+          requests:
+            cpu: 0m
+            memory: 0Mi
+          limits:
+            memory: 1Gi
+
+references:
+  - label: GitHub
+    url: https://github.com/rook/rook/tree/master/deploy/charts/rook-ceph
