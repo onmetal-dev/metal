@@ -1,0 +1,174 @@
+# yaml-language-server: $schema=https://glasskube.dev/schemas/v1/package-manifest.json
+name: rook-ceph-cluster
+shortDescription: Manages a single Ceph cluster namespace for Rook
+longDescription: A Helm chart for rook-ceph-cluster
+iconUrl: https://avatars.githubusercontent.com/u/22860722
+defaultNamespace: rook-ceph
+dependencies:
+  - name: rook-ceph
+helm:
+  chartName: rook-ceph-cluster
+  chartVersion: 1.15.2
+  repositoryUrl: https://charts.rook.io/release
+  values:
+    operatorNamespace: rook-ceph
+    cephClusterSpec:
+      mon:
+        allowMultiplePerNode: true
+      mgr:
+        allowMultiplePerNode: true
+      # zero-out requests for resources to avoid resource starvation. Keep defaults for resource limits
+      resources:
+        mgr:
+          limits:
+            memory: "1Gi"
+          requests:
+            cpu: "0m"
+            memory: "0Mi"
+        mon:
+          limits:
+            memory: "2Gi"
+          requests:
+            cpu: "0m"
+            memory: "0Mi"
+        osd:
+          limits:
+            memory: "4Gi"
+          requests:
+            cpu: "0m"
+            memory: "0Mi"
+        prepareosd:
+          requests:
+            cpu: "0m"
+            memory: "0Mi"
+        mgr-sidecar:
+          limits:
+            memory: "100Mi"
+          requests:
+            cpu: "0m"
+            memory: "0Mi"
+        crashcollector:
+          limits:
+            memory: "60Mi"
+          requests:
+            cpu: "0m"
+            memory: "0Mi"
+        logcollector:
+          limits:
+            memory: "1Gi"
+          requests:
+            cpu: "0m"
+            memory: "0Mi"
+        cleanup:
+          limits:
+            memory: "1Gi"
+          requests:
+            cpu: "0m"
+            memory: "0Mi"
+        exporter:
+          limits:
+            memory: "128Mi"
+          requests:
+            cpu: "0m"
+            memory: "0Mi"
+    cephFileSystems:
+      - name: ceph-filesystem
+        # see https://github.com/rook/rook/blob/master/Documentation/CRDs/Shared-Filesystem/ceph-filesystem-crd.md#filesystem-settings for available configuration
+        spec:
+          metadataPool:
+            replicated:
+              size: 3
+          dataPools:
+            - failureDomain: host
+              replicated:
+                size: 3
+              # Optional and highly recommended, 'data0' by default, see https://github.com/rook/rook/blob/master/Documentation/CRDs/Shared-Filesystem/ceph-filesystem-crd.md#pools
+              name: data0
+          metadataServer:
+            activeCount: 1
+            activeStandby: true
+            resources:
+              limits:
+                memory: "4Gi"
+              requests:
+                cpu: "0m"
+                memory: "0Mi"
+            priorityClassName: system-cluster-critical
+        storageClass:
+          enabled: true
+          isDefault: false
+          name: ceph-filesystem
+          # (Optional) specify a data pool to use, must be the name of one of the data pools above, 'data0' by default
+          pool: data0
+          reclaimPolicy: Delete
+          allowVolumeExpansion: true
+          volumeBindingMode: "Immediate"
+          annotations: {}
+          labels: {}
+          mountOptions: []
+          # see https://github.com/rook/rook/blob/master/Documentation/Storage-Configuration/Shared-Filesystem-CephFS/filesystem-storage.md#provision-storage for available configuration
+          parameters:
+            # The secrets contain Ceph admin credentials.
+            csi.storage.k8s.io/provisioner-secret-name: rook-csi-cephfs-provisioner
+            csi.storage.k8s.io/provisioner-secret-namespace: "{{ .Release.Namespace }}"
+            csi.storage.k8s.io/controller-expand-secret-name: rook-csi-cephfs-provisioner
+            csi.storage.k8s.io/controller-expand-secret-namespace: "{{ .Release.Namespace }}"
+            csi.storage.k8s.io/node-stage-secret-name: rook-csi-cephfs-node
+            csi.storage.k8s.io/node-stage-secret-namespace: "{{ .Release.Namespace }}"
+            # Specify the filesystem type of the volume. If not specified, csi-provisioner
+            # will set default as `ext4`. Note that `xfs` is not recommended due to potential deadlock
+            # in hyperconverged settings where the volume is mounted on the same node as the osds.
+            csi.storage.k8s.io/fstype: ext4
+    cephObjectStores:
+      - name: ceph-objectstore
+        # see https://github.com/rook/rook/blob/master/Documentation/CRDs/Object-Storage/ceph-object-store-crd.md#object-store-settings for available configuration
+        spec:
+          metadataPool:
+            failureDomain: host
+            replicated:
+              size: 3
+          dataPool:
+            failureDomain: host
+            erasureCoded:
+              dataChunks: 2
+              codingChunks: 1
+          preservePoolsOnDelete: true
+          gateway:
+            port: 80
+            resources:
+              limits:
+                memory: "2Gi"
+              requests:
+                cpu: "0m"
+                memory: "0Mi"
+            # securePort: 443
+            # sslCertificateRef:
+            instances: 1
+            priorityClassName: system-cluster-critical
+        storageClass:
+          enabled: true
+          name: ceph-bucket
+          reclaimPolicy: Delete
+          volumeBindingMode: "Immediate"
+          annotations: {}
+          labels: {}
+          # see https://github.com/rook/rook/blob/master/Documentation/Storage-Configuration/Object-Storage-RGW/ceph-object-bucket-claim.md#storageclass for available configuration
+          parameters:
+            # note: objectStoreNamespace and objectStoreName are configured by the chart
+            region: us-east-1
+        ingress:
+          # Enable an ingress for the ceph-objectstore
+          enabled: false
+          # annotations: {}
+          # host:
+          #   name: objectstore.example.com
+          #   path: /
+          # tls:
+          # - hosts:
+          #     - objectstore.example.com
+          #   secretName: ceph-objectstore-tls
+          # ingressClassName: nginx
+
+references:
+  - label: GitHub
+    url: https://github.com/rook/rook/tree/master/deploy/charts/rook-ceph-cluster
