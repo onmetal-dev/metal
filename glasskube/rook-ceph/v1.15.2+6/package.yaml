@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://glasskube.dev/schemas/v1/package-manifest.json
+name: rook-ceph
+shortDescription: File, Block, and Object Storage Services for your Cloud-Native Environment
+longDescription: A Helm chart for rook-ceph
+iconUrl: https://avatars.githubusercontent.com/u/22860722
+defaultNamespace: rook-ceph
+manifests:
+  - url: https://raw.githubusercontent.com/rook/rook/refs/tags/v1.15.2/deploy/examples/crds.yaml
+  - url: https://raw.githubusercontent.com/rook/rook/refs/tags/v1.15.2/deploy/examples/common.yaml
+  - url: https://raw.githubusercontent.com/rook/rook/refs/tags/v1.15.2/deploy/examples/operator.yaml
+references:
+  - label: GitHub
+    url: https://github.com/rook/rook/tree/v1.15.2/deploy/examples
+  - label: Docs
+    url: https://rook.github.io/docs/rook/v1.15/Getting-Started/quickstart/
