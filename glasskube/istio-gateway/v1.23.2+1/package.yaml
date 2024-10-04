@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://glasskube.dev/schemas/v1/package-manifest.json
+name: istio-gateway
+shortDescription: Helm chart for deploying Istio gateways.
+longDescription: Helm chart for deploying Istio gateways.
+iconUrl: https://avatars.githubusercontent.com/u/23534644
+defaultNamespace: isto-system
+dependencies:
+  - name: istio-ambient
+helm:
+  chartName: gateway
+  chartVersion: 1.23.2
+  repositoryUrl: https://istio-release.storage.googleapis.com/charts
+  values:
+    profile: ambient
+references:
+  - label: Docs
+    url: https://istio.io/latest/docs/ambient/install/helm/
+  - label: GitHub
+    url: https://github.com/istio/istio/tree/master/manifests/charts/gateway
