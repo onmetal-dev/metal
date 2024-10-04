@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://glasskube.dev/schemas/v1/package-manifest.json
+name: istio-ambient
+shortDescription: Helm umbrella chart for ambient
+longDescription: Helm umbrella chart for ambient
+iconUrl: https://avatars.githubusercontent.com/u/23534644
+defaultNamespace: istio-system
+helm:
+  chartName: ambient
+  chartVersion: 1.23.2
+  repositoryUrl: https://istio-release.storage.googleapis.com/charts
+  values: {}
+references:
+  - label: Docs
+    url: https://istio.io/latest/docs/ambient/install/helm/
+  - label: GitHub
+    url: https://github.com/istio/istio/blob/master/manifests/sample-charts/ambient/Chart.yaml
