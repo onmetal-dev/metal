@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://glasskube.dev/schemas/v1/package-manifest.json
+name: registry
+shortDescription: Container image registry.
+longDescription: Container image registry. Assumes the presence of a registry-config secret, registry-auth secret, and a registry-pvc persistent volume claim.
+iconUrl: https://avatars.githubusercontent.com/u/78096003
+defaultNamespace: registry
+helm:
+  chartName: registry
+  chartVersion: 22.4.11
+  repositoryUrl: https://mya.sh
+  values:
+    fullnameOverride: docker-registry
+    ui:
+      enabled: false
+    redis:
+      enabled: false
+    storj:
+      enabled: false
+    externalConfig:
+      secretRef:
+        name: registry-config
+    extraVolumeMounts:
+      - name: auth
+        mountPath: /etc/docker/auth
+        readOnly: true
+      - name: data
+        mountPath: /var/lib/registry/
+    extraVolumes:
+      - name: auth
+        secret:
+          secretName: registry-auth
+      - name: data
+        persistentVolumeClaim:
+          claimName: registry-pvc
+references:
+  - label: Docs
+    url: https://distribution.github.io/distribution/
+  - label: GitHub
+    url: https://github.com/distribution/distribution
