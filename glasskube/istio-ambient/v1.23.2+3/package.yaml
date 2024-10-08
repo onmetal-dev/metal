@@ -1,0 +1,97 @@
+# yaml-language-server: $schema=https://glasskube.dev/schemas/v1/package-manifest.json
+name: istio-ambient
+shortDescription: Helm umbrella chart for ambient
+longDescription: Helm umbrella chart for ambient
+iconUrl: https://avatars.githubusercontent.com/u/23534644
+defaultNamespace: istio-system
+helm:
+  chartName: ambient
+  chartVersion: 1.23.2
+  repositoryUrl: https://istio-release.storage.googleapis.com/charts
+  values:
+    cni:
+      defaults:
+        cni:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+    istiod:
+      defaults:
+        pilot:
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2048Mi
+    ztunnel:
+      defaults:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+valueDefinitions:
+  cniMemory:
+    type: text
+    defaultValue: 100Mi
+    metadata:
+      label: CNI memory request
+    targets:
+      - chartName: ambient
+        patch:
+          op: replace
+          path: /cni/defaults/cni/resources/requests/memory
+  cniCpu:
+    type: text
+    defaultValue: 100m
+    metadata:
+      label: CNI CPU request
+    targets:
+      - chartName: ambient
+        patch:
+          op: replace
+          path: /cni/defaults/cni/resources/requests/cpu
+  istiodMemory:
+    type: text
+    defaultValue: 2048Mi
+    metadata:
+      label: Istiod memory request
+    targets:
+      - chartName: ambient
+        patch:
+          op: replace
+          path: /istiod/defaults/pilot/resources/requests/memory
+  istiodCpu:
+    type: text
+    defaultValue: 500m
+    metadata:
+      label: Istiod CPU request
+    targets:
+      - chartName: ambient
+        patch:
+          op: replace
+          path: /istiod/defaults/pilot/resources/requests/cpu
+  ztunnelMemory:
+    type: text
+    defaultValue: 512Mi
+    metadata:
+      label: Ztunnel memory request
+    targets:
+      - chartName: ambient
+        patch:
+          op: replace
+          path: /ztunnel/defaults/resources/requests/memory
+  ztunnelCpu:
+    type: text
+    defaultValue: 200m
+    metadata:
+      label: Ztunnel CPU request
+    targets:
+      - chartName: ambient
+        patch:
+          op: replace
+          path: /ztunnel/defaults/resources/requests/cpu
+references:
+  - label: Docs
+    url: https://istio.io/latest/docs/ambient/install/helm/
+  - label: GitHub
+    url: https://github.com/istio/istio/blob/master/manifests/sample-charts/ambient/Chart.yaml

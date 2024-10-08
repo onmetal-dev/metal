@@ -1,4 +1,5 @@
-latestVersion: v1.23.2+2
+latestVersion: v1.23.2+3
 versions:
   - version: v1.23.2+1
   - version: v1.23.2+2
+  - version: v1.23.2+3
