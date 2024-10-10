@@ -23,6 +23,7 @@ import (
 	"github.com/onmetal-dev/metal/cmd/app/hash/passwordhash"
 	m "github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/lib/background"
+	"github.com/onmetal-dev/metal/lib/background/celljanitor"
 	"github.com/onmetal-dev/metal/lib/background/deployment"
 	"github.com/onmetal-dev/metal/lib/background/serverbillinghourly"
 	"github.com/onmetal-dev/metal/lib/background/serverfulfillment"
@@ -51,10 +52,17 @@ import (
 func mustCreate[T any](slogger *slog.Logger, f func() (T, error)) T {
 	v, err := f()
 	if err != nil {
-		slogger.Error("Error", slog.Any("err", err))
+		slogger.Error("error", slog.String("err", err.Error()))
 		os.Exit(1)
 	}
 	return v
+}
+
+func must(slogger *slog.Logger, f func() error) {
+	if err := f(); err != nil {
+		slogger.Error("error", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
 }
 
 func main() {
@@ -71,6 +79,8 @@ func main() {
 	// Handle SIGINT (CTRL+C) gracefully.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
+	ctx = logger.AddToContext(ctx, slogger)
 
 	// Set up OpenTelemetry.
 	otelShutdown, tracerProvider, err := setupOTelSDK(ctx)
@@ -213,7 +223,6 @@ func main() {
 			cellprovider.WithServerStore(serverStore),
 			cellprovider.WithTmpDirRoot(c.TmpDirRoot),
 			cellprovider.WithTracerProvider(tracerProvider),
-			cellprovider.WithLogger(slog.Default()),
 		)
 	})
 	cellProviderForType := func(cellType store.CellType) cellprovider.CellProvider {
@@ -234,7 +243,6 @@ func main() {
 	producerBilling := background.NewQueueProducer[serverbillinghourly.Message](ctx, queueNameBilling, connString)
 	serverBillingHourlyHandler := mustCreate(slogger, func() (*serverbillinghourly.MessageHandler, error) {
 		return serverbillinghourly.NewMessageHandler(
-			serverbillinghourly.WithLogger(slogger),
 			serverbillinghourly.WithQueueProducer(producerBilling),
 			serverbillinghourly.WithTeamStore(teamStore),
 			serverbillinghourly.WithServerStore(serverStore),
@@ -243,7 +251,7 @@ func main() {
 		)
 	})
 	{
-		consumer := background.NewQueueConsumer[serverbillinghourly.Message](ctx, queueNameBilling, connString, 30, serverBillingHourlyHandler.Handle, slogger)
+		consumer := background.NewQueueConsumer[serverbillinghourly.Message](ctx, queueNameBilling, connString, 30, serverBillingHourlyHandler.Handle)
 		go consumer.Start(ctx)
 		defer consumer.Stop()
 	}
@@ -252,7 +260,6 @@ func main() {
 	producerFulfillment := background.NewQueueProducer[serverfulfillment.Message](ctx, queueNameFulfillment, connString)
 	serverFulfillmentHandler := mustCreate(slogger, func() (*serverfulfillment.MessageHandler, error) {
 		return serverfulfillment.NewMessageHandler(
-			serverfulfillment.WithLogger(slogger),
 			serverfulfillment.WithQueueProducer(producerFulfillment),
 			serverfulfillment.WithServerBillingHourlyProducer(producerBilling),
 			serverfulfillment.WithTeamStore(teamStore),
@@ -270,7 +277,7 @@ func main() {
 		)
 	})
 	{
-		consumer := background.NewQueueConsumer[serverfulfillment.Message](ctx, queueNameFulfillment, connString, 180, serverFulfillmentHandler.Handle, slogger)
+		consumer := background.NewQueueConsumer[serverfulfillment.Message](ctx, queueNameFulfillment, connString, 180, serverFulfillmentHandler.Handle)
 		go consumer.Start(ctx)
 		defer consumer.Stop()
 	}
@@ -279,7 +286,6 @@ func main() {
 	producerDeployment := background.NewQueueProducer[deployment.Message](ctx, queueNameDeployment, connString)
 	deploymentHandler := mustCreate(slogger, func() (*deployment.MessageHandler, error) {
 		return deployment.NewMessageHandler(
-			deployment.WithLogger(slogger),
 			deployment.WithQueueProducer(producerDeployment),
 			deployment.WithDeploymentStore(deploymentStore),
 			deployment.WithCellProviderForType(cellProviderForType),
@@ -287,10 +293,32 @@ func main() {
 		)
 	})
 	{
-		consumer := background.NewQueueConsumer[deployment.Message](ctx, queueNameDeployment, connString, 60, deploymentHandler.Handle, slogger)
+		consumer := background.NewQueueConsumer[deployment.Message](ctx, queueNameDeployment, connString, 60, deploymentHandler.Handle)
 		go consumer.Start(ctx)
 		defer consumer.Stop()
 	}
+
+	queueNameCellJanitor := "celljanitor"
+	producerCellJanitor := background.NewQueueProducer[celljanitor.Message](ctx, queueNameCellJanitor, connString)
+	cellJanitorHandler := mustCreate(slogger, func() (*celljanitor.MessageHandler, error) {
+		return celljanitor.NewMessageHandler(
+			celljanitor.WithQueueProducer(producerCellJanitor),
+			celljanitor.WithCellProviderForType(cellProviderForType),
+			celljanitor.WithCellStore(cellStore),
+		)
+	})
+	{
+		consumer := background.NewQueueConsumer[celljanitor.Message](ctx, queueNameCellJanitor, connString, 60*30 /* might take up to 30 mins to do the thing */, cellJanitorHandler.Handle)
+		go consumer.Start(ctx)
+		defer consumer.Stop()
+	}
+	// TODO: send a message to get things going for previous cells
+	must(slogger, func() error {
+		return producerCellJanitor.Send(ctx, celljanitor.Message{
+			CellId: "cell_01j5gxxyp9e5zad3j0qjwwzja1",
+		})
+	})
+
 	// http router
 	r := chi.NewRouter()
 	r.Use(httprate.LimitByIP(100, time.Minute))

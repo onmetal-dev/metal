@@ -5,7 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	cmacme "github.com/cert-manager/cert-manager/pkg/apis/acme/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/cloudflare/cloudflare-go"
+	"github.com/onmetal-dev/metal/lib/glasskube"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type CloudflareDNSProvider struct {
@@ -84,4 +89,54 @@ func (p *CloudflareDNSProvider) FindOrCreateARecord(ctx context.Context, zoneID,
 		return fmt.Errorf("error creating A record: %v", err)
 	}
 	return nil
+}
+
+func (p *CloudflareDNSProvider) CertManagerIssuer() (*CertManagerIssuer, error) {
+	return &CertManagerIssuer{
+		Secrets: []corev1.Secret{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cloudflare-api-token",
+					Namespace: "cert-manager",
+				},
+				StringData: map[string]string{
+					"api-token": p.api.APIToken,
+				},
+			},
+		},
+		Solvers: []cmacme.ACMEChallengeSolver{
+			{
+				DNS01: &cmacme.ACMEChallengeSolverDNS01{
+					Cloudflare: &cmacme.ACMEIssuerDNS01ProviderCloudflare{
+						Email: "rgarcia2009@gmail.com",
+						APIToken: &cmmeta.SecretKeySelector{
+							LocalObjectReference: cmmeta.LocalObjectReference{
+								Name: "cloudflare-api-token",
+							},
+							Key: "api-token",
+						},
+					},
+				},
+			},
+		},
+	}, nil
+}
+
+func (p *CloudflareDNSProvider) ExternalDnsSetup() (*ExternalDnsSetup, error) {
+	return &ExternalDnsSetup{
+		Secrets: []corev1.Secret{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cloudflare-api-token",
+					Namespace: "external-dns",
+				},
+				StringData: map[string]string{
+					"api-token": p.api.APIToken,
+				},
+			},
+		},
+		GkPkgsToEnsure: []glasskube.EnsureClusterPackageOpts{
+			{Name: "external-dns-cloudflare", Version: "v1.15.0+1", Repo: "metal", Namespace: "external-dns"},
+		},
+	}, nil
 }

@@ -70,6 +70,7 @@ func processDeploymentLogsOptions(opts ...DeploymentLogsOption) DeploymentLogsOp
 
 type CellProvider interface {
 	CreateCell(ctx context.Context, opts CreateCellOptions) (*store.Cell, error)
+	Janitor(ctx context.Context, cellId string) error
 	ServerStats(ctx context.Context, cellId string) ([]ServerStats, error)
 	ServerStatsStream(ctx context.Context, cellId string, interval time.Duration) <-chan ServerStatsResult
 	AdvanceDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/onmetal-dev/metal/lib/background"
 	"github.com/onmetal-dev/metal/lib/billing"
+	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/stripe/stripe-go/v79"
 	"github.com/stripe/stripe-go/v79/billing/meterevent"
@@ -35,7 +36,6 @@ type MessageHandler struct {
 	offeringStore    store.ServerOfferingStore
 	serverStore      store.ServerStore
 	stripeMeterEvent *meterevent.Client
-	logger           *slog.Logger
 }
 
 type Option func(*MessageHandler) error
@@ -90,16 +90,6 @@ func WithStripeMeterEvent(stripeMeterEvent *meterevent.Client) Option {
 	}
 }
 
-func WithLogger(logger *slog.Logger) Option {
-	return func(h *MessageHandler) error {
-		if logger == nil {
-			return errors.New("logger cannot be nil")
-		}
-		h.logger = logger
-		return nil
-	}
-}
-
 func NewMessageHandler(opts ...Option) (*MessageHandler, error) {
 	h := &MessageHandler{}
 	for _, opt := range opts {
@@ -123,9 +113,6 @@ func NewMessageHandler(opts ...Option) (*MessageHandler, error) {
 	if h.stripeMeterEvent == nil {
 		errs = append(errs, "stripe meter event client is required")
 	}
-	if h.logger == nil {
-		errs = append(errs, "logger is required")
-	}
 	if len(errs) > 0 {
 		return nil, errors.New(strings.Join(errs, ", "))
 	}
@@ -137,7 +124,7 @@ func (h MessageHandler) ReQueue(ctx context.Context, m Message) error {
 }
 
 func (h MessageHandler) Handle(ctx context.Context, m Message) error {
-	logger := h.logger.With(
+	log := logger.FromContext(ctx).With(
 		slog.String("teamId", m.TeamId),
 		slog.String("offeringId", m.OfferingId),
 		slog.String("location", m.LocationId),
@@ -173,7 +160,7 @@ func (h MessageHandler) Handle(ctx context.Context, m Message) error {
 	unixTimestampRoundedDownToNearestHour := time.Now().Truncate(time.Hour).Unix()
 	uniqueEventId := fmt.Sprintf("%s-%d", server.Id, unixTimestampRoundedDownToNearestHour)
 
-	logger.Info("hourly server billing event", "hoursToBill", hoursToBill, "uniqueEventId", uniqueEventId)
+	log.Info("hourly server billing event", "hoursToBill", hoursToBill, "uniqueEventId", uniqueEventId)
 	if _, err := h.stripeMeterEvent.New(&stripe.BillingMeterEventParams{
 		EventName: stripe.String(eventName),
 		Payload: map[string]string{
@@ -183,7 +170,7 @@ func (h MessageHandler) Handle(ctx context.Context, m Message) error {
 		Identifier: stripe.String(uniqueEventId),
 	}); err != nil {
 		if strings.Contains(err.Error(), "event already exists with identifier") {
-			logger.Info("hourly server billing event already sent", "hoursToBill", hoursToBill, "uniqueEventId", uniqueEventId)
+			log.Info("hourly server billing event already sent", "hoursToBill", hoursToBill, "uniqueEventId", uniqueEventId)
 		} else {
 			return err
 		}
@@ -193,6 +180,6 @@ func (h MessageHandler) Handle(ctx context.Context, m Message) error {
 		return err
 	}
 
-	logger.Info("hourly server billing completed successfully")
+	log.Info("hourly server billing completed successfully")
 	return h.ReQueue(ctx, m)
 }

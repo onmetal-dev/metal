@@ -2,6 +2,7 @@ package cellprovider
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -21,6 +22,7 @@ import (
 	"github.com/asaskevich/govalidator"
 	thconfig "github.com/budimanjojo/talhelper/v3/pkg/config"
 	"github.com/budimanjojo/talhelper/v3/pkg/generate"
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/getsops/sops/v3"
 	"github.com/getsops/sops/v3/aes"
 	keysource "github.com/getsops/sops/v3/age"
@@ -28,11 +30,16 @@ import (
 	"github.com/getsops/sops/v3/keys"
 	"github.com/getsops/sops/v3/keyservice"
 	sopsyaml "github.com/getsops/sops/v3/stores/yaml"
+	gkv1alpha1 "github.com/glasskube/glasskube/api/v1alpha1"
+	gkbootstrap "github.com/glasskube/glasskube/pkg/bootstrap"
+	gkclient "github.com/glasskube/glasskube/pkg/client"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-yaml/yaml"
 	"github.com/mholt/archiver/v4"
 	"github.com/onmetal-dev/metal/lib/dnsprovider"
+	"github.com/onmetal-dev/metal/lib/glasskube"
+	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/samber/lo"
 	"github.com/siderolabs/talos/cmd/talosctl/pkg/talos/helpers"
@@ -45,6 +52,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/sdk/trace"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 	appsv1 "k8s.io/api/apps/v1"
@@ -52,9 +60,13 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/utils/ptr"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // TalosClusterCellProvider creates a talos k8s cluster using cloudflare for DNS
@@ -63,7 +75,6 @@ type TalosClusterCellProvider struct {
 	cellStore      store.CellStore
 	serverStore    store.ServerStore
 	tmpDirRoot     string
-	logger         *slog.Logger
 	tracerProvider *trace.TracerProvider
 }
 
@@ -95,12 +106,6 @@ func WithTmpDirRoot(tmpDirRoot string) TalosClusterCellProviderOption {
 	}
 }
 
-func WithLogger(logger *slog.Logger) TalosClusterCellProviderOption {
-	return func(p *TalosClusterCellProvider) {
-		p.logger = logger
-	}
-}
-
 func WithTracerProvider(tp *trace.TracerProvider) TalosClusterCellProviderOption {
 	return func(p *TalosClusterCellProvider) {
 		p.tracerProvider = tp
@@ -125,9 +130,6 @@ func NewTalosClusterCellProvider(opts ...TalosClusterCellProviderOption) (*Talos
 	if provider.tmpDirRoot == "" {
 		errs = append(errs, fmt.Errorf("must provide a valid tmpDirRoot"))
 	}
-	if provider.logger == nil {
-		errs = append(errs, fmt.Errorf("must provide a valid logger"))
-	}
 	if provider.tracerProvider == nil {
 		errs = append(errs, fmt.Errorf("must provide a valid tracer provider"))
 	}
@@ -141,6 +143,11 @@ var sopsEnvMutex sync.Mutex
 
 // CreateCell for a talos cluster creates a single-node talos cluster.
 func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCellOptions) (*store.Cell, error) {
+	log := logger.FromContext(ctx).With(
+		slog.String("name", string(opts.Name)),
+		slog.String("teamId", string(opts.TeamId)),
+		slog.String("teamName", string(opts.TeamName)),
+	)
 	talosVersion := "1.7.6"
 	if _, err := govalidator.ValidateStruct(opts); err != nil {
 		return nil, fmt.Errorf("error validating createcell options: %v", err)
@@ -217,7 +224,7 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 	errs, warnings := thConfig.Validate()
 	if len(warnings) > 0 {
 		for _, warning := range warnings {
-			p.logger.Info(warning.Message)
+			log.Info(warning.Message)
 		}
 	}
 	if len(errs) > 0 {
@@ -395,7 +402,10 @@ func (p *TalosClusterCellProvider) CreateCell(ctx context.Context, opts CreateCe
 
 type clientSetup struct {
 	k8sClient   *kubernetes.Clientset
+	ctrlClient  ctrlclient.Client
 	talosClient *client.Client
+	gkClient    gkclient.PackageV1Alpha1Client
+	restConfig  *rest.Config
 	nodeIps     []string
 }
 
@@ -405,9 +415,27 @@ func (p *TalosClusterCellProvider) setupClients(ctx context.Context, cellId stri
 		return nil, fmt.Errorf("error getting cell: %v", err)
 	}
 
-	k8sClient, err := initializeK8sClient(cell.TalosCellData.Kubecfg, p.tracerProvider)
+	k8sClient, restConfig, err := initializeK8sClient(cell.TalosCellData.Kubecfg, p.tracerProvider)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing k8s client: %v", err)
+	}
+
+	scheme := runtime.NewScheme()
+	if err := metallbv1beta1.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("error adding MetalLB scheme: %v", err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("error adding core v1 scheme: %v", err)
+	}
+	if err := cmv1.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("error adding cert-manager v1 scheme: %v", err)
+	}
+	if err := gatewayv1.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("error adding gateway v1 scheme: %v", err)
+	}
+	ctrlClient, err := ctrlclient.New(restConfig, ctrlclient.Options{Scheme: scheme})
+	if err != nil {
+		return nil, fmt.Errorf("error creating controller-runtime client: %v", err)
 	}
 
 	talosClientConfig, err := clientconfig.FromString(cell.TalosCellData.Talosconfig)
@@ -425,11 +453,259 @@ func (p *TalosClusterCellProvider) setupClients(ctx context.Context, cellId stri
 
 	nodeIps := talosClientConfig.Contexts[talosClientConfig.Context].Nodes
 
+	gkClient, err := gkclient.New(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error creating gk client: %v", err)
+	}
+
 	return &clientSetup{
 		k8sClient:   k8sClient,
+		ctrlClient:  ctrlClient,
 		talosClient: talosClient,
+		gkClient:    gkClient,
+		restConfig:  restConfig,
 		nodeIps:     nodeIps,
 	}, nil
+}
+
+func (p *TalosClusterCellProvider) Janitor(ctx context.Context, cellId string) error {
+	log := logger.FromContext(ctx).With(slog.String("cellId", cellId))
+
+	setup, err := p.setupClients(ctx, cellId)
+	if err != nil {
+		return err
+	}
+
+	// TODO: pull down taloscelldata and git repo
+	cell, err := p.cellStore.Get(cellId)
+	if err != nil {
+		return fmt.Errorf("error getting cell: %v", err)
+	}
+	if cell.TalosCellData == nil || cell.TalosCellData.Config == nil {
+		return fmt.Errorf("cell %s has no taloscelldata or config", cellId)
+	}
+
+	// ensure glasskube installed
+	var clusterPackages gkv1alpha1.ClusterPackageList
+	if err := setup.gkClient.ClusterPackages().GetAll(ctx, &clusterPackages); err != nil {
+		if !strings.Contains(err.Error(), "server could not find the requested resource") {
+			return fmt.Errorf("error getting cluster packages: %v", err)
+		}
+		log.Info("installing glasskube", slog.String("error", err.Error()))
+		bootstrapClient := gkbootstrap.NewBootstrapClient(setup.restConfig)
+		if _, err := bootstrapClient.Bootstrap(ctx, gkbootstrap.BootstrapOptions{
+			CreateDefaultRepository: true,
+			DisableTelemetry:        true,
+			Latest:                  true,
+			Type:                    gkbootstrap.BootstrapTypeAio,
+			GitopsMode:              false,
+			NoProgress:              true,
+		}); err != nil {
+			return fmt.Errorf("error bootstrapping: %v", err)
+		}
+		log.Info("glasskube bootstrap complete")
+	}
+
+	// ensure our glasskube repo is present and has the correct URL
+	// TODO BEFORE MERGE: change this to point to main branch
+	var existingRepo gkv1alpha1.PackageRepository
+	const metalRepoUrl = "https://raw.githubusercontent.com/onmetal-dev/metal/cli-up/glasskube/"
+	if err := setup.gkClient.PackageRepositories().Get(ctx, "metal", &existingRepo); err == nil {
+		if existingRepo.Spec.Url != metalRepoUrl {
+			existingRepo.Spec.Url = metalRepoUrl
+			if err := setup.gkClient.PackageRepositories().Update(ctx, &existingRepo, metav1.UpdateOptions{}); err != nil {
+				return fmt.Errorf("error updating metal glasskube repository: %v", err)
+			}
+		}
+	} else if !strings.Contains(err.Error(), "not found") {
+		return fmt.Errorf("error getting metal glasskube repository: %v", err)
+	} else {
+		repo := gkv1alpha1.PackageRepository{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "metal",
+			},
+			Spec: gkv1alpha1.PackageRepositorySpec{
+				Url: metalRepoUrl,
+			},
+		}
+		if err := setup.gkClient.PackageRepositories().Create(ctx, &repo, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("error adding metal glasskube repository: %v", err)
+		}
+		log.Info("metal glasskube repository added")
+	}
+
+	// gateway-api, metrics-server, cert-manager
+	for _, pkg := range []glasskube.EnsureClusterPackageOpts{
+		{Name: "gateway-api", Version: "v1.1.0"},
+		{Name: "metrics-server", Version: "v0.7.2+1"},
+		{Name: "cert-manager", Version: "v1.15.3+1", Namespace: "cert-manager"},
+	} {
+		if err := glasskube.EnsureClusterPackage(ctx, setup.gkClient, pkg); err != nil {
+			return fmt.Errorf("error installing %s: %v", pkg.Name, err)
+		}
+	}
+
+	// cluster issuers to get ssl certs for gateway
+	issuer, err := p.dnsProvider.CertManagerIssuer()
+	if err != nil {
+		return fmt.Errorf("error getting certmanager issuer: %v", err)
+	}
+	if err := ensureLetsEncryptClusterIssuer(ctx, setup.ctrlClient, issuer); err != nil {
+		return fmt.Errorf("error ensuring letsencrypt cluster issuer: %v", err)
+	}
+
+	// external-dns for setting A records
+	if err := ensureNamespaceWithLabels(ctx, setup.k8sClient, "external-dns", podSecurityLabels); err != nil {
+		return fmt.Errorf("error ensuring external-dns namespace: %v", err)
+	}
+	edSetup, err := p.dnsProvider.ExternalDnsSetup()
+	if err != nil {
+		return fmt.Errorf("error setting up external-dns")
+	}
+	for _, secret := range edSetup.Secrets {
+		if err := ensureSecret(ctx, setup.ctrlClient, secret); err != nil {
+			return fmt.Errorf("error ensuring secret: %v", err)
+		}
+	}
+	for _, pkg := range edSetup.GkPkgsToEnsure {
+		if err := glasskube.EnsureClusterPackage(ctx, setup.gkClient, pkg); err != nil {
+			return fmt.Errorf("error installing %s: %v", pkg.Name, err)
+		}
+	}
+
+	// rook-ceph for storage
+	if err := ensureNamespaceWithLabels(ctx, setup.k8sClient, "rook-ceph", podSecurityLabels); err != nil {
+		return fmt.Errorf("error ensuring rook-ceph namespace: %v", err)
+	}
+	for _, pkg := range []glasskube.EnsureClusterPackageOpts{
+		{Name: "rook-ceph", Version: "v1.15.2+6", Repo: "metal"},
+		{Name: "rook-ceph-cluster", Version: "v1.15.2+7", Repo: "metal", Values: gkValues(map[string]string{
+			"k8sNodesAvailable":          "1", // todo make this reflect actual size of cell
+			"makeRbdDefaultStorageClass": "true",
+		})},
+	} {
+		if err := glasskube.EnsureClusterPackage(ctx, setup.gkClient, pkg); err != nil {
+			return fmt.Errorf("error installing %s: %v", pkg.Name, err)
+		}
+	}
+
+	// prometheus, metallb
+	for _, pkg := range []glasskube.EnsureClusterPackageOpts{
+		// kube-prometheus requires us to fix pod security rules
+		// {Name: "kube-prometheus-stack", Version: "v63.0.0+1", Values: gkValues(map[string]string{
+		// 	"grafanaEnabled":        "false",
+		// 	"alertmanagerEnabled":   "false",
+		// 	"prometheusRetention":   "30d",
+		// 	"prometheusStorageSize": "10Gi",
+		// })},
+		{Name: "metallb", Version: "v0.14.8+1", Repo: "metal"},
+	} {
+		if err := glasskube.EnsureClusterPackage(ctx, setup.gkClient, pkg); err != nil {
+			return fmt.Errorf("error installing %s: %v", pkg.Name, err)
+		}
+	}
+
+	// ensure metallb address pool is correct
+	if err := p.createOrUpdateMetalLBIPAddressPool(ctx, setup.k8sClient, setup.ctrlClient); err != nil {
+		return fmt.Errorf("error ensuring metallb address pool: %v", err)
+	}
+
+	// istio for k8s gateway api gateways, maybe other things down the road (mtls?)
+	if err := ensureNamespaceWithLabels(ctx, setup.k8sClient, "istio-system", podSecurityLabels); err != nil {
+		return fmt.Errorf("error ensuring istio-system namespace: %v", err)
+	}
+	for _, pkg := range []glasskube.EnsureClusterPackageOpts{
+		{Name: "istio-ambient", Version: "v1.23.2+3", Repo: "metal", Namespace: "istio-system", Values: gkValues(map[string]string{
+			// until the cluster is fairly beefy, don't eat up resource requests
+			"cniMemory":     "0Mi",
+			"cniCpu":        "0m",
+			"istiodMemory":  "0Mi",
+			"istiodCpu":     "0m",
+			"ztunnelMemory": "0Mi",
+			"ztunnelCpu":    "0m",
+		})},
+	} {
+		if err := glasskube.EnsureClusterPackage(ctx, setup.gkClient, pkg); err != nil {
+			return fmt.Errorf("error installing %s: %v", pkg.Name, err)
+		}
+	}
+
+	// set up the gateway (requires istio, cert-manager, external-dns, metallb)
+	if err := p.createOrUpdateGateway(ctx, setup.k8sClient, setup.ctrlClient, cellId); err != nil {
+		return fmt.Errorf("error ensuring gateway: %v", err)
+	}
+
+	// set up registry so we have a place to push built images
+	if err := p.createOrUpdateRegistry(ctx, setup.k8sClient, setup.ctrlClient, setup.gkClient, cellId); err != nil {
+		return fmt.Errorf("error ensuring registry: %v", err)
+	}
+
+	return nil
+}
+
+func gkValues(input map[string]string) map[string]gkv1alpha1.ValueConfiguration {
+	result := make(map[string]gkv1alpha1.ValueConfiguration)
+	for key, value := range input {
+		result[key] = gkv1alpha1.ValueConfiguration{
+			InlineValueConfiguration: gkv1alpha1.InlineValueConfiguration{
+				Value: lo.ToPtr(value),
+			},
+		}
+	}
+	return result
+}
+
+// talos sets up very strict pod security policies by default
+// we need to label namespaces to opt out of these policies
+var podSecurityLabels = map[string]string{
+	"pod-security.kubernetes.io/enforce": "privileged",
+	"pod-security.kubernetes.io/audit":   "privileged",
+	"pod-security.kubernetes.io/warn":    "privileged",
+}
+
+// ensureNamespaceWithLabels creates a namespace if it doesn't exist and ensures it has the specified labels
+func ensureNamespaceWithLabels(ctx context.Context, client kubernetes.Interface, namespaceName string, desiredLabels map[string]string) error {
+	ns, err := client.CoreV1().Namespaces().Get(ctx, namespaceName, metav1.GetOptions{})
+	if err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return fmt.Errorf("error getting namespace %s: %v", namespaceName, err)
+		}
+		// Namespace doesn't exist, create it
+		newNs := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   namespaceName,
+				Labels: desiredLabels,
+			},
+		}
+		_, err := client.CoreV1().Namespaces().Create(ctx, newNs, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("error creating namespace %s: %v", namespaceName, err)
+		}
+		return nil
+	}
+
+	// Namespace exists, check and update labels if necessary
+	if !hasCorrectLabels(ns.Labels, desiredLabels) {
+		for k, v := range desiredLabels {
+			ns.Labels[k] = v
+		}
+		_, err = client.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("error updating namespace %s: %v", namespaceName, err)
+		}
+	}
+
+	return nil
+}
+
+// hasCorrectLabels checks if the existing labels contain all the desired labels
+func hasCorrectLabels(existing, desired map[string]string) bool {
+	for k, v := range desired {
+		if existing[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // getServerStatsWithClients retrieves server statistics using pre-initialized clients
@@ -996,7 +1272,7 @@ func (p *TalosClusterCellProvider) initializeK8sClientForCell(cellId string) (*k
 		return nil, fmt.Errorf("cell %s has no config", cellId)
 	}
 
-	clientset, err := initializeK8sClient(cell.TalosCellData.Kubecfg, p.tracerProvider)
+	clientset, _, err := initializeK8sClient(cell.TalosCellData.Kubecfg, p.tracerProvider)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing k8s client: %v", err)
 	}
@@ -1005,19 +1281,19 @@ func (p *TalosClusterCellProvider) initializeK8sClientForCell(cellId string) (*k
 }
 
 // initializeK8sClient initializes the Kubernetes client using the provided kubeconfig string.
-func initializeK8sClient(kubeconfig string, tp *trace.TracerProvider) (*kubernetes.Clientset, error) {
+func initializeK8sClient(kubeconfig string, tp *trace.TracerProvider) (*kubernetes.Clientset, *rest.Config, error) {
 	config, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create REST config from kubeconfig: %w", err)
+		return nil, nil, fmt.Errorf("failed to create REST config from kubeconfig: %w", err)
 	}
 	config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		return otelhttp.NewTransport(rt, otelhttp.WithTracerProvider(tp))
 	})
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
+		return nil, nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
-	return clientset, nil
+	return clientset, config, nil
 }
 
 // NodeInfo represents the information of a node including its external IP and labels.
@@ -1190,36 +1466,42 @@ func validateK8sDeploymentMatch(k8sDeployment *appsv1.Deployment, deployment *st
 	return nil
 }
 
-// func unarchiveRepository(sourceZip, destDir string) error {
-//  in, err := os.Open(sourceZip)
-//  if err != nil {
-//      return fmt.Errorf("error opening zip file: %v", err)
-//  }
-//  defer in.Close()
-//  format := archiver.CompressedArchive{
-//      Compression: archiver.Gz{},
-//      Archival:    archiver.Tar{},
-//  }
-//  err = format.Extract(context.Background(), in, nil, func(ctx context.Context, f archiver.File) error {
-//      filePath := filepath.Join(destDir, f.NameInArchive)
-//      if f.FileInfo.IsDir() {
-//          return os.MkdirAll(filePath, os.ModePerm)
-//      }
-//      destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.FileInfo.Mode())
-//      if err != nil {
-//          return err
-//      }
-//      defer destFile.Close()
-//      srcFile, err := f.Open()
-//      if err != nil {
-//          return err
-//      }
-//      defer srcFile.Close()
-//      _, err = io.Copy(destFile, srcFile)
-//      return err
-//  })
-//  if err != nil {
-//      return fmt.Errorf("error extracting files: %v", err)
-//  }
-//  return nil
-// }
+/* TODO: use this to apply cluster machine config updates */
+/* e.g.
+talosConfigDir, err := os.MkdirTemp(p.tmpDirRoot, "talos-git")
+if err != nil {
+	return fmt.Errorf("error creating talos config temp directory: %v", err)
+}
+defer os.RemoveAll(talosConfigDir)
+if err := unarchiveRepository(cell.TalosCellData.Config, talosConfigDir); err != nil {
+	return fmt.Errorf("error unarchiving repository: %v", err)
+}
+*/
+func unarchiveRepository(sourceZip []byte, destDir string) error {
+	in := bytes.NewReader(sourceZip)
+	format := archiver.CompressedArchive{
+		Compression: archiver.Gz{},
+		Archival:    archiver.Tar{},
+	}
+	if err := format.Extract(context.Background(), in, nil, func(ctx context.Context, f archiver.File) error {
+		filePath := filepath.Join(destDir, f.NameInArchive)
+		if f.FileInfo.IsDir() {
+			return os.MkdirAll(filePath, os.ModePerm)
+		}
+		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.FileInfo.Mode())
+		if err != nil {
+			return err
+		}
+		defer destFile.Close()
+		srcFile, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer srcFile.Close()
+		_, err = io.Copy(destFile, srcFile)
+		return err
+	}); err != nil {
+		return fmt.Errorf("error extracting files: %v", err)
+	}
+	return nil
+}
