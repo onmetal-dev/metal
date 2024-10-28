@@ -9,27 +9,23 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 )
 
-func TestProgressTargzipper(t *testing.T) {
-	// Create a temporary directory for the test
+func TestDirTargzipper(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "progresstgz_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
-	// Create test file content
+	// fill test directory with some files and directories
 	fileContent := bytes.Repeat([]byte("test data"), 1000) // 9000 bytes
-
-	// Create test directory structure and files
 	testFiles := []string{
 		"file1.txt",
 		"subdir1/file2.txt",
 		"subdir2/file3.txt",
 		"subdir2/subdir3/file4.txt",
 	}
-
 	for _, filePath := range testFiles {
 		fullPath := filepath.Join(tempDir, filePath)
 		err := os.MkdirAll(filepath.Dir(fullPath), 0755)
@@ -38,29 +34,22 @@ func TestProgressTargzipper(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// Create a buffer to capture the tar.gz data
 	var buf bytes.Buffer
+	targzipper, err := NewDirTargzipper(tempDir, &buf)
+	require.NoError(t, err)
+	tgzIter := targzipper.Run()
 
-	// Create progress callback
-	var progressValues []float64
-	onProgress := func(progress float64) {
-		progressValues = append(progressValues, progress)
+	progressValues := []float64{}
+	for progress, err := range tgzIter {
+		require.NoError(t, err)
+		progressValues = append(progressValues, progress.Percentage)
 	}
 
-	// Create and start the progressTargzipper
-	targzipper, err := NewProgressTargzipper(tempDir, &buf, onProgress)
-	require.NoError(t, err)
-
-	err = targzipper.Start()
-	require.NoError(t, err)
-
 	// Check progress values
-	assert.GreaterOrEqual(t, len(progressValues), 5, "Expected at least 5 progress updates")
-	assert.InDelta(t, 0.0, progressValues[0], 0.1, "First progress should be close to 0.0")
-	assert.InDelta(t, 0.25, progressValues[len(progressValues)/4], 0.1, "Progress should be close to 0.25")
-	assert.InDelta(t, 0.5, progressValues[len(progressValues)/2], 0.1, "Progress should be close to 0.50")
-	assert.InDelta(t, 0.75, progressValues[len(progressValues)*3/4], 0.1, "Progress should be close to 0.75")
-	assert.InDelta(t, 1.0, progressValues[len(progressValues)-1], 0.1, "Last progress should be close to 1.0")
+	require.Equal(t, len(progressValues), 5, "Expected 5 progress updates: %v", progressValues)
+	require.InDeltaSlice(t, []float64{0.0, 0.25, 0.50, 0.75, 1.0}, lo.Map(progressValues, func(p float64, _ int) float64 {
+		return p
+	}), 0.05)
 
 	// Create a temporary directory for extraction
 	extractDir, err := os.MkdirTemp("", "progresstgz_extract")
@@ -71,7 +60,6 @@ func TestProgressTargzipper(t *testing.T) {
 	gzr, err := gzip.NewReader(bytes.NewReader(buf.Bytes()))
 	require.NoError(t, err)
 	tr := tar.NewReader(gzr)
-
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -98,6 +86,6 @@ func TestProgressTargzipper(t *testing.T) {
 		extractedPath := filepath.Join(extractDir, filePath)
 		content, err := os.ReadFile(extractedPath)
 		require.NoError(t, err)
-		assert.Equal(t, fileContent, content, "Extracted file content should match original")
+		require.Equal(t, fileContent, content, "Extracted file content should match original")
 	}
 }

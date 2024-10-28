@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/lib/oapi"
@@ -32,7 +34,7 @@ func (a api) Up(ctx context.Context, request oapi.UpRequestObject) (oapi.UpRespo
 		return oapi.Up500JSONResponse{InternalServerErrorJSONResponse: oapi.InternalServerErrorJSONResponse{Error: "failed to create temporary file"}}, nil
 	}
 	fmt.Println("DEBUG: uploaded archive path", tempFile.Name())
-	//defer os.Remove(tempFile.Name())
+	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
 	var envIdBytes, appIdBytes []byte
@@ -160,10 +162,22 @@ func (a api) Up(ctx context.Context, request oapi.UpRequestObject) (oapi.UpRespo
 		}
 	}
 
-	// TODO: Process the extracted files in tempDir
+	return customUpResponse{}, nil
+}
 
-	return oapi.Up200JSONResponse{
-		Message: lo.ToPtr("Archive successfully uploaded and extracted"),
-		BuildId: nil, // TODO: Generate and return a build ID
-	}, nil
+type customUpResponse struct{}
+
+func (c customUpResponse) VisitUpResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	var i = 0
+	for ; i < 2; i++ {
+		fmt.Fprintf(w, "data: Event %d\n\n", i+1)
+		w.(http.Flusher).Flush()
+		time.Sleep(2 * time.Second)
+	}
+	fmt.Fprintf(w, "data: Event %d\n\n", i+1)
+	return nil
 }

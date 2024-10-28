@@ -41,3 +41,16 @@ func MustApiClient() oapi.ClientWithResponsesInterface {
 	}
 	return client
 }
+
+func MustApiClientRaw() oapi.ClientInterface {
+	client, err := oapi.NewClient(viper.GetString("api-base-url"),
+		oapi.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+			req.Header.Set("Authorization", "Bearer "+viper.GetString("api-token"))
+			return nil
+		}))
+	if err != nil {
+		fmt.Println("error creating client:", err)
+		os.Exit(1)
+	}
+	return client
+}

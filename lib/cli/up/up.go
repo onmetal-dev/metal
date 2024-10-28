@@ -1,9 +1,12 @@
 package up
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"iter"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -16,6 +19,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/onmetal-dev/metal/lib/cli/common"
 	"github.com/onmetal-dev/metal/lib/cli/style"
 	"github.com/onmetal-dev/metal/lib/cli/whoami"
@@ -27,6 +31,7 @@ import (
 var docStyle = lipgloss.NewStyle().Margin(10, 2)
 var textStyle = lipgloss.NewStyle().Foreground(style.BaseLight)
 
+// item fulfills the list.Item interface required by list.Model
 type item struct {
 	title, desc string
 }
@@ -45,11 +50,15 @@ func appsToItems(apps []oapi.App) []list.Item {
 	return items
 }
 
+// getAppsMsg is a message sent when apps have been fetched from the API
 type getAppsMsg struct {
 	Apps  []oapi.App
 	Error error
 }
 
+// getAppsCmd is a command that fetches apps from the API
+// commands in bubbletea "make things happen" (i.e. use them for I/O) and emit messages that
+// get sent to the model update function
 func getAppsCmd(client oapi.ClientWithResponsesInterface) tea.Cmd {
 	return func() tea.Msg {
 		resp, err := client.GetAppsWithResponse(context.Background())
@@ -62,6 +71,7 @@ func getAppsCmd(client oapi.ClientWithResponsesInterface) tea.Cmd {
 	}
 }
 
+// envsToItems converts a list of envs to a list of list.Items
 func envsToItems(envs []oapi.Env) []list.Item {
 	items := lo.Map(envs, func(env oapi.Env, _ int) list.Item {
 		return item{
@@ -72,11 +82,13 @@ func envsToItems(envs []oapi.Env) []list.Item {
 	return items
 }
 
+// getEnvsMsg is a message sent when envs have been fetched from the API
 type getEnvsMsg struct {
 	Envs  []oapi.Env
 	Error error
 }
 
+// getEnvsCmd is a command that fetches envs from the API
 func getEnvsCmd(client oapi.ClientWithResponsesInterface) tea.Cmd {
 	return func() tea.Msg {
 		resp, err := client.GetEnvsWithResponse(context.Background())
@@ -87,53 +99,96 @@ func getEnvsCmd(client oapi.ClientWithResponsesInterface) tea.Cmd {
 	}
 }
 
-type upMsg struct {
-	Result oapi.Up200JSONResponse
-	Error  error
+// upRequestMsg is the result of initiating a request to the /up API endpoint
+type upRequestMsg struct {
+	Result io.ReadCloser
 }
 
-type upProgressMsg struct {
-	Progress float64
-}
-
-func upCmd(client oapi.ClientWithResponsesInterface, path string, envId string, appId string) tea.Cmd {
+// upRequestCmd initiates a request to the /up API endpoint
+func upRequestCmd(path string, part io.Writer, client oapi.ClientInterface, writer *multipart.Writer, body io.Reader) tea.Cmd {
 	return func() tea.Msg {
-		var body bytes.Buffer
-		writer := multipart.NewWriter(&body)
-
-		if err := writer.WriteField("env_id", envId); err != nil {
-			return upMsg{Error: fmt.Errorf("error writing env_id: %w", err)}
-		}
-		if err := writer.WriteField("app_id", appId); err != nil {
-			return upMsg{Error: fmt.Errorf("error writing app_id: %w", err)}
-		}
-		part, err := writer.CreateFormFile("archive", "archive.tar.gz")
+		tgz, err := NewDirTargzipper(path, part)
 		if err != nil {
-			return upMsg{Error: fmt.Errorf("error creating form file: %w", err)}
+			return upRequestIterMsg{Error: fmt.Errorf("error creating targzipper: %w", err)}
 		}
 
-		progressTargzipper, err := NewProgressTargzipper(path, part, func(progress float64) {
-			p.Send(upProgressMsg{Progress: progress})
-		})
-		if err != nil {
-			return upMsg{Error: fmt.Errorf("error creating progress targzipper: %w", err)}
-		}
-		if err := progressTargzipper.Start(); err != nil {
-			return upMsg{Error: fmt.Errorf("error starting progress targzipper: %w", err)}
-		}
-		if err := writer.Close(); err != nil {
-			return upMsg{Error: fmt.Errorf("error closing writer: %w", err)}
-		}
-
-		resp, err := client.UpWithBodyWithResponse(context.Background(), writer.FormDataContentType(), &body)
-		if err != nil {
-			return upMsg{Error: fmt.Errorf("error making request: %w", err)}
-		} else if resp.StatusCode() != http.StatusOK {
-			return upMsg{Error: fmt.Errorf("API returned non-200 status: %d: %s", resp.StatusCode(), string(resp.Body))}
-		}
-		return upMsg{Result: *resp.JSON200}
+		next, stop := iter.Pull2(tgz.Run())
+		return upRequestIterMsg{Pull: iterPull2[Progress]{next: next, stop: stop}, Client: client, Writer: writer, Body: body}
 	}
 }
+
+// iterPull2 captures the output of iter.Pull2 aka a pull-based iterator: https://tip.golang.org/blog/range-functions#pull-iterators
+type iterPull2[T any] struct {
+	next func() (T, error, bool)
+	stop func()
+}
+
+// upRequestIterMsg captures the upload iterator's progress and keeps some other state (client, writer, body) around for when the iterator is done
+type upRequestIterMsg struct {
+	Error    error
+	Progress *Progress
+	Pull     iterPull2[Progress]
+	Client   oapi.ClientInterface
+	Writer   *multipart.Writer
+	Body     io.Reader
+}
+
+// upRequestIterCmd wraps the iterator that tars up the app directory and produces progress updates in the form of upRequestIterMsg
+func upRequestIterCmd(pull iterPull2[Progress], client oapi.ClientInterface, writer *multipart.Writer, body io.Reader) tea.Cmd {
+	return func() tea.Msg {
+		progress, err, ok := pull.next()
+		if err != nil {
+			return upRequestIterMsg{Error: fmt.Errorf("error from tgz iter: %w", err)}
+		} else if ok {
+			return upRequestIterMsg{
+				Progress: &progress,
+				Pull:     pull,
+				Client:   client,
+				Writer:   writer,
+				Body:     body,
+			}
+		}
+		pull.stop()
+		if err := writer.Close(); err != nil {
+			return upRequestIterMsg{Error: fmt.Errorf("error closing writer: %w", err)}
+		}
+		resp, err := client.UpWithBody(context.Background(), writer.FormDataContentType(), body)
+		if err != nil {
+			return upRequestIterMsg{Error: fmt.Errorf("error making request: %w", err)}
+		} else if resp.StatusCode != http.StatusOK {
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return upRequestIterMsg{Error: fmt.Errorf("error reading response body: %w", err)}
+			}
+			return upRequestIterMsg{Error: fmt.Errorf("API returned non-200 status: %d: %s", resp.StatusCode, string(body))}
+		}
+		return upRequestMsg{Result: resp.Body}
+	}
+}
+
+// upResponseMsg is sent when a line of the build / deploy logs is received
+type upResponseMsg struct {
+	Line    string
+	Scanner *bufio.Scanner
+	Error   error
+	Done    bool
+}
+
+// streamUpResponse is a command that streams the build / deploy logs from the /up API endpoint
+func streamUpResponse(scanner *bufio.Scanner) tea.Cmd {
+	return func() tea.Msg {
+		if scanner.Scan() {
+			line := scanner.Text()
+			return upResponseMsg{Scanner: scanner, Line: line}
+		}
+		if err := scanner.Err(); err != nil {
+			return upResponseMsg{Done: true, Error: fmt.Errorf("error streaming up response: %w", err)}
+		}
+		return upResponseMsg{Done: true}
+	}
+}
+
+var dump io.Writer
 
 type model struct {
 	flags     flags
@@ -143,6 +198,7 @@ type model struct {
 	width, height int
 	loading       spinner.Model
 	apiClient     oapi.ClientWithResponsesInterface
+	apiClientRaw  oapi.ClientInterface
 	authCheck     *whoami.Msg
 
 	apps        *getAppsMsg
@@ -153,8 +209,11 @@ type model struct {
 	selectedEnv *oapi.Env
 	envList     *list.Model
 
-	upProgress *progress.Model
-	up         *upMsg
+	upProgress   *progress.Model
+	lastProgress *Progress
+	upLogs       []string
+	upDone       bool
+	upError      error
 }
 
 var _ tea.Model = (*model)(nil)
@@ -180,6 +239,13 @@ func finalPause() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if dump != nil {
+		if m, ok := msg.(upRequestIterMsg); ok {
+			spew.Fdump(dump, time.Now(), "upRequestIterMsg", map[string]any{"err": m.Error, "p": m.Progress})
+		} else {
+			spew.Fdump(dump, time.Now(), msg)
+		}
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -196,9 +262,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.loading, cmd = m.loading.Update(msg)
-		return m, cmd
+		if m.authCheck == nil {
+			var cmd tea.Cmd
+			m.loading, cmd = m.loading.Update(msg)
+			return m, cmd
+		}
 	case whoami.Msg:
 		m.authCheck = &msg
 		if m.authCheck.Error == nil {
@@ -234,15 +302,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		envList.Title = "pick which env to deploy into"
 		envList.SetStatusBarItemName("option", "options")
 		m.envList = &envList
-	case upProgressMsg:
-		return m, m.upProgress.SetPercent(msg.Progress)
+	case upRequestIterMsg:
+		if msg.Error != nil {
+			m.exitError = fmt.Errorf("error uploading directory: %w", msg.Error)
+			return m, tea.Quit
+		}
+		m.lastProgress = msg.Progress
+		cmds := []tea.Cmd{upRequestIterCmd(msg.Pull, msg.Client, msg.Writer, msg.Body)}
+		if msg.Progress != nil {
+			cmds = append([]tea.Cmd{m.upProgress.SetPercent(msg.Progress.Percentage)}, cmds...)
+		}
+		return m, tea.Sequence(cmds...)
 	case progress.FrameMsg:
 		pm, cmd := m.upProgress.Update(msg)
 		m.upProgress = lo.ToPtr(pm.(progress.Model))
 		return m, cmd
-	case upMsg:
-		m.up = &msg
-		return m, tea.Sequence(finalPause(), tea.Quit)
+	case upRequestMsg:
+		//		m.up = &msg
+		m.upLogs = []string{}
+		return m, streamUpResponse(bufio.NewScanner(msg.Result))
+	case upResponseMsg:
+		if msg.Done {
+			m.upDone = true
+			m.upError = msg.Error
+			return m, tea.Sequence(finalPause(), tea.Quit)
+		}
+		m.upLogs = append(m.upLogs, msg.Line)
+		return m, streamUpResponse(msg.Scanner)
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -279,7 +365,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selectedEnv = &env
 					m.envList = nil
 					m.upProgress = lo.ToPtr(progress.New(progress.WithGradient(string(style.Secondary), string(style.Primary))))
-					return m, upCmd(m.apiClient, m.args.path, m.selectedEnv.Id, m.selectedApp.Id)
+					var body bytes.Buffer
+					writer := multipart.NewWriter(&body)
+					if err := writer.WriteField("env_id", m.selectedEnv.Id); err != nil {
+						m.exitError = fmt.Errorf("error writing env_id: %w", err)
+						return m, tea.Quit
+					}
+					if err := writer.WriteField("app_id", m.selectedApp.Id); err != nil {
+						m.exitError = fmt.Errorf("error writing app_id: %w", err)
+						return m, tea.Quit
+					}
+					part, err := writer.CreateFormFile("archive", "archive.tar.gz")
+					if err != nil {
+						m.exitError = fmt.Errorf("error creating form file: %w", err)
+						return m, tea.Quit
+					}
+					return m, upRequestCmd(m.args.path, part, m.apiClientRaw, writer, &body)
 				}
 			}
 		}
@@ -355,19 +456,36 @@ func (m model) View() string {
 	var upResult string
 	if m.upProgress == nil {
 		upResult = renderError(fmt.Errorf("unexpected nil upProgress"))
-	} else if m.upProgress != nil && m.up == nil {
+	} else if m.upProgress != nil {
 		pad := strings.Repeat(" ", padding)
-		upResult = lipgloss.JoinVertical(lipgloss.Left, textStyle.Render(fmt.Sprintf("uploading %s...", m.args.path)), "\n"+
-			pad+m.upProgress.View()+"\n\n")
-	} else if m.up != nil && m.up.Error != nil {
-		upResult = renderError(m.up.Error)
-	} else if m.up != nil {
-		pad := strings.Repeat(" ", padding)
-		upResult = lipgloss.JoinVertical(lipgloss.Left, textStyle.Render(fmt.Sprintf("uploaded %s!", m.args.path)), "\n"+
+		verb := "uploading"
+		file := ""
+		if m.lastProgress != nil {
+			if m.lastProgress.Done {
+				verb = "uploaded"
+				file = m.args.path + "!"
+			} else {
+				file = m.lastProgress.Filename + "..."
+			}
+		}
+		upResult = lipgloss.JoinVertical(lipgloss.Left, textStyle.Render(fmt.Sprintf("%s %s", verb, file)), "\n"+
 			pad+m.upProgress.View()+"\n\n")
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, appSelection, envSelection, upResult)
+	var upLogs string
+	if len(m.upLogs) > 0 {
+		upLogs = strings.Join(m.upLogs, "\n")
+		upLogs += "\n"
+	}
+	if m.upDone {
+		if m.upError != nil {
+			upLogs += textStyle.Render(fmt.Sprintf("deploy failed! ❌\n\n%s\n", m.upError))
+		} else {
+			upLogs += textStyle.Render("deploy completed! ✅\n")
+		}
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, appSelection, envSelection, upResult, upLogs)
 }
 
 func NewCmd() *cobra.Command {
@@ -397,6 +515,14 @@ type args struct {
 var p *tea.Program
 
 func runUp(cmd *cobra.Command, argss []string) {
+	if _, ok := os.LookupEnv("DEBUG"); ok {
+		var err error
+		dump, err = os.OpenFile("tmp/messages.log", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+		if err != nil {
+			os.Exit(1)
+		}
+	}
+
 	path := "."
 	if len(argss) > 0 {
 		path = argss[0]
@@ -417,8 +543,9 @@ func runUp(cmd *cobra.Command, argss []string) {
 		args: args{
 			path: path,
 		},
-		loading:   common.NewSpinner(),
-		apiClient: common.MustApiClient(),
+		loading:      common.NewSpinner(),
+		apiClient:    common.MustApiClient(),
+		apiClientRaw: common.MustApiClientRaw(),
 	})
 	if _, err := p.Run(); err != nil {
 		fmt.Println("could not start program:", err)

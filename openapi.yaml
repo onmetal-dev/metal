@@ -129,6 +129,19 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/Env"
+    UpLog:
+      type: object
+      properties:
+        time:
+          type: string
+          format: date-time
+          description: Timestamp of the log.
+        message:
+          type: string
+          description: Content of the log.
+      example:
+        time: "2023-11-20T10:30:00Z"
+        message: "Build started"
 paths:
   /api/whoami:
     get:
@@ -338,16 +351,11 @@ paths:
                 - archive
       responses:
         "200":
-          description: Upload received successfully
+          description: Upload received successfully and build / deploy started.
           content:
-            application/json:
+            text/event-stream:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  build_id:
-                    $ref: "#/components/schemas/Id"
+                $ref: "#/components/schemas/UpLog"
         "400":
           $ref: "#/components/responses/BadRequest"
         "500":
