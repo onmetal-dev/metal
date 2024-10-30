@@ -400,7 +400,7 @@ func (m model) View() string {
 		return fmt.Sprintf("\n %s %s\n\n", m.loading.View(), textStyle.Render(fmt.Sprintf(msg, args...)))
 	}
 	renderError := func(err error) string {
-		return fmt.Sprintf("%s\n", lipgloss.NewStyle().Foreground(style.Error).Render(fmt.Sprintf("error: %v", err)))
+		return textStyle.Width(m.width).Render(fmt.Sprintf("error: %v", err))
 	}
 	if m.exitError != nil {
 		return renderError(m.exitError)

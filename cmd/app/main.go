@@ -402,14 +402,27 @@ func main() {
 		})
 
 		// API routes
+		buildStore := dbstore.NewBuildStore(db)
 		oapi.HandlerWithOptions(
-			oapi.NewStrictHandler(api.New(apiTokenStore, appStore, deploymentStore, teamStore), []oapi.StrictMiddlewareFunc{}),
+			oapi.NewStrictHandler(
+				api.New(
+					apiTokenStore,
+					appStore,
+					deploymentStore,
+					teamStore,
+					buildStore,
+					cellStore,
+					cellProviderForType,
+				),
+				[]oapi.StrictMiddlewareFunc{},
+			),
 			oapi.ChiServerOptions{
 				BaseRouter: r,
 				Middlewares: []oapi.MiddlewareFunc{
 					m.ApiAuthMiddleware(apiTokenStore),
 				},
-			})
+			},
+		)
 	})
 
 	srv := &http.Server{

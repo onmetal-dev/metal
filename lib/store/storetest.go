@@ -19,6 +19,7 @@ type TestStoresConfig struct {
 	AppStore        AppStore
 	DeploymentStore DeploymentStore
 	ApiTokenStore   ApiTokenStore
+	BuildStore      BuildStore
 }
 
 func createUser(t *testing.T, stores TestStoresConfig, email, password string) User {
@@ -191,7 +192,7 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			addUserToTeam(t, ctx, stores, user.Id, team.Id)
 
 			// Create an app
-			appName := "Test App"
+			appName := "test-app"
 			createAppOpts := CreateAppOptions{
 				Name:   appName,
 				TeamId: team.Id,
@@ -498,6 +499,86 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			// Verify API token is deleted
 			_, err = stores.ApiTokenStore.Get(apiToken.Id)
 			require.Error(err, "Expected error when getting deleted API token")
+		})
+
+		t.Run("Build Operations", func(t *testing.T) {
+			require := require.New(t)
+			ctx := context.Background()
+
+			// Create a team and app for the build tests
+			team := createTeam(t, stores, "Build Test Team", "A team for testing builds")
+			user := createUser(t, stores, "buildtest@example.com", "password123")
+			addUserToTeam(t, ctx, stores, user.Id, team.Id)
+			app, err := stores.AppStore.Create(CreateAppOptions{
+				Name:   "test-app",
+				TeamId: team.Id,
+				UserId: user.Id,
+			})
+			require.NoError(err, "Failed to create app")
+
+			// Test initializing a new build
+			initOpts := InitBuildOptions{
+				TeamId:    team.Id,
+				CreatorId: user.Id,
+				AppId:     app.Id,
+			}
+			build, err := stores.BuildStore.Init(ctx, initOpts)
+			require.NoError(err, "Failed to initialize build")
+			require.NotEmpty(build.Id, "Expected build id to be present")
+			require.Equal(BuildStatusPending, build.Status, "Expected initial build status to be pending")
+			require.Equal(team.Id, build.TeamId, "Expected build team id to match")
+			require.Equal(app.Id, build.AppId, "Expected build app id to match")
+
+			// Test getting the build
+			fetchedBuild, err := stores.BuildStore.Get(ctx, build.Id)
+			require.NoError(err, "Failed to get build")
+			require.Equal(build.Id, fetchedBuild.Id, "Expected fetched build id to match")
+			require.Equal(build.Status, fetchedBuild.Status, "Expected fetched build status to match")
+
+			// Test updating build status
+			err = stores.BuildStore.UpdateStatus(ctx, build.Id, BuildStatusBuilding, "building...")
+			require.NoError(err, "Failed to update build status")
+
+			updatedBuild, err := stores.BuildStore.Get(ctx, build.Id)
+			require.NoError(err, "Failed to get updated build")
+			require.Equal(BuildStatusBuilding, updatedBuild.Status, "Expected updated build status to match")
+			require.Equal("building...", updatedBuild.StatusReason, "Expected updated build status reason to match")
+
+			// Test updating build logs
+			buildLogs := BuildLogs{
+				{
+					Time:    time.Now(),
+					Message: "Starting build process",
+				},
+				{
+					Time:    time.Now(),
+					Message: "Build completed successfully",
+				},
+			}
+			err = stores.BuildStore.UpdateLogs(ctx, build.Id, buildLogs)
+			require.NoError(err, "Failed to update build logs")
+
+			buildWithLogs, err := stores.BuildStore.Get(ctx, build.Id)
+			require.NoError(err, "Failed to get build with logs")
+			require.Equal(len(buildLogs), len(buildWithLogs.Logs.Data()), "Expected build logs length to match")
+			require.Equal(buildLogs[0].Message, buildWithLogs.Logs.Data()[0].Message, "Expected build log message to match")
+
+			// Test updating build artifact
+			artifact := BuildArtifact{
+				Image: &ImageArtifact{
+					Repository: "docker.io",
+					Name:       "test-app",
+					Tag:        "latest",
+				},
+			}
+			err = stores.BuildStore.UpdateArtifacts(ctx, build.Id, []BuildArtifact{artifact})
+			require.NoError(err, "Failed to update build artifact")
+
+			buildWithArtifact, err := stores.BuildStore.Get(ctx, build.Id)
+			require.NoError(err, "Failed to get build with artifact")
+			require.NotNil(buildWithArtifact.Artifacts.Data()[0].Image, "Expected build artifact image to be present")
+			require.Equal(artifact.Image.Name, buildWithArtifact.Artifacts.Data()[0].Image.Name, "Expected build artifact image name to match")
+			require.Equal(artifact.Image.Tag, buildWithArtifact.Artifacts.Data()[0].Image.Tag, "Expected build artifact image tag to match")
 		})
 	}
 }

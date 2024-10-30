@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"log/slog"
-
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,7 +39,7 @@ func TestQueueProducerAndConsumer(t *testing.T) {
 			receivedMsg = m
 			mu.Unlock()
 			return nil
-		}, slog.Default())
+		})
 
 		consumer.Start(ctx)
 		defer consumer.Stop()
@@ -72,7 +70,7 @@ func TestQueueProducerAndConsumer(t *testing.T) {
 			receivedTime = time.Now()
 			mu.Unlock()
 			return nil
-		}, slog.Default())
+		})
 
 		consumer.Start(ctx)
 		defer consumer.Stop()
@@ -104,7 +102,7 @@ func TestQueueProducerAndConsumer(t *testing.T) {
 			receivedMsgs = append(receivedMsgs, m)
 			mu.Unlock()
 			return nil
-		}, slog.Default())
+		})
 
 		consumer.Start(ctx)
 		defer consumer.Stop()
@@ -152,8 +150,8 @@ func TestQueueProducerAndConsumer(t *testing.T) {
 			return nil
 		}
 
-		consumer1 := NewQueueConsumer(ctx, queueName, testConnString, 30, consumerFunc, slog.Default())
-		consumer2 := NewQueueConsumer(ctx, queueName, testConnString, 30, consumerFunc, slog.Default())
+		consumer1 := NewQueueConsumer(ctx, queueName, testConnString, 30, consumerFunc)
+		consumer2 := NewQueueConsumer(ctx, queueName, testConnString, 30, consumerFunc)
 
 		consumer1.Start(ctx)
 		consumer2.Start(ctx)

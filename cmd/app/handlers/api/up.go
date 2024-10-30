@@ -11,10 +11,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
+	"github.com/onmetal-dev/metal/lib/cellprovider"
+	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/oapi"
+	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/samber/lo"
 	"go.jetify.com/typeid"
 )
@@ -162,22 +164,114 @@ func (a api) Up(ctx context.Context, request oapi.UpRequestObject) (oapi.UpRespo
 		}
 	}
 
-	return customUpResponse{}, nil
+	build, err := a.buildStore.Init(ctx, store.InitBuildOptions{
+		TeamId:    token.TeamId,
+		CreatorId: token.CreatorId,
+		AppId:     app.Id,
+	})
+	if err != nil {
+		return oapi.Up500JSONResponse{InternalServerErrorJSONResponse: oapi.InternalServerErrorJSONResponse{Error: fmt.Sprintf("failed to initialize build: %s", err)}}, nil
+	}
+
+	return customUpResponse{
+		ctx:                 ctx,
+		buildStore:          a.buildStore,
+		cellStore:           a.cellStore,
+		cellProviderForType: a.cellProviderForType,
+		build:               build,
+		tempDir:             tempDir,
+		app:                 app,
+		env:                 env,
+		token:               token,
+	}, nil
 }
 
-type customUpResponse struct{}
+type customUpResponse struct {
+	ctx                 context.Context
+	buildStore          store.BuildStore
+	cellStore           store.CellStore
+	cellProviderForType func(cellType store.CellType) cellprovider.CellProvider
+	build               store.Build
+	tempDir             string
+	app                 store.App
+	env                 store.Env
+	token               store.ApiToken
+}
 
-func (c customUpResponse) VisitUpResponse(w http.ResponseWriter) error {
+type flusherWriter struct {
+	w http.ResponseWriter
+}
+
+func (fw *flusherWriter) Write(p []byte) (n int, err error) {
+	n, err = fw.w.Write(p)
+	if err == nil {
+		if flusher, ok := fw.w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}
+	return n, err
+}
+
+func (c customUpResponse) VisitUpResponse(w http.ResponseWriter) (err error) {
+	defer func() {
+		if err != nil {
+			c.buildStore.UpdateStatus(context.Background(), c.build.Id, store.BuildStatusFailed, err.Error())
+		} else {
+			c.buildStore.UpdateStatus(context.Background(), c.build.Id, store.BuildStatusCompleted, "")
+		}
+	}()
+	logger := logger.FromContext(c.ctx).With("buildId", c.build.Id, "appId", c.app.Id, "appName", c.app.Name, "envId", c.env.Id, "envName", c.env.Name, "teamId", c.token.TeamId)
+	defer os.Remove(c.tempDir)
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	var i = 0
-	for ; i < 2; i++ {
-		fmt.Fprintf(w, "data: Event %d\n\n", i+1)
-		w.(http.Flusher).Flush()
-		time.Sleep(2 * time.Second)
+	err = c.buildStore.UpdateStatus(context.Background(), c.build.Id, store.BuildStatusBuilding, "")
+	if err != nil {
+		fmt.Fprintf(w, "data: Error starting build: %s\n\n", err)
+		return
 	}
-	fmt.Fprintf(w, "data: Event %d\n\n", i+1)
+
+	logger.Info("build started")
+	var cells []store.Cell
+	cells, err = c.cellStore.GetForTeam(c.ctx, c.token.TeamId)
+	if err != nil {
+		logger.Error("failed to get cells", "error", err)
+		return
+	}
+	if len(cells) != 1 {
+		logger.Error("TODO: support specifying selecting a subset of multiple cells for build+deploy", "numCells", len(cells))
+		err = fmt.Errorf("TODO: %d cells. support specifying selecting a subset of multiple cells for build+deploy", len(cells))
+		return
+	}
+	cell := cells[0]
+
+	cp := c.cellProviderForType(cell.Type)
+	var artifact *store.ImageArtifact
+	fw := &flusherWriter{w: w}
+	artifact, err = cp.BuildImage(c.ctx, cellprovider.BuildImageOptions{
+		CellId:   cell.Id,
+		BuildDir: c.tempDir,
+		AppName:  c.app.Name,
+		BuildId:  c.build.Id,
+		Stdout:   fw,
+		Stderr:   fw,
+	})
+	if err != nil {
+		err = fmt.Errorf("failed to build image: %w", err)
+		return
+	}
+	w.(http.Flusher).Flush()
+
+	if err := c.buildStore.UpdateArtifacts(c.ctx, c.build.Id, []store.BuildArtifact{
+		{Image: artifact},
+	}); err != nil {
+		return fmt.Errorf("failed to update build artifacts: %w", err)
+	}
+	fmt.Fprintf(w, "build complete\n")
+	w.(http.Flusher).Flush()
+
+	// TODO: deploy the build
+
 	return nil
 }

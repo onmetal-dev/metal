@@ -17,6 +17,10 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
+func cellRegistryHostname(cellId string) string {
+	return fmt.Sprintf("registry.%s", cellHostname(cellId))
+}
+
 // createOrUpdateRegistry creates or updates the private docker registry for the cluster
 func (p *TalosClusterCellProvider) createOrUpdateRegistry(ctx context.Context, k8sClient kubernetes.Interface, ctrlClient client.Client, gkClient gkclient.PackageV1Alpha1Client, cellId string) error {
 	namespace := "registry"
@@ -186,7 +190,7 @@ storage:
 				},
 			},
 			Hostnames: []gatewayv1.Hostname{
-				gatewayv1.Hostname(fmt.Sprintf("registry.%s", cellHostname(cellId))),
+				gatewayv1.Hostname(cellRegistryHostname(cellId)),
 			},
 			Rules: []gatewayv1.HTTPRouteRule{
 				{

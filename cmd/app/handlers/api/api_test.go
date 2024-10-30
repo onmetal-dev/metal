@@ -8,5 +8,8 @@ func newTestAPI() api {
 		&mock.AppStoreMock{},
 		&mock.DeploymentStoreMock{},
 		&mock.TeamStoreMock{},
+		nil,
+		nil,
+		nil,
 	).(api)
 }

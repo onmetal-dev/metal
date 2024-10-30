@@ -35,6 +35,7 @@ import (
 	gkclient "github.com/glasskube/glasskube/pkg/client"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-logr/logr"
 	"github.com/go-yaml/yaml"
 	"github.com/mholt/archiver/v4"
 	"github.com/onmetal-dev/metal/lib/dnsprovider"
@@ -66,8 +67,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
+
+func init() {
+	ctrllog.SetLogger(logr.FromSlogHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})))
+}
 
 // TalosClusterCellProvider creates a talos k8s cluster using cloudflare for DNS
 type TalosClusterCellProvider struct {

@@ -25,6 +25,7 @@ require (
 	github.com/go-chi/httprate v0.12.0
 	github.com/go-git/go-git v4.7.0+incompatible
 	github.com/go-git/go-git/v5 v5.12.0
+	github.com/go-logr/logr v1.4.2
 	github.com/go-playground/form/v4 v4.2.1
 	github.com/go-playground/validator/v10 v10.22.0
 	github.com/go-yaml/yaml v2.1.0+incompatible
@@ -145,12 +146,15 @@ require (
 	github.com/cli/browser v1.3.0 // indirect
 	github.com/cloudflare/circl v1.3.9 // indirect
 	github.com/connesc/cipherio v0.2.1 // indirect
+	github.com/containerd/containerd v1.7.19 // indirect
 	github.com/containerd/go-cni v1.1.10 // indirect
 	github.com/containernetworking/cni v1.2.3 // indirect
 	github.com/cosi-project/runtime v0.5.5 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/denisbrodbeck/machineid v1.0.1 // indirect
+	github.com/docker/cli v27.2.2-0.20240913085431-48a2cdff970d+incompatible // indirect
+	github.com/docker/docker v27.2.1+incompatible // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -171,7 +175,6 @@ require (
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.5.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.2 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect

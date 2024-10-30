@@ -537,3 +537,60 @@ type ApiTokenStore interface {
 	Delete(id string) error
 	UpdateLastUsedAt(id string, lastUsedAt time.Time) error
 }
+
+type BuildStatus string
+
+const (
+	BuildStatusPending   BuildStatus = "pending"
+	BuildStatusBuilding  BuildStatus = "building"
+	BuildStatusCompleted BuildStatus = "completed"
+	BuildStatusFailed    BuildStatus = "failed"
+)
+
+type ImageArtifact struct {
+	// Repository is optional. If not provided, dockerhub is used. Else, it could be something like registry.k8s.io.
+	Repository string `json:"repository"`
+	// Name of the image. Required. E.g. busybox, stefanprodan/podinfo
+	Name string `json:"name" validate:"required"`
+	// Tag of the image. If not specified, latest is used.
+	Tag string `json:"tag"`
+	// Digest of the image can be used in place of a tag. E.g. sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9
+	Digest string `json:"digest"`
+}
+
+type BuildArtifact struct {
+	Image *ImageArtifact
+	// Tarball *TarballArtifact // if we support deploying non-image artifacts in the future, e.g. lambda functions
+}
+
+type BuildLog struct {
+	Time    time.Time `json:"time"`
+	Message string    `json:"message"`
+}
+
+type BuildLogs []BuildLog
+
+type Build struct {
+	Common
+	TeamId       string
+	CreatorId    string
+	AppId        string
+	Status       BuildStatus
+	StatusReason string
+	Logs         datatypes.JSONType[BuildLogs]
+	Artifacts    datatypes.JSONType[[]BuildArtifact]
+}
+
+type InitBuildOptions struct {
+	TeamId    string `validate:"required"`
+	CreatorId string `validate:"required"`
+	AppId     string `validate:"required"`
+}
+
+type BuildStore interface {
+	Init(ctx context.Context, opts InitBuildOptions) (Build, error)
+	Get(ctx context.Context, id string) (Build, error)
+	UpdateStatus(ctx context.Context, id string, status BuildStatus, statusReason string) error
+	UpdateLogs(ctx context.Context, id string, logs BuildLogs) error
+	UpdateArtifacts(ctx context.Context, id string, artifacts []BuildArtifact) error
+}

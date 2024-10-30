@@ -127,10 +127,8 @@ func TestUp(t *testing.T) {
 		resp, err := api.Up(ctx, req)
 		require.NoError(t, err)
 
-		successResp, ok := resp.(oapi.Up200JSONResponse)
+		_, ok := resp.(customUpResponse)
 		require.True(t, ok, "Expected 200 response")
-		assert.NotNil(t, successResp.Message)
-		assert.Contains(t, *successResp.Message, "Archive successfully uploaded and extracted")
 	})
 }
 
