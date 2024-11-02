@@ -209,11 +209,12 @@ type model struct {
 	selectedEnv *oapi.Env
 	envList     *list.Model
 
-	upProgress   *progress.Model
-	lastProgress *Progress
-	upLogs       []string
-	upDone       bool
-	upError      error
+	upProgress    *progress.Model
+	lastProgress  *Progress
+	upLogsSpinner spinner.Model
+	upLogs        []string
+	upDone        bool
+	upError       error
 }
 
 var _ tea.Model = (*model)(nil)
@@ -262,9 +263,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case spinner.TickMsg:
+		var cmd tea.Cmd
 		if m.authCheck == nil {
-			var cmd tea.Cmd
 			m.loading, cmd = m.loading.Update(msg)
+			return m, cmd
+		} else {
+			m.upLogsSpinner, cmd = m.upLogsSpinner.Update(msg)
 			return m, cmd
 		}
 	case whoami.Msg:
@@ -318,7 +322,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.upProgress = lo.ToPtr(pm.(progress.Model))
 		return m, cmd
 	case upRequestMsg:
-		//		m.up = &msg
 		m.upLogs = []string{}
 		return m, streamUpResponse(bufio.NewScanner(msg.Result))
 	case upResponseMsg:
@@ -380,7 +383,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.exitError = fmt.Errorf("error creating form file: %w", err)
 						return m, tea.Quit
 					}
-					return m, upRequestCmd(m.args.path, part, m.apiClientRaw, writer, &body)
+					return m, tea.Batch(m.upLogsSpinner.Tick, upRequestCmd(m.args.path, part, m.apiClientRaw, writer, &body))
 				}
 			}
 		}
@@ -419,7 +422,7 @@ func (m model) View() string {
 	} else if m.apps.Error != nil {
 		appSelection = renderError(m.apps.Error)
 	} else if m.selectedApp != nil {
-		appSelection = textStyle.Render(fmt.Sprintf("app %s selected", m.selectedApp.Name))
+		appSelection = textStyle.Render(fmt.Sprintf("✅ app %s selected", m.selectedApp.Name))
 	} else if m.appList == nil {
 		appSelection = renderError(fmt.Errorf("unexpected nil appList after pulling apps down and with no selected app"))
 	} else {
@@ -439,7 +442,7 @@ func (m model) View() string {
 	} else if m.envs.Error != nil {
 		envSelection = renderError(m.envs.Error)
 	} else if m.selectedEnv != nil {
-		envSelection = textStyle.Render(fmt.Sprintf("env %s selected", m.selectedEnv.Name))
+		envSelection = textStyle.Render(fmt.Sprintf("✅ env %s selected", m.selectedEnv.Name))
 	} else if m.envList == nil {
 		envSelection = renderError(fmt.Errorf("unexpected nil envList after pulling envs down"))
 	} else {
@@ -456,6 +459,8 @@ func (m model) View() string {
 	var upResult string
 	if m.upProgress == nil {
 		upResult = renderError(fmt.Errorf("unexpected nil upProgress"))
+	} else if m.lastProgress != nil && m.lastProgress.Done {
+		upResult = textStyle.Render("✅ code uploaded!")
 	} else if m.upProgress != nil {
 		pad := strings.Repeat(" ", padding)
 		verb := "uploading"
@@ -473,15 +478,24 @@ func (m model) View() string {
 	}
 
 	var upLogs string
-	if len(m.upLogs) > 0 {
-		upLogs = strings.Join(m.upLogs, "\n")
-		upLogs += "\n"
-	}
-	if m.upDone {
-		if m.upError != nil {
-			upLogs += textStyle.Render(fmt.Sprintf("deploy failed! ❌\n\n%s\n", m.upError))
-		} else {
-			upLogs += textStyle.Render("deploy completed! ✅\n")
+	if m.lastProgress != nil && m.lastProgress.Done {
+		// show the last m.height/2 lines of the up logs
+		upLogs += fmt.Sprintf("%s  %s\n", m.upLogsSpinner.View(), textStyle.Render("building and deploying..."))
+		if len(m.upLogs) > 0 {
+			// Only show the last m.height/2 lines
+			startLine := 0
+			if len(m.upLogs) > m.height/2 {
+				startLine = len(m.upLogs) - m.height/2
+			}
+			upLogs += strings.Join(m.upLogs[startLine:], "\n")
+			upLogs += "\n"
+		}
+		if m.upDone {
+			if m.upError != nil {
+				upLogs = textStyle.Render(fmt.Sprintf("❌ deploy failed!\n\n%s\n", m.upError))
+			} else {
+				upLogs = textStyle.Render("✅ deploy completed!\n")
+			}
 		}
 	}
 
@@ -543,9 +557,10 @@ func runUp(cmd *cobra.Command, argss []string) {
 		args: args{
 			path: path,
 		},
-		loading:      common.NewSpinner(),
-		apiClient:    common.MustApiClient(),
-		apiClientRaw: common.MustApiClientRaw(),
+		loading:       common.NewSpinner(),
+		upLogsSpinner: common.NewSpinner(),
+		apiClient:     common.MustApiClient(),
+		apiClientRaw:  common.MustApiClientRaw(),
 	})
 	if _, err := p.Run(); err != nil {
 		fmt.Println("could not start program:", err)
