@@ -61,7 +61,7 @@ func (s *BuildStore) UpdateLogs(ctx context.Context, id string, logs store.Build
 	return nil
 }
 
-func (s *BuildStore) UpdateArtifacts(ctx context.Context, id string, artifacts []store.BuildArtifact) error {
+func (s *BuildStore) UpdateArtifacts(ctx context.Context, id string, artifacts []store.Artifact) error {
 	if err := s.db.WithContext(ctx).Model(&store.Build{}).Where("id = ?", id).Update("artifacts", datatypes.NewJSONType(artifacts)).Error; err != nil {
 		return fmt.Errorf("failed to update build artifacts: %w", err)
 	}

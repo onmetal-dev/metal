@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	filippo.io/age v1.2.0
 	github.com/PuerkitoBio/goquery v1.10.0
-	github.com/a-h/templ v0.2.747
+	github.com/a-h/templ v0.2.793
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/budimanjojo/talhelper/v3 v3.0.5
 	github.com/cenkalti/backoff/v4 v4.3.0

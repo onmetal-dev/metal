@@ -26,6 +26,7 @@ func TestUp(t *testing.T) {
 	envId := typeid.Must(typeid.WithPrefix("env"))
 	appId := typeid.Must(typeid.WithPrefix("app"))
 	teamId := typeid.Must(typeid.WithPrefix("team"))
+	buildId := typeid.Must(typeid.WithPrefix("build"))
 
 	t.Run("400 responses", func(t *testing.T) {
 		testCases := []struct {
@@ -99,6 +100,9 @@ func TestUp(t *testing.T) {
 		api := newTestAPI()
 		api.appStore.(*mock.AppStoreMock).On("Get", testifymock.Anything, appId.String()).Return(store.App{TeamId: teamId.String()}, nil)
 		api.deploymentStore.(*mock.DeploymentStoreMock).On("GetEnv", envId.String()).Return(store.Env{TeamId: teamId.String()}, nil)
+		api.buildStore.(*mock.BuildStoreMock).On("Init", testifymock.Anything, store.InitBuildOptions{
+			TeamId: teamId.String(),
+		}).Return(store.Build{Common: store.Common{Id: buildId.String()}}, nil)
 
 		// Create a temporary directory for the test
 		tempDir, err := os.MkdirTemp("", "test-up-*")

@@ -278,7 +278,6 @@ func (h *GetServersCheckoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	if len(products) == 0 {
-		fmt.Println("DEBUG creating products since none found")
 		ps, err := createStripeProductsForOffering(*offering, locationId, h.stripeProduct, h.stripePrice, h.stripeMeter)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error creating stripe products: %v", err), http.StatusInternalServerError)

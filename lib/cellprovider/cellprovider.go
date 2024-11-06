@@ -41,8 +41,9 @@ type LogEntry struct {
 }
 
 type DeploymentLogsResult struct {
-	Logs  []LogEntry
-	Error error
+	Annotations map[string]string
+	Logs        []LogEntry
+	Error       error
 }
 
 // DeploymentLogsOptions defines options for fetching deployment logs

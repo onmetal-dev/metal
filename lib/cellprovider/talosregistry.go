@@ -2,6 +2,7 @@ package cellprovider
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	gkclient "github.com/glasskube/glasskube/pkg/client"
@@ -17,15 +18,69 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
+const registryNamespace = "registry"
+const registryPlaintextSecretName = "registry-auth-plaintext"
+const dockerconfigjsonSecretName = "registry-dockerconfigjson"
+
 func cellRegistryHostname(cellId string) string {
 	return fmt.Sprintf("registry.%s", cellHostname(cellId))
 }
 
+type cellRegistryCredentials struct {
+	Username string
+	Password string
+}
+
+// cellRegistryCredentials returns the username and password for the registry.
+// The username and password are stored in a secret in the registry namespace.
+func (p *TalosClusterCellProvider) cellRegistryCredentials(ctx context.Context, ctrlClient client.Client) (*cellRegistryCredentials, error) {
+	plaintextSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      registryPlaintextSecretName,
+			Namespace: registryNamespace,
+		},
+	}
+	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: registryPlaintextSecretName, Namespace: registryNamespace}, plaintextSecret); err != nil {
+		return nil, fmt.Errorf("failed to get plaintext secret: %w", err)
+	}
+	return &cellRegistryCredentials{
+		Username: string(plaintextSecret.Data["username"]),
+		Password: string(plaintextSecret.Data["password"]),
+	}, nil
+}
+
+// copyImagePullSecretToNamespace copies the dockerconfigjson secret from the registry namespace to the given namespace
+func copyImagePullSecretToNamespace(ctx context.Context, ctrlClient client.Client, srcNamespace, dstNamespace string) error {
+	srcSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dockerconfigjsonSecretName,
+			Namespace: srcNamespace,
+		},
+	}
+	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: dockerconfigjsonSecretName, Namespace: srcNamespace}, srcSecret); err != nil {
+		return fmt.Errorf("failed to get dockerconfigjson secret: %w", err)
+	}
+
+	// create a new secret object and copy the necessary fields
+	dstSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dockerconfigjsonSecretName,
+			Namespace: dstNamespace,
+		},
+		Data: srcSecret.Data,
+		Type: srcSecret.Type,
+	}
+
+	if err := createOrUpdateResource(ctx, ctrlClient, dstSecret); err != nil {
+		return fmt.Errorf("failed to create or update dockerconfigjson secret: %w", err)
+	}
+	return nil
+}
+
 // createOrUpdateRegistry creates or updates the private docker registry for the cluster
 func (p *TalosClusterCellProvider) createOrUpdateRegistry(ctx context.Context, k8sClient kubernetes.Interface, ctrlClient client.Client, gkClient gkclient.PackageV1Alpha1Client, cellId string) error {
-	namespace := "registry"
-	if err := ensureNamespaceWithLabels(ctx, k8sClient, namespace, podSecurityLabels); err != nil {
-		return fmt.Errorf("error ensuring %s namespace: %w", namespace, err)
+	if err := ensureNamespaceWithLabels(ctx, k8sClient, registryNamespace, podSecurityLabels); err != nil {
+		return fmt.Errorf("error ensuring %s namespace: %w", registryNamespace, err)
 	}
 
 	// create a shared fs pvc for the registry. This is taken from the canonical example in the rook docs:
@@ -35,10 +90,10 @@ func (p *TalosClusterCellProvider) createOrUpdateRegistry(ctx context.Context, k
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
-			Namespace: namespace,
+			Namespace: registryNamespace,
 		},
 	}
-	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: namespace}, pvc); err != nil {
+	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: registryNamespace}, pvc); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get PVC: %w", err)
 		}
@@ -62,14 +117,13 @@ func (p *TalosClusterCellProvider) createOrUpdateRegistry(ctx context.Context, k
 	// This secret is just for record keeping / reference for when we need to use the registry.
 	// It is not the secret used by the registry itself. The registry uses a secret that contains
 	// the bcrypt'd password, which we will create separately.
-	plaintextSecretName := "registry-auth-plaintext"
 	plaintextSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      plaintextSecretName,
-			Namespace: namespace,
+			Name:      registryPlaintextSecretName,
+			Namespace: registryNamespace,
 		},
 	}
-	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: plaintextSecretName, Namespace: namespace}, plaintextSecret); err != nil {
+	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: registryPlaintextSecretName, Namespace: registryNamespace}, plaintextSecret); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get plaintext secret: %w", err)
 		}
@@ -86,15 +140,37 @@ func (p *TalosClusterCellProvider) createOrUpdateRegistry(ctx context.Context, k
 		}
 	}
 
+	// store a registry-dockerconfigjson secret for pods to use
+	creds, err := p.cellRegistryCredentials(ctx, ctrlClient)
+	if err != nil {
+		return fmt.Errorf("failed to get registry credentials: %w", err)
+	}
+	dockerconfigjsonSecret := &corev1.Secret{
+		Type: corev1.SecretTypeDockerConfigJson,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dockerconfigjsonSecretName,
+			Namespace: registryNamespace,
+		},
+		Data: map[string][]byte{
+			".dockerconfigjson": []byte(fmt.Sprintf(`{"auths":{"%s":{"auth":"%s"}}}`,
+				cellRegistryHostname(cellId),
+				base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", creds.Username, creds.Password))),
+			)),
+		},
+	}
+	if err := createOrUpdateResource(ctx, ctrlClient, dockerconfigjsonSecret); err != nil {
+		return fmt.Errorf("failed to create dockerconfigjson secret: %w", err)
+	}
+
 	// create the bcrypt'd secret for the registry to use
 	bcryptedSecretName := "registry-auth"
 	bcryptedSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      bcryptedSecretName,
-			Namespace: namespace,
+			Namespace: registryNamespace,
 		},
 	}
-	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: bcryptedSecretName, Namespace: namespace}, bcryptedSecret); err != nil {
+	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: bcryptedSecretName, Namespace: registryNamespace}, bcryptedSecret); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get bcrypted secret: %w", err)
 		}
@@ -117,10 +193,10 @@ func (p *TalosClusterCellProvider) createOrUpdateRegistry(ctx context.Context, k
 	registryConfigSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      registryConfigSecretName,
-			Namespace: namespace,
+			Namespace: registryNamespace,
 		},
 	}
-	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: registryConfigSecretName, Namespace: namespace}, registryConfigSecret); err != nil {
+	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: registryConfigSecretName, Namespace: registryNamespace}, registryConfigSecret); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get registry config secret: %w", err)
 		}
@@ -166,7 +242,7 @@ storage:
 		Name:      "registry",
 		Repo:      "metal",
 		Version:   "v22.4.11+1",
-		Namespace: namespace,
+		Namespace: registryNamespace,
 	}); err != nil {
 		return fmt.Errorf("failed to ensure cluster package: %w", err)
 	}
@@ -176,7 +252,7 @@ storage:
 	route := &gatewayv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      routeName,
-			Namespace: namespace,
+			Namespace: registryNamespace,
 		},
 		Spec: gatewayv1.HTTPRouteSpec{
 			CommonRouteSpec: gatewayv1.CommonRouteSpec{

@@ -11,8 +11,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
+	"github.com/onmetal-dev/metal/lib/background"
+	"github.com/onmetal-dev/metal/lib/background/deployment"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/oapi"
@@ -35,7 +38,6 @@ func (a api) Up(ctx context.Context, request oapi.UpRequestObject) (oapi.UpRespo
 	if err != nil {
 		return oapi.Up500JSONResponse{InternalServerErrorJSONResponse: oapi.InternalServerErrorJSONResponse{Error: "failed to create temporary file"}}, nil
 	}
-	fmt.Println("DEBUG: uploaded archive path", tempFile.Name())
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
@@ -123,8 +125,7 @@ func (a api) Up(ctx context.Context, request oapi.UpRequestObject) (oapi.UpRespo
 	if err != nil {
 		return oapi.Up500JSONResponse{InternalServerErrorJSONResponse: oapi.InternalServerErrorJSONResponse{Error: "Failed to create temporary directory"}}, nil
 	}
-	fmt.Println("DEBUG: tempDir", tempDir)
-	//defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir)
 
 	// Untar and ungzip the archive
 	gzr, err := gzip.NewReader(tempFile)
@@ -178,6 +179,9 @@ func (a api) Up(ctx context.Context, request oapi.UpRequestObject) (oapi.UpRespo
 		buildStore:          a.buildStore,
 		cellStore:           a.cellStore,
 		cellProviderForType: a.cellProviderForType,
+		deploymentStore:     a.deploymentStore,
+		appStore:            a.appStore,
+		producerDeployment:  a.producerDeployment,
 		build:               build,
 		tempDir:             tempDir,
 		app:                 app,
@@ -191,6 +195,9 @@ type customUpResponse struct {
 	buildStore          store.BuildStore
 	cellStore           store.CellStore
 	cellProviderForType func(cellType store.CellType) cellprovider.CellProvider
+	deploymentStore     store.DeploymentStore
+	appStore            store.AppStore
+	producerDeployment  *background.QueueProducer[deployment.Message]
 	build               store.Build
 	tempDir             string
 	app                 store.App
@@ -263,15 +270,179 @@ func (c customUpResponse) VisitUpResponse(w http.ResponseWriter) (err error) {
 	}
 	w.(http.Flusher).Flush()
 
-	if err := c.buildStore.UpdateArtifacts(c.ctx, c.build.Id, []store.BuildArtifact{
+	if err := c.buildStore.UpdateArtifacts(c.ctx, c.build.Id, []store.Artifact{
 		{Image: artifact},
 	}); err != nil {
 		return fmt.Errorf("failed to update build artifacts: %w", err)
 	}
-	fmt.Fprintf(w, "build complete\n")
-	w.(http.Flusher).Flush()
+	fmt.Fprintf(fw, "✅ build complete! beginning deployment 🚀\n")
 
-	// TODO: deploy the build
+	// get latest deployment for this app in this env. We will clone the app settings from this deployment so we match the previous deployment as much as possible.
+	ld, err := c.deploymentStore.GetLatestForAppEnv(c.ctx, c.app.Id, c.env.Id)
+	if err != nil {
+		return fmt.Errorf("failed to get latest deployment: %w", err)
+	}
 
-	return nil
+	var appSettings *store.AppSettings
+	var appEnvVars *store.AppEnvVars
+	if ld != nil {
+		appEnvVars = &ld.AppEnvVars
+		as, err := c.appStore.CreateAppSettings(store.CreateAppSettingsOptions{
+			TeamId: c.token.TeamId,
+			AppId:  c.app.Id,
+			Artifact: store.Artifact{
+				Image: artifact,
+			},
+			Ports:         ld.AppSettings.Ports.Data(),
+			ExternalPorts: ld.AppSettings.ExternalPorts.Data(),
+			Resources:     ld.AppSettings.Resources.Data(),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create app settings: %w", err)
+		}
+		appSettings = &as
+	} else {
+		as, err := c.appStore.CreateAppSettings(store.CreateAppSettingsOptions{
+			TeamId: c.token.TeamId,
+			AppId:  c.app.Id,
+			Artifact: store.Artifact{
+				Image: artifact,
+			},
+			Ports: []store.Port{
+				{
+					Name:  "http",
+					Port:  80,
+					Proto: "http",
+				},
+			},
+			ExternalPorts: []store.ExternalPort{
+				{
+					Name:  "http",
+					Port:  80,
+					Proto: "http",
+				},
+			},
+			Resources: store.Resources{
+				Limits: store.ResourceLimits{
+					CpuCores:  0.1,
+					MemoryMiB: 128,
+				},
+				Requests: store.ResourceRequests{
+					CpuCores:  0.1,
+					MemoryMiB: 128,
+				},
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create app settings: %w", err)
+		}
+		appSettings = &as
+
+		aev, err := c.deploymentStore.CreateAppEnvVars(store.CreateAppEnvVarOptions{
+			TeamId:  c.token.TeamId,
+			EnvId:   c.env.Id,
+			AppId:   c.app.Id,
+			EnvVars: []store.EnvVar{},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create app env vars: %w", err)
+		}
+		appEnvVars = &aev
+	}
+
+	cdo := store.CreateDeploymentOptions{
+		TeamId:        c.token.TeamId,
+		EnvId:         c.env.Id,
+		AppId:         c.app.Id,
+		Type:          store.DeploymentTypeDeploy,
+		AppSettingsId: appSettings.Id,
+		AppEnvVarsId:  appEnvVars.Id,
+		CellIds:       []string{cell.Id},
+		Replicas:      1,
+	}
+	if ld != nil {
+		cdo.Replicas = ld.Replicas
+		cdo.CellIds = lo.Map(ld.Cells, func(cell store.Cell, _ int) string {
+			return cell.Id
+		})
+	}
+	d, err := c.deploymentStore.Create(cdo)
+	if err != nil {
+		return fmt.Errorf("failed to create deployment: %w", err)
+	}
+	if err := c.producerDeployment.Send(c.ctx, deployment.Message{
+		DeploymentId: d.Id,
+		AppId:        d.AppId,
+		EnvId:        d.EnvId,
+	}); err != nil {
+		return fmt.Errorf("failed to send deployment message to queue: %w", err)
+	}
+
+	errChan := make(chan error, 2)
+	doneChan := make(chan struct{})
+
+	// goroutine to poll deployment status
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-c.ctx.Done():
+				errChan <- c.ctx.Err()
+				return
+			case <-doneChan:
+				return
+			case <-ticker.C:
+				updatedD, err := c.deploymentStore.Get(d.AppId, d.EnvId, d.Id)
+				if err != nil {
+					errChan <- fmt.Errorf("failed to get deployment: %w", err)
+					return
+				}
+				switch updatedD.Status {
+				case store.DeploymentStatusRunning:
+					close(doneChan)
+					return
+				case store.DeploymentStatusFailed:
+					errChan <- fmt.Errorf("deployment failed: %s", updatedD.StatusReason)
+					return
+				}
+			}
+		}
+	}()
+
+	// goroutine to stream logs
+	go func() {
+		logChan := cp.DeploymentLogsStream(c.ctx, cell.Id, &d, cellprovider.WithSince(time.Minute*10))
+		for {
+			select {
+			case <-c.ctx.Done():
+				return
+			case <-doneChan:
+				return
+			case log, ok := <-logChan:
+				if !ok {
+					return
+				}
+				if log.Error != nil {
+					errChan <- fmt.Errorf("failed to stream logs: %w", log.Error)
+					return
+				}
+				for _, log := range log.Logs {
+					if _, err := fmt.Fprintf(fw, "%s %s", log.Timestamp.Format(time.RFC3339), log.Message); err != nil {
+						errChan <- fmt.Errorf("failed to write log: %w", err)
+						return
+					}
+				}
+			}
+		}
+	}()
+
+	// wait for completion or error
+	select {
+	case err := <-errChan:
+		return err
+	case <-doneChan:
+		return nil
+	}
 }

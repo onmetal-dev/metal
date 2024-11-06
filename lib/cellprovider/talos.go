@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -921,7 +922,7 @@ func (p *TalosClusterCellProvider) DestroyDeployments(ctx context.Context, cellI
 			return fmt.Errorf("error getting deployment: %v", err)
 		}
 		if err := validateK8sDeploymentMatch(k8sDeployment, &deployment); err != nil {
-			if err == ErrDeploymentIdMismatch {
+			if _, ok := err.(ErrDeploymentIdMismatch); ok {
 				continue // deployment in k8s is more recent, so we don't need to delete it
 			}
 			return err
@@ -934,13 +935,19 @@ func (p *TalosClusterCellProvider) DestroyDeployments(ctx context.Context, cellI
 }
 
 func (p *TalosClusterCellProvider) handlePendingDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error) {
-	clientset, err := p.initializeK8sClientForCell(cellId)
+	log := logger.FromContext(ctx)
+	clients, err := p.setupClients(ctx, cellId)
 	if err != nil {
 		return nil, err
 	}
+	k8sClient := clients.k8sClient
+	ctrlClient := clients.ctrlClient
 
-	if err := ensureNamespaceExists(ctx, clientset, deployment.Env.Name); err != nil {
+	if err := ensureNamespaceExists(ctx, k8sClient, deployment.Env.Name); err != nil {
 		return nil, fmt.Errorf("error ensuring namespace exists: %v", err)
+	}
+	if err := copyImagePullSecretToNamespace(ctx, ctrlClient, registryNamespace, deployment.Env.Name); err != nil {
+		return nil, fmt.Errorf("error copying image pull secret to namespace: %v", err)
 	}
 
 	limits, requests, err := getResourceLimits(deployment.AppSettings.Resources.Data())
@@ -978,8 +985,18 @@ func (p *TalosClusterCellProvider) handlePendingDeployment(ctx context.Context, 
 					Labels: map[string]string{
 						"app": deployment.App.Name,
 					},
+					Annotations: map[string]string{
+						"onmetal.dev/app-id":        deployment.App.Id,
+						"onmetal.dev/team-id":       deployment.TeamId,
+						"onmetal.dev/deployment-id": fmt.Sprintf("%d", deployment.Id),
+					},
 				},
 				Spec: corev1.PodSpec{
+					ImagePullSecrets: []corev1.LocalObjectReference{
+						{
+							Name: dockerconfigjsonSecretName,
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Resources: corev1.ResourceRequirements{
@@ -987,7 +1004,7 @@ func (p *TalosClusterCellProvider) handlePendingDeployment(ctx context.Context, 
 								Requests: requests,
 							},
 							Name:  deployment.App.Name,
-							Image: deployment.AppSettings.Artifact.Data().Image.Name,
+							Image: deployment.AppSettings.Artifact.Data().Image.Name(),
 							Ports: ports,
 							Env:   convertEnvVars(deployment.AppEnvVars.EnvVars.Data()),
 						},
@@ -998,19 +1015,21 @@ func (p *TalosClusterCellProvider) handlePendingDeployment(ctx context.Context, 
 	}
 
 	// Check if the deployment already exists
-	_, err = clientset.AppsV1().Deployments(deployment.Env.Name).Get(ctx, deployment.App.Name, metav1.GetOptions{})
+	_, err = k8sClient.AppsV1().Deployments(deployment.Env.Name).Get(ctx, deployment.App.Name, metav1.GetOptions{})
 	if err != nil {
 		if !k8serrors.IsNotFound(err) {
 			return nil, fmt.Errorf("error checking existing deployment: %v", err)
 		}
 		// Deployment doesn't exist, create it
-		_, err = clientset.AppsV1().Deployments(deployment.Env.Name).Create(ctx, k8sDeployment, metav1.CreateOptions{})
+		log.Info("creating deployment")
+		_, err = k8sClient.AppsV1().Deployments(deployment.Env.Name).Create(ctx, k8sDeployment, metav1.CreateOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("error creating deployment: %v", err)
 		}
 	} else {
 		// Deployment exists, update it
-		_, err = clientset.AppsV1().Deployments(deployment.Env.Name).Update(ctx, k8sDeployment, metav1.UpdateOptions{})
+		log.Info("updating deployment", slog.String("image", k8sDeployment.Spec.Template.Spec.Containers[0].Image))
+		_, err = k8sClient.AppsV1().Deployments(deployment.Env.Name).Update(ctx, k8sDeployment, metav1.UpdateOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("error updating deployment: %v", err)
 		}
@@ -1027,24 +1046,33 @@ func (p *TalosClusterCellProvider) handleDeployingDeployment(ctx context.Context
 		return nil, err
 	}
 
-	// Get the deployment
+	// get the deployment
 	k8sDeployment, err := clientset.AppsV1().Deployments(deployment.Env.Name).Get(ctx, deployment.App.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting deployment: %v", err)
 	}
 
 	if err := validateK8sDeploymentMatch(k8sDeployment, deployment); err != nil {
+		if mismatch, ok := err.(ErrDeploymentIdMismatch); ok {
+			if mismatch.ExpectedId < mismatch.FoundId {
+				return &AdvanceDeploymentResult{
+					Status:       store.DeploymentStatusStopped,
+					StatusReason: fmt.Sprintf("deployment superseded by %d", mismatch.FoundId),
+				}, nil
+			}
+			return nil, err
+		}
 		return nil, err
 	}
 
-	// Check if the deployment is ready
+	// check if the deployment is ready
 	if k8sDeployment.Status.ReadyReplicas == k8sDeployment.Status.Replicas {
 		return &AdvanceDeploymentResult{
 			Status: store.DeploymentStatusRunning,
 		}, nil
 	}
 
-	// Check for any errors in the deployment
+	// check for any errors in the deployment
 	for _, condition := range k8sDeployment.Status.Conditions {
 		if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
 			return &AdvanceDeploymentResult{
@@ -1054,10 +1082,67 @@ func (p *TalosClusterCellProvider) handleDeployingDeployment(ctx context.Context
 		}
 	}
 
-	// If not ready and no errors, it's still deploying
+	// get the latest replica set for the deployment
+	replicaSet, err := p.replicaSetForDeployment(ctx, clientset, k8sDeployment)
+	if err != nil {
+		return nil, fmt.Errorf("error getting replica set: %v", err)
+	}
+
+	// get all pods from replicaSet.spec.selector.matchLabels
+	pods, err := clientset.CoreV1().Pods(deployment.Env.Name).List(ctx, metav1.ListOptions{
+		LabelSelector: metav1.FormatLabelSelector(replicaSet.Spec.Selector),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing pods: %v", err)
+	}
+
+	// loop through pod.status.containerStatuses. Look for state.waiting.reason == "CrashLoopBackOff" or "ImagePullBackOff" and fail the deployment if this is the case
+	for _, pod := range pods.Items {
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if containerStatus.State.Waiting != nil && lo.Contains([]string{"CrashLoopBackOff", "ImagePullBackOff"}, containerStatus.State.Waiting.Reason) {
+				return &AdvanceDeploymentResult{
+					Status:       store.DeploymentStatusFailed,
+					StatusReason: containerStatus.State.Waiting.Message,
+				}, nil
+			}
+		}
+	}
+
+	// detect if the replicaset timed out. look for something like this in the deployment status
+	// specifically look for the Progressing condition with a reason of ProgressDeadlineExceeded and with a replica set name that matches the replica set for this deployment
+	for _, condition := range k8sDeployment.Status.Conditions {
+		if condition.Type == appsv1.DeploymentProgressing && condition.Reason == "ProgressDeadlineExceeded" && strings.Contains(condition.Message, replicaSet.Name) {
+			return &AdvanceDeploymentResult{
+				Status:       store.DeploymentStatusFailed,
+				StatusReason: condition.Message,
+			}, nil
+		}
+	}
+
+	// if not ready and no errors, it's still deploying
 	return &AdvanceDeploymentResult{
 		Status: store.DeploymentStatusDeploying,
 	}, nil
+}
+
+// replicaSetForDeployment finds the latest replica set for a given deployment
+func (p *TalosClusterCellProvider) replicaSetForDeployment(ctx context.Context, clientset *kubernetes.Clientset, deployment *appsv1.Deployment) (*appsv1.ReplicaSet, error) {
+	replicaSets, err := clientset.AppsV1().ReplicaSets(deployment.Namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: metav1.FormatLabelSelector(deployment.Spec.Selector),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing replica sets: %v", err)
+	}
+
+	for _, rs := range replicaSets.Items {
+		if rs.Annotations["onmetal.dev/app-id"] == deployment.Annotations["onmetal.dev/app-id"] &&
+			rs.Annotations["onmetal.dev/team-id"] == deployment.Annotations["onmetal.dev/team-id"] &&
+			rs.Annotations["onmetal.dev/deployment-id"] == deployment.Annotations["onmetal.dev/deployment-id"] {
+			return &rs, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no matching replica set found for deployment %s", deployment.Name)
 }
 
 func (p *TalosClusterCellProvider) DeploymentLogs(ctx context.Context, cellId string, deployment *store.Deployment, opts ...DeploymentLogsOption) ([]LogEntry, error) {
@@ -1190,8 +1275,11 @@ func (p *TalosClusterCellProvider) DeploymentLogsStream(ctx context.Context, cel
 			return
 		}
 		if err := validateK8sDeploymentMatch(k8sDeployment, deployment); err != nil {
-			returnError = err
-			return
+			// if ErrDeploymentIdMismatch, we're fine since we want all logs across new/old deployments
+			if _, ok := err.(ErrDeploymentIdMismatch); !ok {
+				returnError = err
+				return
+			}
 		}
 
 		pods, err := clientset.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{
@@ -1245,6 +1333,7 @@ func (p *TalosClusterCellProvider) DeploymentLogsStream(ctx context.Context, cel
 						}
 
 						logs <- DeploymentLogsResult{
+							Annotations: pod.Annotations,
 							Logs: []LogEntry{{
 								Timestamp: timestamp,
 								Message:   parts[1],
@@ -1457,7 +1546,22 @@ func convertEnvVars(storeEnvVars []store.EnvVar) []corev1.EnvVar {
 	return k8sEnvVars
 }
 
-var ErrDeploymentIdMismatch = errors.New("deployment id mismatch")
+type ErrDeploymentIdMismatch struct {
+	ExpectedId uint
+	FoundId    uint
+}
+
+func (e ErrDeploymentIdMismatch) Error() string {
+	return fmt.Sprintf("deployment id mismatch: expected %d, found %d", e.ExpectedId, e.FoundId)
+}
+
+func mustAtoi(s string) uint {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		panic(err)
+	}
+	return uint(i)
+}
 
 func validateK8sDeploymentMatch(k8sDeployment *appsv1.Deployment, deployment *store.Deployment) error {
 	if k8sDeployment.Annotations["onmetal.dev/app-id"] != deployment.App.Id {
@@ -1467,7 +1571,10 @@ func validateK8sDeploymentMatch(k8sDeployment *appsv1.Deployment, deployment *st
 		return fmt.Errorf("deployment team id mismatch")
 	}
 	if k8sDeployment.Annotations["onmetal.dev/deployment-id"] != fmt.Sprintf("%d", deployment.Id) {
-		return ErrDeploymentIdMismatch
+		return ErrDeploymentIdMismatch{
+			ExpectedId: deployment.Id,
+			FoundId:    mustAtoi(k8sDeployment.Annotations["onmetal.dev/deployment-id"]),
+		}
 	}
 	return nil
 }

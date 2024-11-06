@@ -422,6 +422,25 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 				// Verify deployment is deleted
 				_, err = stores.DeploymentStore.Get(app.Id, env.Id, deployment.Id)
 				require.Error(err, "Expected error when getting deleted deployment")
+
+				// Test GetLatestForAppEnv
+				latestDeployment, err := stores.DeploymentStore.GetLatestForAppEnv(ctx, app.Id, env.Id)
+				require.NoError(err, "Failed to get latest deployment")
+				require.NotNil(latestDeployment, "Expected latest deployment to not be nil")
+				require.Equal(deployment2.Id, latestDeployment.Id, "Expected latest deployment to be the most recently created one")
+
+				// Test GetLatestForAppEnv with non-existent app/env
+				nonExistentLatest, err := stores.DeploymentStore.GetLatestForAppEnv(ctx, "non-existent-app", "non-existent-env")
+				require.NoError(err, "Expected no error for non-existent app/env")
+				require.Nil(nonExistentLatest, "Expected nil deployment for non-existent app/env")
+
+				// Delete all deployments and verify GetLatestForAppEnv returns nil
+				err = stores.DeploymentStore.DeleteDeployment(app.Id, env.Id, deployment2.Id)
+				require.NoError(err, "Failed to delete deployment2")
+
+				emptyLatest, err := stores.DeploymentStore.GetLatestForAppEnv(ctx, app.Id, env.Id)
+				require.NoError(err, "Expected no error when getting latest deployment after deletion")
+				require.Nil(emptyLatest, "Expected nil deployment when no deployments exist")
 			})
 		})
 
@@ -564,20 +583,20 @@ func NewStoreTestSuite(stores TestStoresConfig) func(t *testing.T) {
 			require.Equal(buildLogs[0].Message, buildWithLogs.Logs.Data()[0].Message, "Expected build log message to match")
 
 			// Test updating build artifact
-			artifact := BuildArtifact{
+			artifact := Artifact{
 				Image: &ImageArtifact{
-					Repository: "docker.io",
-					Name:       "test-app",
+					Registry:   "docker.io",
+					Repository: "test-app",
 					Tag:        "latest",
 				},
 			}
-			err = stores.BuildStore.UpdateArtifacts(ctx, build.Id, []BuildArtifact{artifact})
+			err = stores.BuildStore.UpdateArtifacts(ctx, build.Id, []Artifact{artifact})
 			require.NoError(err, "Failed to update build artifact")
 
 			buildWithArtifact, err := stores.BuildStore.Get(ctx, build.Id)
 			require.NoError(err, "Failed to get build with artifact")
 			require.NotNil(buildWithArtifact.Artifacts.Data()[0].Image, "Expected build artifact image to be present")
-			require.Equal(artifact.Image.Name, buildWithArtifact.Artifacts.Data()[0].Image.Name, "Expected build artifact image name to match")
+			require.Equal(artifact.Image.Repository, buildWithArtifact.Artifacts.Data()[0].Image.Repository, "Expected build artifact image name to match")
 			require.Equal(artifact.Image.Tag, buildWithArtifact.Artifacts.Data()[0].Image.Tag, "Expected build artifact image tag to match")
 		})
 	}

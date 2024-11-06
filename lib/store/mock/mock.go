@@ -215,6 +215,11 @@ func (m *DeploymentStoreMock) GetForApp(ctx context.Context, appId string) ([]st
 	return args.Get(0).([]store.Deployment), args.Error(1)
 }
 
+func (m *DeploymentStoreMock) GetLatestForAppEnv(ctx context.Context, appId string, envId string) (*store.Deployment, error) {
+	args := m.Called(ctx, appId, envId)
+	return args.Get(0).(*store.Deployment), args.Error(1)
+}
+
 func (m *DeploymentStoreMock) GetForEnv(envId string) ([]store.Deployment, error) {
 	args := m.Called(envId)
 	return args.Get(0).([]store.Deployment), args.Error(1)
@@ -268,5 +273,36 @@ func (m *ApiTokenStoreMock) Delete(id string) error {
 
 func (m *ApiTokenStoreMock) UpdateLastUsedAt(id string, lastUsedAt time.Time) error {
 	args := m.Called(id, lastUsedAt)
+	return args.Error(0)
+}
+
+type BuildStoreMock struct {
+	mock.Mock
+}
+
+var _ store.BuildStore = &BuildStoreMock{}
+
+func (m *BuildStoreMock) Init(ctx context.Context, opts store.InitBuildOptions) (store.Build, error) {
+	args := m.Called(ctx, opts)
+	return args.Get(0).(store.Build), args.Error(1)
+}
+
+func (m *BuildStoreMock) Get(ctx context.Context, id string) (store.Build, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(store.Build), args.Error(1)
+}
+
+func (m *BuildStoreMock) UpdateStatus(ctx context.Context, id string, status store.BuildStatus, statusReason string) error {
+	args := m.Called(ctx, id, status, statusReason)
+	return args.Error(0)
+}
+
+func (m *BuildStoreMock) UpdateLogs(ctx context.Context, id string, logs store.BuildLogs) error {
+	args := m.Called(ctx, id, logs)
+	return args.Error(0)
+}
+
+func (m *BuildStoreMock) UpdateArtifacts(ctx context.Context, id string, artifacts []store.Artifact) error {
+	args := m.Called(ctx, id, artifacts)
 	return args.Error(0)
 }

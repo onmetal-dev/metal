@@ -38,7 +38,13 @@ func createOrUpdateResource(ctx context.Context, ctrlClient client.Client, obj c
 			// Update the existing resource with new spec and annotations
 			existingValue := reflect.ValueOf(existing).Elem()
 			newValue := reflect.ValueOf(obj).Elem()
-			existingValue.FieldByName("Spec").Set(newValue.FieldByName("Spec"))
+			// only set Spec if the field exists, since some resources like Secrets don't have it
+			if specField := existingValue.FieldByName("Spec"); specField.IsValid() {
+				specField.Set(newValue.FieldByName("Spec"))
+			}
+			if dataField := existingValue.FieldByName("Data"); dataField.IsValid() {
+				dataField.Set(newValue.FieldByName("Data"))
+			}
 			existingMeta := existingValue.FieldByName("ObjectMeta")
 			newMeta := newValue.FieldByName("ObjectMeta")
 			existingMeta.FieldByName("Annotations").Set(newMeta.FieldByName("Annotations"))

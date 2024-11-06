@@ -422,7 +422,7 @@ func (m model) View() string {
 	} else if m.apps.Error != nil {
 		appSelection = renderError(m.apps.Error)
 	} else if m.selectedApp != nil {
-		appSelection = textStyle.Render(fmt.Sprintf("✅ app %s selected", m.selectedApp.Name))
+		appSelection = textStyle.Render(fmt.Sprintf("✅ app selected: %s", m.selectedApp.Name))
 	} else if m.appList == nil {
 		appSelection = renderError(fmt.Errorf("unexpected nil appList after pulling apps down and with no selected app"))
 	} else {
@@ -442,7 +442,7 @@ func (m model) View() string {
 	} else if m.envs.Error != nil {
 		envSelection = renderError(m.envs.Error)
 	} else if m.selectedEnv != nil {
-		envSelection = textStyle.Render(fmt.Sprintf("✅ env %s selected", m.selectedEnv.Name))
+		envSelection = textStyle.Render(fmt.Sprintf("✅ env selected: %s", m.selectedEnv.Name))
 	} else if m.envList == nil {
 		envSelection = renderError(fmt.Errorf("unexpected nil envList after pulling envs down"))
 	} else {
@@ -460,7 +460,7 @@ func (m model) View() string {
 	if m.upProgress == nil {
 		upResult = renderError(fmt.Errorf("unexpected nil upProgress"))
 	} else if m.lastProgress != nil && m.lastProgress.Done {
-		upResult = textStyle.Render("✅ code uploaded!")
+		upResult = textStyle.Render("✅ code uploaded")
 	} else if m.upProgress != nil {
 		pad := strings.Repeat(" ", padding)
 		verb := "uploading"
@@ -492,9 +492,9 @@ func (m model) View() string {
 		}
 		if m.upDone {
 			if m.upError != nil {
-				upLogs = textStyle.Render(fmt.Sprintf("❌ deploy failed!\n\n%s\n", m.upError))
+				upLogs += textStyle.Render(fmt.Sprintf("❌ deploy failed!\n\n%s\n", m.upError))
 			} else {
-				upLogs = textStyle.Render("✅ deploy completed!\n")
+				upLogs += textStyle.Render("✅ deploy completed!\n")
 			}
 		}
 	}
@@ -561,9 +561,11 @@ func runUp(cmd *cobra.Command, argss []string) {
 		upLogsSpinner: common.NewSpinner(),
 		apiClient:     common.MustApiClient(),
 		apiClientRaw:  common.MustApiClientRaw(),
-	})
-	if _, err := p.Run(); err != nil {
+	}, tea.WithAltScreen())
+	finalModel, err := p.Run()
+	if err != nil {
 		fmt.Println("could not start program:", err)
 		os.Exit(1)
 	}
+	fmt.Println(finalModel.View())
 }

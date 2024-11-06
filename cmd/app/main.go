@@ -413,6 +413,7 @@ func main() {
 					buildStore,
 					cellStore,
 					cellProviderForType,
+					producerDeployment,
 				),
 				[]oapi.StrictMiddlewareFunc{},
 			),

@@ -104,11 +104,12 @@ func (c *TalosClusterCellProvider) BuildImage(ctx context.Context, opts BuildIma
 
 	// build the image using buildx
 	logger.Info("building image")
-	registryHost := cellRegistryHostname(opts.CellId)
-	imageTag := fmt.Sprintf("%s/%s:%s", registryHost, opts.AppName, opts.BuildId)
+	imageRegistry := cellRegistryHostname(opts.CellId)
+	imageRepository := opts.AppName
+	imageTag := opts.BuildId
 	cmd = exec.CommandContext(ctx, "docker", "buildx", "build",
 		"-f", "./env/prod/app/Dockerfile", // TODO: make this configurable
-		"-t", imageTag,
+		"-t", fmt.Sprintf("%s/%s:%s", imageRegistry, imageRepository, imageTag),
 		"--load",
 		"--push",
 		"--progress", "plain",
@@ -122,8 +123,8 @@ func (c *TalosClusterCellProvider) BuildImage(ctx context.Context, opts BuildIma
 		return nil, fmt.Errorf("error running docker buildx build: %w", err)
 	}
 	return &store.ImageArtifact{
-		Repository: registryHost,
-		Name:       opts.AppName,
+		Registry:   imageRegistry,
+		Repository: imageRepository,
 		Tag:        imageTag,
 	}, nil
 }

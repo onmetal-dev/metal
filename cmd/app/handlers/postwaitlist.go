@@ -28,7 +28,6 @@ func (h *PostWaitlistHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	var f templates.JoinWaitlistFormData
 	fieldErrors, err := form.Decode(&f, r)
 	if fieldErrors.NotNil() || err != nil {
-		logger.FromContext(ctx).Info("DEBUG: field errors", "fieldErrors", fieldErrors, "err", err)
 		templates.WaitlistForm(f, fieldErrors, err, "").Render(ctx, w)
 		return
 	}

@@ -192,11 +192,24 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create AppSettings
+	var imageArtifact store.ImageArtifact
+	if strings.Contains(f.ContainerImage, ":") {
+		parts := strings.Split(f.ContainerImage, ":")
+		imageArtifact = store.ImageArtifact{
+			Repository: parts[0],
+			Tag:        parts[1],
+		}
+	} else {
+		imageArtifact = store.ImageArtifact{
+			Repository: f.ContainerImage,
+			Tag:        "latest",
+		}
+	}
 	appSettings, err := h.appStore.CreateAppSettings(store.CreateAppSettingsOptions{
 		TeamId: teamId,
 		AppId:  app.Id,
 		Artifact: store.Artifact{
-			Image: store.Image{Name: f.ContainerImage},
+			Image: &imageArtifact,
 		},
 		Ports: store.Ports{{
 			Name:  "http",

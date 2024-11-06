@@ -1,6 +1,8 @@
 package api
 
 import (
+	"github.com/onmetal-dev/metal/lib/background"
+	"github.com/onmetal-dev/metal/lib/background/deployment"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/oapi"
 	"github.com/onmetal-dev/metal/lib/store"
@@ -14,6 +16,7 @@ func New(
 	buildStore store.BuildStore,
 	cellStore store.CellStore,
 	cellProviderForType func(cellType store.CellType) cellprovider.CellProvider,
+	producerDeployment *background.QueueProducer[deployment.Message],
 ) oapi.StrictServerInterface {
 	return api{
 		apiTokenStore:       apiTokenStore,
@@ -23,6 +26,7 @@ func New(
 		buildStore:          buildStore,
 		cellStore:           cellStore,
 		cellProviderForType: cellProviderForType,
+		producerDeployment:  producerDeployment,
 	}
 }
 
@@ -34,6 +38,7 @@ type api struct {
 	buildStore          store.BuildStore
 	cellStore           store.CellStore
 	cellProviderForType func(cellType store.CellType) cellprovider.CellProvider
+	producerDeployment  *background.QueueProducer[deployment.Message]
 }
 
 var _ oapi.StrictServerInterface = api{}

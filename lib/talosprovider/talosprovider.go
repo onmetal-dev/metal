@@ -90,7 +90,6 @@ func NewSshClient(user string, host string, port int, privateKeyBase64 string, p
 			return nil
 		},
 		BannerCallback: func(message string) error {
-			fmt.Println("DEBUG BANNER", message)
 			return nil
 		},
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/datatypes"
@@ -306,14 +307,6 @@ type App struct {
 	Name      string    `json:"name"`
 	CreatedAt time.Time `gorm:"index:idx_team_createdat"`
 }
-
-type Artifact struct {
-	Image Image `json:"image"`
-}
-
-type Image struct {
-	Name string `json:"name"`
-}
 type Port struct {
 	Name  string `validate:"required,lowercasealphanumhyphen"`
 	Port  int    `validate:"required"`
@@ -504,6 +497,7 @@ type DeploymentStore interface {
 	Get(appId string, envId string, id uint) (Deployment, error)
 	GetForTeam(ctx context.Context, teamId string) ([]Deployment, error)
 	GetForApp(ctx context.Context, appId string) ([]Deployment, error)
+	GetLatestForAppEnv(ctx context.Context, appId string, envId string) (*Deployment, error)
 	GetForEnv(envId string) ([]Deployment, error)
 	GetForCell(cellId string) ([]Deployment, error)
 	DeleteDeployment(appId string, envId string, id uint) error
@@ -548,17 +542,25 @@ const (
 )
 
 type ImageArtifact struct {
-	// Repository is optional. If not provided, dockerhub is used. Else, it could be something like registry.k8s.io.
-	Repository string `json:"repository"`
-	// Name of the image. Required. E.g. busybox, stefanprodan/podinfo
-	Name string `json:"name" validate:"required"`
+	// Registry is optional. If not provided, dockerhub is used. Else, it could be something like registry.k8s.io.
+	Registry string `json:"registry"`
+	// Repository of the image. Required. E.g. busybox, stefanprodan/podinfo
+	Repository string `json:"repository" validate:"required"`
 	// Tag of the image. If not specified, latest is used.
 	Tag string `json:"tag"`
 	// Digest of the image can be used in place of a tag. E.g. sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9
 	Digest string `json:"digest"`
 }
 
-type BuildArtifact struct {
+// Name returns the full name of the image: <registry>/<repository>:<tag>
+func (i *ImageArtifact) Name() string {
+	if i.Registry == "" {
+		return fmt.Sprintf("%s:%s", i.Repository, i.Tag)
+	}
+	return fmt.Sprintf("%s/%s:%s", i.Registry, i.Repository, i.Tag)
+}
+
+type Artifact struct {
 	Image *ImageArtifact
 	// Tarball *TarballArtifact // if we support deploying non-image artifacts in the future, e.g. lambda functions
 }
@@ -578,7 +580,7 @@ type Build struct {
 	Status       BuildStatus
 	StatusReason string
 	Logs         datatypes.JSONType[BuildLogs]
-	Artifacts    datatypes.JSONType[[]BuildArtifact]
+	Artifacts    datatypes.JSONType[[]Artifact]
 }
 
 type InitBuildOptions struct {
@@ -592,5 +594,5 @@ type BuildStore interface {
 	Get(ctx context.Context, id string) (Build, error)
 	UpdateStatus(ctx context.Context, id string, status BuildStatus, statusReason string) error
 	UpdateLogs(ctx context.Context, id string, logs BuildLogs) error
-	UpdateArtifacts(ctx context.Context, id string, artifacts []BuildArtifact) error
+	UpdateArtifacts(ctx context.Context, id string, artifacts []Artifact) error
 }
