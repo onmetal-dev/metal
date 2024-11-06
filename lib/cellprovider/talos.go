@@ -2,7 +2,6 @@ package cellprovider
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -437,7 +436,7 @@ func (p *TalosClusterCellProvider) setupClients(ctx context.Context, cellId stri
 	if err := cmv1.AddToScheme(scheme); err != nil {
 		return nil, fmt.Errorf("error adding cert-manager v1 scheme: %v", err)
 	}
-	if err := gatewayv1.AddToScheme(scheme); err != nil {
+	if err := gatewayv1.Install(scheme); err != nil {
 		return nil, fmt.Errorf("error adding gateway v1 scheme: %v", err)
 	}
 	ctrlClient, err := ctrlclient.New(restConfig, ctrlclient.Options{Scheme: scheme})
@@ -1590,31 +1589,31 @@ if err := unarchiveRepository(cell.TalosCellData.Config, talosConfigDir); err !=
 	return fmt.Errorf("error unarchiving repository: %v", err)
 }
 */
-func unarchiveRepository(sourceZip []byte, destDir string) error {
-	in := bytes.NewReader(sourceZip)
-	format := archiver.CompressedArchive{
-		Compression: archiver.Gz{},
-		Archival:    archiver.Tar{},
-	}
-	if err := format.Extract(context.Background(), in, nil, func(ctx context.Context, f archiver.File) error {
-		filePath := filepath.Join(destDir, f.NameInArchive)
-		if f.FileInfo.IsDir() {
-			return os.MkdirAll(filePath, os.ModePerm)
-		}
-		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.FileInfo.Mode())
-		if err != nil {
-			return err
-		}
-		defer destFile.Close()
-		srcFile, err := f.Open()
-		if err != nil {
-			return err
-		}
-		defer srcFile.Close()
-		_, err = io.Copy(destFile, srcFile)
-		return err
-	}); err != nil {
-		return fmt.Errorf("error extracting files: %v", err)
-	}
-	return nil
-}
+// func unarchiveRepository(sourceZip []byte, destDir string) error {
+// 	in := bytes.NewReader(sourceZip)
+// 	format := archiver.CompressedArchive{
+// 		Compression: archiver.Gz{},
+// 		Archival:    archiver.Tar{},
+// 	}
+// 	if err := format.Extract(context.Background(), in, nil, func(ctx context.Context, f archiver.File) error {
+// 		filePath := filepath.Join(destDir, f.NameInArchive)
+// 		if f.FileInfo.IsDir() {
+// 			return os.MkdirAll(filePath, os.ModePerm)
+// 		}
+// 		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.FileInfo.Mode())
+// 		if err != nil {
+// 			return err
+// 		}
+// 		defer destFile.Close()
+// 		srcFile, err := f.Open()
+// 		if err != nil {
+// 			return err
+// 		}
+// 		defer srcFile.Close()
+// 		_, err = io.Copy(destFile, srcFile)
+// 		return err
+// 	}); err != nil {
+// 		return fmt.Errorf("error extracting files: %v", err)
+// 	}
+// 	return nil
+// }
