@@ -1,0 +1,2 @@
+- Don't capitalize the first letter of a comment
+- The first letter of Go error strings should not be capitalized: e.g. fmt.Errorf("failed to send deployment message to queue: %w", err)

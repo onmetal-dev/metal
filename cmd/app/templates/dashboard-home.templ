@@ -20,6 +20,7 @@ const (
 	TabNameHome      TabName = "home"
 	TabNameBuyServer TabName = "buy server"
 	TabNameCreateApp TabName = "create app"
+	TabNameSettings  TabName = "settings"
 )
 
 type Tab struct {
@@ -32,6 +33,7 @@ func dashboardTabs(teamId string) []Tab {
 		{Name: TabNameHome, Href: fmt.Sprintf("/dashboard/%s", teamId)},
 		{Name: TabNameBuyServer, Href: fmt.Sprintf("/dashboard/%s/servers/new", teamId)},
 		{Name: TabNameCreateApp, Href: fmt.Sprintf("/dashboard/%s/apps/new", teamId)},
+		{Name: TabNameSettings, Href: fmt.Sprintf("/dashboard/%s/settings", teamId)},
 	}
 }
 
@@ -64,8 +66,6 @@ templ dashboardNav(state DashboardState) {
 						<details>
 							<summary>{ state.ActiveTeam.Name }</summary>
 							<ul>
-								<li><a href={ templ.SafeURL("/dashboard/" + state.ActiveTeam.Id) }>home</a></li>
-								<li><a>settings</a></li>
 								if len(state.UserTeams) > 0 {
 									<li>
 										<h2 class="menu-title">switch</h2>
@@ -356,7 +356,11 @@ templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, d
 									<ul class="p-0 menu menu-horizontal menu-xs rounded-box">
 										<li>
 											<a class="tooltip" data-tip="Delete">
-												<button hx-delete={ "/dashboard/" + teamId + "/apps/" + app.Id } hx-confirm="Are you sure you want to delete this app?" class="w-4 h-4">
+												<button
+													hx-delete={ "/dashboard/" + teamId + "/apps/" + app.Id }
+													hx-confirm="Are you sure you want to delete this app?"
+													class="w-4 h-4"
+												>
 													@iconTrash()
 												</button>
 											</a>

@@ -13,6 +13,7 @@ import (
 	"github.com/onmetal-dev/metal/lib/background"
 	"github.com/onmetal-dev/metal/lib/background/serverbillinghourly"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
+	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/serverprovider"
 	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/onmetal-dev/metal/lib/talosprovider"
@@ -72,7 +73,6 @@ type MessageHandler struct {
 	sshKeyBase64          string
 	sshKeyPassword        string
 	sshKeyFingerprint     string
-	logger                *slog.Logger
 }
 
 type MessageHandlerOption func(*MessageHandler) error
@@ -217,16 +217,6 @@ func WithSshKeyFingerprint(sshKeyFingerprint string) MessageHandlerOption {
 	}
 }
 
-func WithLogger(logger *slog.Logger) MessageHandlerOption {
-	return func(h *MessageHandler) error {
-		if logger == nil {
-			return errors.New("logger cannot be nil")
-		}
-		h.logger = logger
-		return nil
-	}
-}
-
 func NewMessageHandler(opts ...MessageHandlerOption) (*MessageHandler, error) {
 	h := &MessageHandler{}
 	for _, opt := range opts {
@@ -277,9 +267,6 @@ func NewMessageHandler(opts ...MessageHandlerOption) (*MessageHandler, error) {
 	if h.sshKeyFingerprint == "" {
 		errs = append(errs, "ssh key fingerprint is required")
 	}
-	if h.logger == nil {
-		errs = append(errs, "logger is required")
-	}
 	if len(errs) > 0 {
 		return nil, errors.New(strings.Join(errs, ", "))
 	}
@@ -291,7 +278,7 @@ func (h MessageHandler) ReQueue(ctx context.Context, s Message) error {
 }
 
 func (h MessageHandler) Handle(ctx context.Context, s Message) error {
-	logger := h.logger.With(
+	log := logger.FromContext(ctx).With(
 		slog.String("teamId", s.TeamId),
 		slog.String("userId", s.UserId),
 		slog.String("offeringId", s.OfferingId),
@@ -299,11 +286,11 @@ func (h MessageHandler) Handle(ctx context.Context, s Message) error {
 	)
 	offering, err := h.serverOfferingStore.GetServerOffering(s.OfferingId)
 	if err != nil {
-		logger.Error("Failed to get offering", "error", err)
+		log.Error("Failed to get offering", "error", err)
 		return err
 	}
 	if s.StepServerId == "" {
-		logger.Info("Creating server in database")
+		log.Info("Creating server in database")
 		// sometimes we send the same fulfillment message after payment has cleared
 		// but we want to re-create the server object in the db
 		status := store.ServerStatusPendingPayment
@@ -327,32 +314,32 @@ func (h MessageHandler) Handle(ctx context.Context, s Message) error {
 			ProviderId:   providerId,
 		})
 		if err != nil {
-			logger.Error("Failed to create server", "error", err)
+			log.Error("Failed to create server", "error", err)
 			return err
 		}
 		s.StepServerId = server.Id
-		logger.Info("Server created in database", "serverId", s.StepServerId)
+		log.Info("Server created in database", "serverId", s.StepServerId)
 	}
-	logger = logger.With(slog.String("serverId", s.StepServerId))
+	log = log.With(slog.String("serverId", s.StepServerId))
 
 	if !s.StepPaymentReceived {
-		logger.Info("Checking payment status", "checkoutSessionId", s.StripeCheckoutSessionId)
+		log.Info("Checking payment status", "checkoutSessionId", s.StripeCheckoutSessionId)
 		checkoutSession, err := h.stripeCheckoutSession.Get(s.StripeCheckoutSessionId, nil)
 		if err != nil {
-			logger.Error("Failed to get checkout session", "error", err)
+			log.Error("Failed to get checkout session", "error", err)
 			return err
 		}
 		if !(checkoutSession.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid ||
 			checkoutSession.PaymentStatus == stripe.CheckoutSessionPaymentStatusNoPaymentRequired) {
-			logger.Info("Payment not yet received, re-queueing", "paymentStatus", checkoutSession.PaymentStatus)
+			log.Info("Payment not yet received, re-queueing", "paymentStatus", checkoutSession.PaymentStatus)
 			return h.ReQueue(ctx, s)
 		}
 		if err := h.serverStore.UpdateServerStatus(s.StepServerId, store.ServerStatusPendingProvider); err != nil {
-			logger.Error("Failed to update server status", "error", err)
+			log.Error("Failed to update server status", "error", err)
 			return err
 		}
 		s.StepPaymentReceived = true
-		logger.Info("Payment received and server status updated")
+		log.Info("Payment received and server status updated")
 	}
 
 	provider, err := h.getServerProvider(string(offering.ProviderSlug))
@@ -361,65 +348,65 @@ func (h MessageHandler) Handle(ctx context.Context, s Message) error {
 	}
 
 	if s.StepProviderTransactionId == "" {
-		logger.Info("Ordering server from provider")
+		log.Info("Ordering server from provider")
 		transaction, err := provider.OrderServer(serverprovider.Order{
 			OfferingId: s.OfferingId,
 			LocationId: s.LocationId,
 		})
 		if err != nil {
-			logger.Error("Failed to order server", "error", err)
+			log.Error("Failed to order server", "error", err)
 			return err
 		}
 		s.StepProviderTransactionId = transaction.Id
-		logger.Info("Server ordered from provider", "transactionId", s.StepProviderTransactionId)
+		log.Info("Server ordered from provider", "transactionId", s.StepProviderTransactionId)
 	}
-	logger = logger.With(slog.String("transactionId", s.StepProviderTransactionId))
+	log = log.With(slog.String("transactionId", s.StepProviderTransactionId))
 
 	if s.StepProviderServerId == "" {
-		logger.Info("Checking if server has a provider ID")
+		log.Info("Checking if server has a provider ID")
 		tx, err := provider.GetTransaction(s.StepProviderTransactionId)
 		if err != nil {
-			logger.Error("Failed to get transaction", "error", err)
+			log.Error("Failed to get transaction", "error", err)
 			return err
 		}
 		if tx.ServerId != "" {
 			s.StepProviderServerId = tx.ServerId
 			if err := h.serverStore.UpdateProviderId(s.StepServerId, tx.ServerId); err != nil {
-				logger.Error("Failed to update server provider ID", "error", err)
+				log.Error("Failed to update server provider ID", "error", err)
 				return err
 			}
 		} else {
-			logger.Info("Server doesn't have a provider ID yet, re-queueing")
+			log.Info("Server doesn't have a provider ID yet, re-queueing")
 			return h.ReQueue(ctx, s)
 		}
 	}
-	logger = logger.With(slog.String("providerServerId", s.StepProviderServerId))
+	log = log.With(slog.String("providerServerId", s.StepProviderServerId))
 
 	if !s.StepServerOnline {
-		logger.Info("Checking if server is online")
+		log.Info("Checking if server is online")
 		server, err := provider.GetServer(s.StepProviderServerId)
 		if err != nil {
-			logger.Error("Failed to get server status", "error", err)
+			log.Error("Failed to get server status", "error", err)
 			return err
 		}
 		if server.Ipv4 == "" {
-			logger.Info("Server not yet online (no ipv4), re-queueing")
+			log.Info("Server not yet online (no ipv4), re-queueing")
 			return h.ReQueue(ctx, s)
 		}
 		if err := h.serverStore.UpdateServerPublicIpv4(s.StepServerId, server.Ipv4); err != nil {
-			logger.Error("Failed to update server public ipv4", "error", err)
+			log.Error("Failed to update server public ipv4", "error", err)
 			return err
 		}
 		s.StepServerOnline = server.Status == serverprovider.ServerStatusRunning
 		if !s.StepServerOnline {
-			logger.Info("Server not yet online, re-queueing", "serverStatus", server.Status)
+			log.Info("Server not yet online, re-queueing", "serverStatus", server.Status)
 			return h.ReQueue(ctx, s)
 		}
-		logger.Info("Server is online")
+		log.Info("Server is online")
 	}
 
 	if !s.StepServerInstalled {
-		logger.Info("Installing Talos on server")
+		log.Info("Installing Talos on server")
 		talosProvider, err := h.getTalosProvider(string(offering.ProviderSlug))
 		if err != nil {
 			return err
@@ -436,14 +423,14 @@ func (h MessageHandler) Handle(ctx context.Context, s Message) error {
 			SshKeyPrivatePassword: h.sshKeyPassword,
 			SshKeyFingerprint:     h.sshKeyFingerprint,
 		}, talosprovider.WithTalosVersion("1.7.6"), talosprovider.WithArch("amd64")); err != nil {
-			logger.Error("Failed to install Talos", "error", err)
+			log.Error("Failed to install Talos", "error", err)
 			return err
 		}
 		s.StepServerInstalled = true
 	}
 
 	if !s.StepTalosOnline {
-		logger.Info("Checking if Talos is online")
+		log.Info("Checking if Talos is online")
 		server, err := provider.GetServer(s.StepProviderServerId)
 		if err != nil {
 			return err
@@ -455,14 +442,14 @@ func (h MessageHandler) Handle(ctx context.Context, s Message) error {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		if _, err := c.Disks(ctxWithTimeout); err != nil {
-			logger.Info("Talos not yet online, re-queueing", slog.String("error", err.Error()))
+			log.Info("Talos not yet online, re-queueing", slog.String("error", err.Error()))
 			return h.ReQueue(ctx, s)
 		}
 		s.StepTalosOnline = true
 	}
 
 	if !s.StepServerAddedToCell {
-		logger.Info("Adding server to cell")
+		log.Info("Adding server to cell")
 		var c *store.Cell
 		if cells, err := h.cellStore.GetForTeam(ctx, s.TeamId); err != nil {
 			return err
@@ -512,10 +499,11 @@ func (h MessageHandler) Handle(ctx context.Context, s Message) error {
 			}); err != nil {
 				return err
 			}
+			// TODO: spawn cell janitor background process
 		}
 	}
 
-	logger.Info("Server fulfillment completed successfully")
+	log.Info("Server fulfillment completed successfully")
 
 	team, err := h.teamStore.GetTeam(ctx, s.TeamId)
 	if err != nil {
@@ -528,7 +516,7 @@ func (h MessageHandler) Handle(ctx context.Context, s Message) error {
 		StripeCustomerId: team.StripeCustomerId,
 		ServerId:         s.StepServerId,
 	}); err != nil {
-		logger.Error("Failed to send server billing hourly message", "error", err)
+		log.Error("Failed to send server billing hourly message", "error", err)
 		return err
 	}
 	return nil

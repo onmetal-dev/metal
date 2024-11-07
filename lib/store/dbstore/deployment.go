@@ -56,7 +56,13 @@ func (s *DeploymentStore) CreateEnv(opts store.CreateEnvOptions) (store.Env, err
 
 func (s *DeploymentStore) GetEnv(id string) (store.Env, error) {
 	env := store.Env{Common: store.Common{Id: id}}
-	return env, s.db.First(&env).Error
+	if err := s.db.First(&env).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return store.Env{}, store.ErrEnvNotFound
+		}
+		return store.Env{}, err
+	}
+	return env, nil
 }
 
 func (s *DeploymentStore) GetEnvsForTeam(teamId string) ([]store.Env, error) {
@@ -205,7 +211,11 @@ func (s *DeploymentStore) Create(opts store.CreateDeploymentOptions) (store.Depl
 			return store.Cell{Common: store.Common{Id: cellId}}
 		}),
 	}
-	return deployment, s.db.Create(&deployment).Error
+	if err := s.db.Create(&deployment).Error; err != nil {
+		return store.Deployment{}, err
+	}
+	// do this to populate things. Otherwise code needs to assume popualted vs. not depending on which methods are used
+	return s.Get(deployment.AppId, deployment.EnvId, deployment.Id)
 }
 
 func (s *DeploymentStore) preloadDeployment(query *gorm.DB) *gorm.DB {
@@ -256,6 +266,20 @@ func (s *DeploymentStore) GetForApp(ctx context.Context, appId string) ([]store.
 		}
 	}
 	return deployments, nil
+}
+
+func (s *DeploymentStore) GetLatestForAppEnv(ctx context.Context, appId string, envId string) (*store.Deployment, error) {
+	var deployment store.Deployment
+	if err := s.preloadDeployment(s.db).WithContext(ctx).
+		Where(&store.Deployment{AppId: appId, EnvId: envId}).
+		Order("id DESC").
+		First(&deployment).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &deployment, nil
 }
 
 func (s *DeploymentStore) GetForEnv(envId string) ([]store.Deployment, error) {

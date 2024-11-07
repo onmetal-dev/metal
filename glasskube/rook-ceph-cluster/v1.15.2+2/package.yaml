@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://glasskube.dev/schemas/v1/package-manifest.json
+name: rook-ceph-cluster
+shortDescription: Manages a single Ceph cluster namespace for Rook
+longDescription: A Helm chart for rook-ceph-cluster
+iconUrl: https://avatars.githubusercontent.com/u/22860722
+defaultNamespace: rook-ceph
+dependencies:
+  - name: rook-ceph
+helm:
+  chartName: rook-ceph-cluster
+  chartVersion: 1.15.2
+  repositoryUrl: https://charts.rook.io/release
+  values:
+    operatorNamespace: rook-ceph
+    cephClusterSpec:
+      mon:
+        allowMultiplePerNode: true
+      mgr:
+        allowMultiplePerNode: true
+references:
+  - label: GitHub
+    url: https://github.com/rook/rook/tree/master/deploy/charts/rook-ceph-cluster

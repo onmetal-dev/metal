@@ -1,0 +1,362 @@
+openapi: 3.0.0
+info:
+  version: 0.0.1
+  title: Metal API
+  contact:
+    email: support@onmetal.dev
+security:
+  - bearerAuth: []
+servers:
+  - url: https://www.onmetal.dev
+    description: Production URL
+  - url: http://localhost:8080
+    description: Development URL
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Id:
+      type: string
+      pattern: "^[a-z]+_[a-z0-9]{26}$"
+      description: A string with a prefix, underscore, and 26 alphanumeric characters (type ID)
+      example: user_014kg56dc0ewfs4dgvfj8pbzse
+    LowercaseAlphaNumHyphen:
+      type: string
+      pattern: "^[a-z0-9-]+$"
+      description: A string with only lowercase alphanumeric characters and hyphens
+      example: my-app-name
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+      required:
+        - error
+    WhoAmI:
+      type: object
+      properties:
+        token_id:
+          $ref: "#/components/schemas/Id"
+        team_id:
+          $ref: "#/components/schemas/Id"
+        team_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - token_id
+        - team_id
+        - team_name
+        - created_at
+    App:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        team_id:
+          $ref: "#/components/schemas/Id"
+        creator_id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+      required:
+        - id
+        - created_at
+        - updated_at
+        - team_id
+        - creator_id
+        - name
+    Apps:
+      type: array
+      items:
+        $ref: "#/components/schemas/App"
+    Env:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        name:
+          type: string
+      required:
+        - id
+        - created_at
+        - updated_at
+        - name
+    Envs:
+      type: array
+      items:
+        $ref: "#/components/schemas/Env"
+    UpLog:
+      type: object
+      properties:
+        time:
+          type: string
+          format: date-time
+          description: Timestamp of the log.
+        message:
+          type: string
+          description: Content of the log.
+      example:
+        time: "2023-11-20T10:30:00Z"
+        message: "Build started"
+paths:
+  /api/whoami:
+    get:
+      operationId: WhoAmI
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Retrieve information about the authenticated token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhoAmI"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/apps:
+    get:
+      operationId: GetApps
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Retrieve all applications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Apps"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/apps/{appId}:
+    get:
+      operationId: GetApp
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Retrieve an application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/App"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: CreateApp
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  format: lowercasealphanumhyphen
+              required:
+                - name
+      responses:
+        "201":
+          description: Create an application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/App"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: DeleteApp
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "204":
+          description: App successfully deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/envs:
+    get:
+      operationId: GetEnvs
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Retrieve all environments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envs"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/envs/{envId}:
+    get:
+      operationId: GetEnv
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: envId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "200":
+          description: Retrieve an environment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Env"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      operationId: CreateEnv
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: envId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  format: lowercasealphanumhyphen
+              required:
+                - name
+      responses:
+        "201":
+          description: Create an environment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Env"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: DeleteEnv
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: envId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Id"
+      responses:
+        "204":
+          description: Environment successfully deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /api/up:
+    post:
+      operationId: Up
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                env_id:
+                  $ref: "#/components/schemas/Id"
+                app_id:
+                  $ref: "#/components/schemas/Id"
+                archive:
+                  type: string
+                  format: binary
+              required:
+                - env_id
+                - app_id
+                - archive
+      responses:
+        "200":
+          description: Upload received successfully and build / deploy started.
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/UpLog"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"

@@ -1,0 +1,109 @@
+# yaml-language-server: $schema=https://glasskube.dev/schemas/v1/package-manifest.json
+name: rook-ceph-cluster
+shortDescription: Manages a single Ceph cluster namespace for Rook
+longDescription: A Helm chart for rook-ceph-cluster
+iconUrl: https://avatars.githubusercontent.com/u/22860722
+defaultNamespace: rook-ceph
+dependencies:
+  - name: rook-ceph
+manifests:
+  - url: https://raw.githubusercontent.com/rook/rook/refs/tags/v1.15.2/deploy/examples/cluster.yaml
+  - url: https://raw.githubusercontent.com/rook/rook/refs/tags/v1.15.2/deploy/examples/csi/rbd/storageclass.yaml
+  - url: https://raw.githubusercontent.com/rook/rook/refs/tags/v1.15.2/deploy/examples/filesystem.yaml
+  - url: https://raw.githubusercontent.com/rook/rook/refs/tags/v1.15.2/deploy/examples/csi/cephfs/storageclass.yaml
+valueDefinitions:
+  makeRbdDefaultStorageClass:
+    type: boolean
+    defaultValue: "false"
+    targets:
+      - resource:
+          apiGroup: storage.k8s.io/v1
+          kind: StorageClass
+          name: rook-ceph-block
+        valueTemplate: |
+          {"storageclass.kubernetes.io/is-default-class": "{{if .}}true{{else}}false{{end}}"}
+        patch:
+          op: add
+          path: /metadata/annotations
+  k8sNodesAvailable:
+    type: number
+    constraints:
+      min: 1
+    targets:
+      - resource:
+          apiGroup: ceph.rook.io/v1
+          kind: CephCluster
+          name: rook-ceph
+        valueTemplate: |
+          {{if or (eq . "1") (eq . "2")}}true{{else}}false{{end}}
+        patch:
+          op: replace
+          path: /spec/mon/allowMultiplePerNode
+      - resource:
+          apiGroup: ceph.rook.io/v1
+          kind: CephCluster
+          name: rook-ceph
+        valueTemplate: |
+          {{if or (eq . "1") (eq . "2")}}true{{else}}false{{end}}
+        patch:
+          op: replace
+          path: /spec/mgr/allowMultiplePerNode
+      - resource:
+          apiGroup: ceph.rook.io/v1
+          kind: CephBlockPool
+          name: replicapool
+        valueTemplate: |
+          {{if or (eq . "1") (eq . "2")}}false{{else}}true{{end}}
+        patch:
+          op: replace
+          path: /spec/replicated/requireSafeReplicaSize
+      - resource:
+          apiGroup: ceph.rook.io/v1
+          kind: CephBlockPool
+          name: replicapool
+        valueTemplate: |
+          {{if or (eq . "1") (eq . "2")}}{{.}}{{else}}3{{end}}
+        patch:
+          op: replace
+          path: /spec/replicated/size
+      - resource:
+          apiGroup: ceph.rook.io/v1
+          kind: CephFilesystem
+          name: myfs
+        valueTemplate: |
+          {{if or (eq . "1") (eq . "2")}}false{{else}}true{{end}}
+        patch:
+          op: replace
+          path: /spec/metadataPool/replicated/requireSafeReplicaSize
+      - resource:
+          apiGroup: ceph.rook.io/v1
+          kind: CephFilesystem
+          name: myfs
+        valueTemplate: |
+          {{if or (eq . "1") (eq . "2")}}{{.}}{{else}}3{{end}}
+        patch:
+          op: replace
+          path: /spec/metadataPool/replicated/size
+      - resource:
+          apiGroup: ceph.rook.io/v1
+          kind: CephFilesystem
+          name: myfs
+        valueTemplate: |
+          [{"name": "replicated", "failureDomain": "host", "replicated": {"size": {{if or (eq . "1") (eq . "2")}}{{.}}{{else}}3{{end}}, "requireSafeReplicaSize": {{if or (eq . "1") (eq . "2")}}false{{else}}true{{end}}}, "parameters": {"compression_mode": "none"}}]
+        patch:
+          op: replace
+          path: /spec/dataPools
+      - resource:
+          apiGroup: ceph.rook.io/v1
+          kind: CephFilesystem
+          name: myfs
+        valueTemplate: |
+          []
+        patch:
+          op: replace
+          path: /spec/metadataServer/placement/podAntiAffinity/requiredDuringSchedulingIgnoredDuringExecution
+references:
+  - label: GitHub
+    url: https://github.com/rook/rook/tree/v1.15.2/deploy/examples
+  - label: Docs
+    url: https://rook.github.io/docs/rook/v1.15/Getting-Started/quickstart/

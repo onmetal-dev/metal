@@ -3,10 +3,11 @@ SHELL := /bin/bash
 .PHONY: templ-generate templ-watch
 templ-generate: templ
 	templ generate
-templ-watch: templ
-	templ generate --watch
 
-
+.PHONY: oapi-generate
+oapi-generate: oapi-codegen
+	oapi-codegen -config ./oapi-codegen.yaml ./openapi.yaml
+	
 .PHONY: tailwind-build tailwind-watch
 TAILWINDCLI := bunx tailwindcss
 tailwind-watch: bun
@@ -17,13 +18,17 @@ tailwind-build: bun
 	$(TAILWINDCLI) -c ./cmd/app/tailwind.config.js -i ./cmd/app/static/css/input.css -o ./cmd/app/static/css/style.css
 
 
-.PHONY: install_deps templ bun docker
-install_deps: templ bun staticcheck
+.PHONY: install_deps templ oapi-codegen bun docker
+install_deps: templ bun staticcheck oapi-codegen
 	bun install
 	go mod download
 templ:
 	@if ! command -v templ &> /dev/null; then \
 		go install github.com/a-h/templ/cmd/templ@latest; \
+	fi
+oapi-codegen:
+	@if ! command -v oapi-codegen &> /dev/null; then \
+		go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest; \
 	fi
 bun:
 	@if ! command -v bun &> /dev/null; then \
@@ -44,7 +49,7 @@ air:
 	fi
 
 .PHONY: build
-build: templ-generate tailwind-build
+build: templ-generate oapi-generate tailwind-build
 	mkdir -p bin/
 	go build -o ./bin/app ./cmd/app
 

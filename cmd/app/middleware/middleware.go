@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/sessions"
 	"github.com/onmetal-dev/metal/lib/store"
@@ -200,4 +201,47 @@ func GetFlashes(ctx context.Context) []string {
 		return []string{}
 	}
 	return getFlashes()
+}
+
+type apiTokenKey string
+
+const apiTokenContextKey apiTokenKey = "api_token"
+
+func ApiAuthMiddleware(apiTokenStore store.ApiTokenStore) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
+				return
+			}
+
+			bearerToken := strings.TrimPrefix(authHeader, "Bearer ")
+			if bearerToken == authHeader {
+				http.Error(w, "Invalid Authorization header format", http.StatusUnauthorized)
+				return
+			}
+
+			token, err := apiTokenStore.GetByToken(bearerToken)
+			if err != nil {
+				http.Error(w, "Invalid token", http.StatusUnauthorized)
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), apiTokenContextKey, *token)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func MustGetApiToken(ctx context.Context) store.ApiToken {
+	token, ok := ctx.Value(apiTokenContextKey).(store.ApiToken)
+	if !ok {
+		panic("api token not found in context")
+	}
+	return token
+}
+
+func WithApiToken(ctx context.Context, token store.ApiToken) context.Context {
+	return context.WithValue(ctx, apiTokenContextKey, token)
 }

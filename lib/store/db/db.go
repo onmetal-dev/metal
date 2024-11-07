@@ -52,6 +52,8 @@ func MustOpen(host, user, password, dbname string, port int, sslmode string, tp 
 		&store.Env{},
 		&store.AppEnvVars{},
 		&store.Deployment{},
+		&store.ApiToken{},
+		&store.Build{},
 	)
 	if err != nil {
 		panic(err)

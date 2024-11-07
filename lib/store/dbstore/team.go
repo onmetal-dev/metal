@@ -53,10 +53,13 @@ func (s TeamStore) CreateTeam(name string, description string) (*store.Team, err
 	return &team, nil
 }
 
+func (s *TeamStore) preloadTeam(query *gorm.DB) *gorm.DB {
+	return query.Preload("Members").Preload("Members.User").Preload("InvitedMembers").Preload("PaymentMethods").Preload("Cells")
+}
+
 func (s TeamStore) GetTeam(ctx context.Context, id string) (*store.Team, error) {
 	var team store.Team
-	err := s.db.WithContext(ctx).Where("id = ?", id).Preload("Members").Preload("InvitedMembers").Preload("PaymentMethods").Preload("Cells").First(&team).Error
-	if err != nil {
+	if err := s.preloadTeam(s.db).WithContext(ctx).Where("id = ?", id).First(&team).Error; err != nil {
 		return nil, err
 	}
 	return &team, nil

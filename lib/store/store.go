@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/datatypes"
@@ -73,6 +74,7 @@ type Team struct {
 	Apps        []App        `gorm:"foreignKey:TeamId"`
 	Envs        []Env        `gorm:"foreignKey:TeamId"`
 	Deployments []Deployment `gorm:"foreignKey:TeamId"`
+	ApiTokens   []ApiToken   `gorm:"foreignKey:TeamId"`
 }
 
 type PaymentMethod struct {
@@ -102,6 +104,7 @@ type TeamMemberInvite struct {
 
 type TeamMember struct {
 	UserId    string    `gorm:"primaryKey" json:"user_id"`
+	User      User      `gorm:"foreignKey:UserId"`
 	TeamId    string    `gorm:"primaryKey" json:"team_id"`
 	Role      TeamRole  `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
@@ -304,14 +307,6 @@ type App struct {
 	Name      string    `json:"name"`
 	CreatedAt time.Time `gorm:"index:idx_team_createdat"`
 }
-
-type Artifact struct {
-	Image Image `json:"image"`
-}
-
-type Image struct {
-	Name string `json:"name"`
-}
 type Port struct {
 	Name  string `validate:"required,lowercasealphanumhyphen"`
 	Port  int    `validate:"required"`
@@ -355,7 +350,7 @@ type AppSettings struct {
 }
 
 type CreateAppOptions struct {
-	Name   string `validate:"required"`
+	Name   string `validate:"required,lowercasealphanumhyphen"`
 	TeamId string `validate:"required"`
 	UserId string `validate:"required"`
 }
@@ -368,6 +363,8 @@ type CreateAppSettingsOptions struct {
 	ExternalPorts ExternalPorts `validate:"required"`
 	Resources     Resources     `validate:"required"`
 }
+
+var ErrAppNotFound = errors.New("app not found")
 
 type AppStore interface {
 	Create(opts CreateAppOptions) (App, error)
@@ -479,6 +476,8 @@ type CreateDeploymentOptions struct {
 	Replicas      int            `validate:"required"`
 }
 
+var ErrEnvNotFound = errors.New("env not found")
+
 // DeploymentStore allows for
 // - creating, retrieving (by teamId), and deleting environments
 // - creating, retrieving (by teamId, appId, envId), and deleting AppEnvVars
@@ -498,8 +497,102 @@ type DeploymentStore interface {
 	Get(appId string, envId string, id uint) (Deployment, error)
 	GetForTeam(ctx context.Context, teamId string) ([]Deployment, error)
 	GetForApp(ctx context.Context, appId string) ([]Deployment, error)
+	GetLatestForAppEnv(ctx context.Context, appId string, envId string) (*Deployment, error)
 	GetForEnv(envId string) ([]Deployment, error)
 	GetForCell(cellId string) ([]Deployment, error)
 	DeleteDeployment(appId string, envId string, id uint) error
 	UpdateDeploymentStatus(appId string, envId string, id uint, status DeploymentStatus, statusReason string) error
+}
+
+// ApiTokenScope represents the access level of an API token
+type ApiTokenScope string
+
+const (
+	ApiTokenScopeAdmin ApiTokenScope = "admin"
+)
+
+// ApiToken represents an API token for a team
+type ApiToken struct {
+	Common
+	TeamId     string        `json:"team_id" gorm:"index"`
+	CreatorId  string        `json:"creator_id"`
+	Name       string        `json:"name"`
+	Token      string        `json:"token" gorm:"uniqueIndex"`
+	Scope      ApiTokenScope `json:"scope"`
+	LastUsedAt *time.Time    `json:"last_used"`
+}
+
+// ApiTokenStore interface for managing API tokens
+type ApiTokenStore interface {
+	Create(teamId string, creatorId string, name string, scope ApiTokenScope) (*ApiToken, error)
+	Get(id string) (*ApiToken, error)
+	GetByToken(token string) (*ApiToken, error)
+	List(teamId string) ([]ApiToken, error)
+	Delete(id string) error
+	UpdateLastUsedAt(id string, lastUsedAt time.Time) error
+}
+
+type BuildStatus string
+
+const (
+	BuildStatusPending   BuildStatus = "pending"
+	BuildStatusBuilding  BuildStatus = "building"
+	BuildStatusCompleted BuildStatus = "completed"
+	BuildStatusFailed    BuildStatus = "failed"
+)
+
+type ImageArtifact struct {
+	// Registry is optional. If not provided, dockerhub is used. Else, it could be something like registry.k8s.io.
+	Registry string `json:"registry"`
+	// Repository of the image. Required. E.g. busybox, stefanprodan/podinfo
+	Repository string `json:"repository" validate:"required"`
+	// Tag of the image. If not specified, latest is used.
+	Tag string `json:"tag"`
+	// Digest of the image can be used in place of a tag. E.g. sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9
+	Digest string `json:"digest"`
+}
+
+// Name returns the full name of the image: <registry>/<repository>:<tag>
+func (i *ImageArtifact) Name() string {
+	if i.Registry == "" {
+		return fmt.Sprintf("%s:%s", i.Repository, i.Tag)
+	}
+	return fmt.Sprintf("%s/%s:%s", i.Registry, i.Repository, i.Tag)
+}
+
+type Artifact struct {
+	Image *ImageArtifact
+	// Tarball *TarballArtifact // if we support deploying non-image artifacts in the future, e.g. lambda functions
+}
+
+type BuildLog struct {
+	Time    time.Time `json:"time"`
+	Message string    `json:"message"`
+}
+
+type BuildLogs []BuildLog
+
+type Build struct {
+	Common
+	TeamId       string
+	CreatorId    string
+	AppId        string
+	Status       BuildStatus
+	StatusReason string
+	Logs         datatypes.JSONType[BuildLogs]
+	Artifacts    datatypes.JSONType[[]Artifact]
+}
+
+type InitBuildOptions struct {
+	TeamId    string `validate:"required"`
+	CreatorId string `validate:"required"`
+	AppId     string `validate:"required"`
+}
+
+type BuildStore interface {
+	Init(ctx context.Context, opts InitBuildOptions) (Build, error)
+	Get(ctx context.Context, id string) (Build, error)
+	UpdateStatus(ctx context.Context, id string, status BuildStatus, statusReason string) error
+	UpdateLogs(ctx context.Context, id string, logs BuildLogs) error
+	UpdateArtifacts(ctx context.Context, id string, artifacts []Artifact) error
 }

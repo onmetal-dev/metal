@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/craigpastro/pgmq-go"
+	"github.com/onmetal-dev/metal/lib/logger"
 )
 
 type QueueProducer[T any] struct {
@@ -52,11 +53,10 @@ type QueueConsumer[T any] struct {
 	vt        int64
 	handler   func(context.Context, T) error
 	stopChan  chan struct{}
-	logger    *slog.Logger
 }
 
 // NewQueueConsumer creates a new read loop on the queue, with a visibility timeout in seconds and a handler function
-func NewQueueConsumer[T any](ctx context.Context, queueName string, connString string, vt int64, handler func(context.Context, T) error, logger *slog.Logger) *QueueConsumer[T] {
+func NewQueueConsumer[T any](ctx context.Context, queueName string, connString string, vt int64, handler func(context.Context, T) error) *QueueConsumer[T] {
 	q, err := pgmq.New(ctx, connString)
 	if err != nil {
 		panic(err)
@@ -67,11 +67,11 @@ func NewQueueConsumer[T any](ctx context.Context, queueName string, connString s
 		vt:        vt,
 		handler:   handler,
 		stopChan:  make(chan struct{}),
-		logger:    logger,
 	}
 }
 
 func (c *QueueConsumer[T]) Start(ctx context.Context) {
+	log := logger.FromContext(ctx)
 	go func() {
 		timer := time.NewTimer(0)
 		defer timer.Stop()
@@ -86,7 +86,7 @@ func (c *QueueConsumer[T]) Start(ctx context.Context) {
 						timer.Reset(5 * time.Second)
 						continue
 					}
-					c.logger.Error("error reading message", slog.Any("error", err))
+					log.Error("error reading message", slog.Any("error", err))
 					continue
 				}
 				// Reset timer for immediate next read
@@ -94,7 +94,7 @@ func (c *QueueConsumer[T]) Start(ctx context.Context) {
 
 				var decodedMsg T
 				if err := json.Unmarshal(msg.Message, &decodedMsg); err != nil {
-					c.logger.Error("error decoding message", slog.Any("error", err))
+					log.Error("error decoding message", slog.Any("error", err))
 					continue
 				}
 
@@ -107,12 +107,12 @@ func (c *QueueConsumer[T]) Start(ctx context.Context) {
 				}()
 				select {
 				case <-ctx.Done():
-					c.logger.Error("visibility timeout deadline exceeded before handler returned")
+					log.Error("visibility timeout deadline exceeded before handler returned")
 					cancel()
 					continue
 				case err := <-done:
 					if err != nil {
-						c.logger.Error("error handling message", slog.Any("error", err))
+						log.Error("error handling message", slog.Any("error", err))
 						cancel()
 						continue
 					}
@@ -120,7 +120,7 @@ func (c *QueueConsumer[T]) Start(ctx context.Context) {
 				cancel()
 				_, err = c.q.Archive(context.Background(), c.queueName, msg.MsgID)
 				if err != nil {
-					c.logger.Error("error deleting message", slog.Any("error", err))
+					log.Error("error deleting message", slog.Any("error", err))
 				}
 			}
 		}

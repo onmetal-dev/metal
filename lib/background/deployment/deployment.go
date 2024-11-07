@@ -11,6 +11,7 @@ import (
 
 	"github.com/onmetal-dev/metal/lib/background"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
+	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/store"
 )
 
@@ -29,7 +30,6 @@ type MessageHandler struct {
 	deploymentStore     store.DeploymentStore
 	cellStore           store.CellStore
 	cellProviderForType func(cellType store.CellType) cellprovider.CellProvider
-	logger              *slog.Logger
 }
 
 type Option func(*MessageHandler) error
@@ -50,16 +50,6 @@ func WithDeploymentStore(deploymentStore store.DeploymentStore) Option {
 			return errors.New("deployment store cannot be nil")
 		}
 		h.deploymentStore = deploymentStore
-		return nil
-	}
-}
-
-func WithLogger(logger *slog.Logger) Option {
-	return func(h *MessageHandler) error {
-		if logger == nil {
-			return errors.New("logger cannot be nil")
-		}
-		h.logger = logger
 		return nil
 	}
 }
@@ -98,8 +88,11 @@ func NewMessageHandler(opts ...Option) (*MessageHandler, error) {
 	if h.deploymentStore == nil {
 		errs = append(errs, "deployment store is required")
 	}
-	if h.logger == nil {
-		errs = append(errs, "logger is required")
+	if h.cellStore == nil {
+		errs = append(errs, "cell store is required")
+	}
+	if h.cellProviderForType == nil {
+		errs = append(errs, "cell provider for type function is required")
 	}
 	if len(errs) > 0 {
 		return nil, errors.New(strings.Join(errs, ", "))
@@ -112,7 +105,7 @@ func (h MessageHandler) ReQueue(ctx context.Context, m Message) error {
 }
 
 func (h MessageHandler) Handle(ctx context.Context, m Message) error {
-	logger := h.logger.With(
+	log := logger.FromContext(ctx).With(
 		slog.Int("deploymentID", int(m.DeploymentId)),
 		slog.String("appID", m.AppId),
 		slog.String("envID", m.EnvId),
@@ -124,7 +117,7 @@ func (h MessageHandler) Handle(ctx context.Context, m Message) error {
 	}
 
 	if deployment.Status == store.DeploymentStatusRunning || deployment.Status == store.DeploymentStatusFailed {
-		logger.Info("Deployment already in final state, no action needed")
+		log.Info("Deployment already in final state, no action needed")
 		return nil
 	}
 
@@ -144,26 +137,26 @@ func (h MessageHandler) Handle(ctx context.Context, m Message) error {
 
 	result, err := cellProvider.AdvanceDeployment(ctx, cell.Id, &deployment)
 	if err != nil {
-		logger.Error("Error advancing deployment", slog.Any("error", err))
+		log.Error("Error advancing deployment", slog.Any("error", err))
 		if updateErr := h.deploymentStore.UpdateDeploymentStatus(m.AppId, m.EnvId, m.DeploymentId, store.DeploymentStatusFailed, err.Error()); updateErr != nil {
-			logger.Error("Error updating deployment status", slog.Any("error", updateErr))
+			log.Error("Error updating deployment status", slog.Any("error", updateErr))
 		}
 		return err
 	}
 
 	if err := h.deploymentStore.UpdateDeploymentStatus(m.AppId, m.EnvId, m.DeploymentId, result.Status, result.StatusReason); err != nil {
-		logger.Error("Error updating deployment status", slog.Any("error", err))
+		log.Error("Error updating deployment status", slog.Any("error", err))
 		return err
 	}
 
 	if result.StatusReason != "" {
-		logger.Info("Deployment status update", slog.String("status", string(result.Status)), slog.String("reason", result.StatusReason))
+		log.Info("Deployment status update", slog.String("status", string(result.Status)), slog.String("reason", result.StatusReason))
 	} else {
-		logger.Info("Deployment status update", slog.String("status", string(result.Status)))
+		log.Info("Deployment status update", slog.String("status", string(result.Status)))
 	}
 
 	if result.Status == store.DeploymentStatusDeploying {
-		logger.Info("Deployment still in progress, requeueing")
+		log.Info("Deployment still in progress, requeueing")
 		return h.ReQueue(ctx, m)
 	}
 
