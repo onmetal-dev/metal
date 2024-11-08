@@ -96,7 +96,7 @@ templ LogsForm(thisUrl string, formData LogsFormData, fieldErrors form.FieldErro
 
 templ LogEntry(log cellprovider.LogEntry) {
 	<tr>
-		<td>{ log.Timestamp.Format("Jan 02 15:04:05") }</td>
+		<td>{ log.Timestamp.Format(TimeFormat) }</td>
 		<td>{ log.Message }</td>
 	</tr>
 }

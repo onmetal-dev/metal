@@ -1,6 +1,9 @@
 package templates
 
-import "github.com/onmetal-dev/metal/lib/form"
+import (
+	"github.com/onmetal-dev/metal/cmd/app/urls"
+	"github.com/onmetal-dev/metal/lib/form"
+)
 
 type JoinWaitlistFormData struct {
 	Email string `validate:"required,email"`
@@ -9,7 +12,7 @@ type JoinWaitlistFormData struct {
 templ WaitlistForm(data JoinWaitlistFormData, errors form.FieldErrors, submitError error, successMsg string) {
 	<form
 		novalidate
-		hx-post="/waitlist"
+		hx-post={ urls.Waitlist.Render() }
 		hx-disabled-elt="find button[type='submit'], find input[name='Email']"
 		hx-trigger="submit"
 		hx-indicator="find .loading"

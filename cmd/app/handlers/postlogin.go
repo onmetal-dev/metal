@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"encoding/gob"
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/sessions"
 	"github.com/onmetal-dev/metal/cmd/app/hash"
 	"github.com/onmetal-dev/metal/cmd/app/templates"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/store"
 )
@@ -85,7 +85,7 @@ func (h *PostLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if len(team.PaymentMethods) == 0 {
-			w.Header().Set("HX-Redirect", fmt.Sprintf("/onboarding/%s/payment", team.Id))
+			w.Header().Set("HX-Redirect", urls.OnboardingPayment{TeamId: team.Id}.Render())
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -105,7 +105,7 @@ func (h *PostLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			firstTeamId := invites[0].TeamId
-			w.Header().Set("HX-Redirect", "/dashboard/"+firstTeamId)
+			w.Header().Set("HX-Redirect", urls.Home{TeamId: firstTeamId, EnvName: urls.DefaultEnvSentinel}.Render())
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -121,7 +121,7 @@ func (h *PostLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if next != "" {
 		w.Header().Set("HX-Redirect", next)
 	} else {
-		w.Header().Set("HX-Redirect", "/dashboard/"+user.TeamMemberships[0].TeamId)
+		w.Header().Set("HX-Redirect", urls.Home{TeamId: user.TeamMemberships[0].TeamId, EnvName: urls.DefaultEnvSentinel}.Render())
 	}
 	w.WriteHeader(http.StatusOK)
 }

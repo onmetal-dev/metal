@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/cmd/app/templates"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/background"
 	"github.com/onmetal-dev/metal/lib/background/serverfulfillment"
 	"github.com/onmetal-dev/metal/lib/billing"
@@ -72,7 +73,7 @@ func (h *GetServersNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
 	user := middleware.GetUser(ctx)
-	team, userTeams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
+	team, teams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
@@ -84,7 +85,7 @@ func (h *GetServersNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	if err := templates.DashboardLayout(templates.DashboardState{
 		User:          *user,
-		UserTeams:     userTeams,
+		Teams:         teams,
 		ActiveTeam:    *team,
 		ActiveTabName: templates.TabNameBuyServer,
 	}, templates.CreateServer(teamId, serverOfferings)).Render(ctx, w); err != nil {
@@ -241,7 +242,7 @@ func (h *GetServersCheckoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
 	user := middleware.GetUser(ctx)
-	team, userTeams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
+	team, teams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
@@ -347,7 +348,7 @@ func (h *GetServersCheckoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	if err := templates.DashboardLayout(templates.DashboardState{
 		User:          *user,
-		UserTeams:     userTeams,
+		Teams:         teams,
 		ActiveTeam:    *team,
 		ActiveTabName: templates.TabNameBuyServer,
 		AdditionalScripts: []templates.ScriptTag{
@@ -418,7 +419,7 @@ func (h *GetServersCheckoutReturnHandler) ServeHTTP(w http.ResponseWriter, r *ht
 	}
 
 	middleware.AddFlash(ctx, "success! hold tight while we spin up your new server")
-	http.Redirect(w, r, fmt.Sprintf("/dashboard/%s", teamId), http.StatusFound)
+	http.Redirect(w, r, urls.Home{TeamId: teamId, EnvName: urls.DefaultEnvSentinel}.Render(), http.StatusFound)
 }
 
 // truncateToFourDecimalPlaces truncates a float64 to four decimal places so that users can comprehend prices like 0.0754 / hour

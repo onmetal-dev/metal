@@ -10,6 +10,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/cmd/app/templates"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/background"
 	"github.com/onmetal-dev/metal/lib/background/deployment"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
@@ -39,7 +40,7 @@ func (h *AppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
 	user := middleware.GetUser(ctx)
-	team, userTeams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
+	team, teams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
@@ -51,7 +52,7 @@ func (h *AppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	dashboardState := templates.DashboardState{
 		User:              *user,
-		UserTeams:         userTeams,
+		Teams:             teams,
 		ActiveTeam:        *team,
 		ActiveTabName:     templates.TabNameCreateApp,
 		AdditionalScripts: []templates.ScriptTag{},
@@ -290,7 +291,7 @@ func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Redirect to the dashboard on success
 	middleware.AddFlash(ctx, fmt.Sprintf("app %s created successfully", f.AppName))
-	w.Header().Set("HX-Redirect", fmt.Sprintf("/dashboard/%s", teamId))
+	w.Header().Set("HX-Redirect", urls.Home{TeamId: teamId, EnvName: urls.DefaultEnvSentinel}.Render())
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -397,6 +398,6 @@ func (h *DeleteAppHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Redirect to the dashboard on success
 	middleware.AddFlash(ctx, fmt.Sprintf("app %s deleted successfully", app.Name))
-	w.Header().Set("HX-Redirect", fmt.Sprintf("/dashboard/%s", teamId))
+	w.Header().Set("HX-Redirect", urls.Home{TeamId: teamId, EnvName: urls.DefaultEnvSentinel}.Render())
 	w.WriteHeader(http.StatusOK)
 }

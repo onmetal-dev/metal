@@ -3,6 +3,7 @@ package templates
 import (
 	"github.com/onmetal-dev/metal/cmd/app/config"
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/store"
 )
 
@@ -73,22 +74,22 @@ templ nav(user *store.User) {
 			<div class="flex-none">
 				<ul class="px-1 menu menu-horizontal">
 					if user != nil {
-						<li><a href={ templ.SafeURL("/dashboard/" + user.TeamMemberships[0].TeamId) }>dashboard</a></li>
+						<li><a href={ templ.SafeURL(urls.Home{TeamId: user.TeamMemberships[0].TeamId, EnvName: urls.DefaultEnvSentinel}.Render()) }>dashboard</a></li>
 						<li>
 							<details>
 								<summary>{ user.Email }</summary>
 								<ul class="p-2 rounded-t-none bg-base-100">
 									<li><a href={ templ.SafeURL("/settings") }>settings</a></li>
-									<li><a hx-target="body" hx-swap="innerHTML" hx-post="/logout">logout</a></li>
+									<li><a hx-target="body" hx-swap="innerHTML" hx-post={ urls.Logout.Render() }>logout</a></li>
 								</ul>
 							</details>
 						</li>
 					} else {
 						<li>
-							<a href="/signup">sign up</a>
+							<a href={ templ.SafeURL(urls.Signup.Render()) }>sign up</a>
 						</li>
 						<li>
-							<a href="/login">login</a>
+							<a href={ templ.SafeURL(urls.Login.Render()) }>login</a>
 						</li>
 					}
 				</ul>

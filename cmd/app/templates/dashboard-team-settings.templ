@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/onmetal-dev/metal/lib/form"
 	"github.com/onmetal-dev/metal/lib/store"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"time"
 )
 
@@ -16,7 +17,7 @@ templ InviteForm(teamId string, data InviteFormData, errors form.FieldErrors, su
 	<div id="invite-form">
 		<button class="absolute btn btn-sm btn-circle btn-ghost right-2 top-2" onclick="invite.close()">✕</button>
 		<form
-			hx-post={ fmt.Sprintf("/dashboard/%s/invites", teamId) }
+			hx-post={ urls.TeamInvites{TeamId: teamId}.Render() }
 			hx-target="#invite-form"
 			hx-swap="outerHTML"
 			class="grid grid-cols-[auto,1fr] gap-4 text-xs mt-4"
@@ -73,7 +74,7 @@ templ ApiTokenForm(teamId string, data ApiTokenFormData, errors form.FieldErrors
 	<div id="apitoken-form">
 		<button class="absolute btn btn-sm btn-circle btn-ghost right-2 top-2" onclick="apitoken.close()">✕</button>
 		<form
-			hx-post={ fmt.Sprintf("/dashboard/%s/apitokens", teamId) }
+			hx-post={ urls.TeamApiTokens{TeamId: teamId}.Render() }
 			hx-target="#apitoken-form"
 			hx-swap="outerHTML"
 			class="grid grid-cols-[auto,1fr] gap-4 text-xs mt-4"
@@ -162,7 +163,7 @@ templ TeamSettings(teamId string, team store.Team, apiTokens []store.ApiToken) {
 									<li>
 										<a class="tooltip" data-tip="delete">
 											<button
-												hx-delete={ fmt.Sprintf("/dashboard/%s/invites/%s", teamId, invite.Email) }
+												hx-delete={ urls.DeleteTeamInvite{TeamId: teamId, Email: invite.Email}.Render() }
 												hx-confirm="are you sure you want to remove this invite?"
 												class="w-4 h-4"
 											>
@@ -232,7 +233,7 @@ templ TeamSettings(teamId string, team store.Team, apiTokens []store.ApiToken) {
 										<li>
 											<a class="tooltip" data-tip="delete">
 												<button
-													hx-delete={ fmt.Sprintf("/dashboard/%s/apitokens/%s", teamId, token.Id) }
+													hx-delete={ urls.DeleteTeamApiToken{TeamId: teamId, ApiTokenId: token.Id}.Render() }
 													hx-confirm="Are you sure you want to delete this API token?"
 													class="w-4 h-4"
 												>
