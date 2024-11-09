@@ -1,6 +1,9 @@
 package templates
 
-import "github.com/onmetal-dev/metal/lib/store"
+import (
+	"github.com/onmetal-dev/metal/lib/store"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
+)
 
 templ Onboarding(user store.User) {
 	<div class="flex flex-col items-center justify-start max-w-md gap-4 mx-auto">
@@ -8,7 +11,7 @@ templ Onboarding(user store.User) {
 		<p>to get started spinning up servers and deploying stuff, you'll need to create a team and add a payment method.</p>
 		<div hx-ext="response-targets">
 			<form
-				hx-post="/onboarding"
+				hx-post={ urls.Onboarding.Render() }
 				hx-trigger="submit"
 				hx-target-error="#form-error"
 				class="flex flex-col gap-4"

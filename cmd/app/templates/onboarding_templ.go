@@ -8,7 +8,10 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/onmetal-dev/metal/lib/store"
+import (
+	"github.com/onmetal-dev/metal/cmd/app/urls"
+	"github.com/onmetal-dev/metal/lib/store"
+)
 
 func Onboarding(user store.User) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -28,7 +31,20 @@ func Onboarding(user store.User) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-col items-center justify-start max-w-md gap-4 mx-auto\"><p>welcome to metal!</p><p>to get started spinning up servers and deploying stuff, you'll need to create a team and add a payment method.</p><div hx-ext=\"response-targets\"><form hx-post=\"/onboarding\" hx-trigger=\"submit\" hx-target-error=\"#form-error\" class=\"flex flex-col gap-4\"><div id=\"form-error\"></div><div class=\"flex flex-col gap-2\"><label for=\"team-name\">team name</label> <input class=\"input input-bordered input-primary\" type=\"text\" name=\"team-name\" id=\"team-name\" placeholder=\"the dream team\" required=\"\"></div><button type=\"submit\" class=\"btn btn-primary\">create team</button></form></div></div>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex flex-col items-center justify-start max-w-md gap-4 mx-auto\"><p>welcome to metal!</p><p>to get started spinning up servers and deploying stuff, you'll need to create a team and add a payment method.</p><div hx-ext=\"response-targets\"><form hx-post=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var2 string
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(urls.Onboarding.Render())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/onboarding.templ`, Line: 14, Col: 38}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\" hx-trigger=\"submit\" hx-target-error=\"#form-error\" class=\"flex flex-col gap-4\"><div id=\"form-error\"></div><div class=\"flex flex-col gap-2\"><label for=\"team-name\">team name</label> <input class=\"input input-bordered input-primary\" type=\"text\" name=\"team-name\" id=\"team-name\" placeholder=\"the dream team\" required=\"\"></div><button type=\"submit\" class=\"btn btn-primary\">create team</button></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

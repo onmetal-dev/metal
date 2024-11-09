@@ -9,7 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	"fmt"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/form"
 	"github.com/onmetal-dev/metal/lib/store"
 )
@@ -60,9 +60,9 @@ func CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, er
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/dashboard/%s/apps/new", teamId))
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(urls.NewApp{TeamId: teamId}.Render())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 35, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/dashboard-create-app.templ`, Line: 35, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {

@@ -3,12 +3,14 @@ package templates
 import (
 	"fmt"
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
+    "github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/samber/lo"
 	"strings"
-	"time"
 )
+
+const TimeFormat = "Jan 02 15:04:05"
 
 templ party() {
 	<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-party-popper"><path d="M5.8 11.3 2 22l10.7-3.79"></path><path d="M4 3h.01"></path><path d="M22 8h.01"></path><path d="M15 2h.01"></path><path d="M22 20h.01"></path><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"></path><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"></path><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"></path><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"></path></svg>
@@ -20,7 +22,6 @@ const (
 	TabNameHome      TabName = "home"
 	TabNameBuyServer TabName = "buy server"
 	TabNameCreateApp TabName = "create app"
-	TabNameSettings  TabName = "settings"
 )
 
 type Tab struct {
@@ -28,21 +29,36 @@ type Tab struct {
 	Href string
 }
 
-func dashboardTabs(teamId string) []Tab {
+func dashboardTabs(teamId string, envId string) []Tab {
 	return []Tab{
-		{Name: TabNameHome, Href: fmt.Sprintf("/dashboard/%s", teamId)},
-		{Name: TabNameBuyServer, Href: fmt.Sprintf("/dashboard/%s/servers/new", teamId)},
-		{Name: TabNameCreateApp, Href: fmt.Sprintf("/dashboard/%s/apps/new", teamId)},
-		{Name: TabNameSettings, Href: fmt.Sprintf("/dashboard/%s/settings", teamId)},
+		{Name: TabNameHome, Href: urls.Home{TeamId: teamId, EnvName: envId}.Render()},
+		{Name: TabNameBuyServer, Href: urls.NewServer{TeamId: teamId}.Render()},
+		{Name: TabNameCreateApp, Href: urls.NewApp{TeamId: teamId}.Render()},
 	}
 }
 
 type DashboardState struct {
 	User              store.User
-	UserTeams         []store.Team
+	Teams         []store.Team
 	ActiveTeam        store.Team
+    Envs []store.Env
+	ActiveEnv         *store.Env
 	ActiveTabName     TabName
 	AdditionalScripts []ScriptTag
+}
+
+func boolToString(value bool) string {
+	if value {
+		return "true"
+	}
+	return "false"
+}
+
+func activeEnvNameOrSentinel(env *store.Env) string {
+	if env == nil {
+		return urls.DefaultEnvSentinel
+	}
+	return env.Name
 }
 
 templ dashboardNav(state DashboardState) {
@@ -51,7 +67,7 @@ templ dashboardNav(state DashboardState) {
 			<div class="flex-1">
 				@logoWithText()
 				<div role="tablist" class="pl-4 tabs">
-					for _, tab := range dashboardTabs(state.ActiveTeam.Id) {
+					for _, tab := range dashboardTabs(state.ActiveTeam.Id, activeEnvNameOrSentinel(state.ActiveEnv)) {
 						if tab.Name == state.ActiveTabName {
 							<a role="tab" class="font-bold border-b-2 tab border-primary" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a>
 						} else {
@@ -59,33 +75,51 @@ templ dashboardNav(state DashboardState) {
 						}
 					}
 				</div>
+                <ul class="px-1 pt-2 menu menu-horizontal">
+                    <li>
+                        <details>
+                            <summary>{ state.ActiveTeam.Name }</summary>
+                            <ul>
+                                <li><a>settings</a></li>
+                                if len(state.Teams) > 1 {
+                                <li>
+                                    <h2 class="menu-title">switch</h2>
+                                    <ul>
+                                        for _, team := range state.Teams {
+                                        <li><a href={ templ.SafeURL(urls.Home{TeamId: team.Id, EnvName: "x" }.Render()) }>{ team.Name }</a>
+                                        </li>
+                                        }
+                                    </ul>
+                                </li>
+                                <li><a>create team</a></li>
+                                }
+                            </ul>
+                        </details>
+                    </li>
+                    if state.ActiveEnv != nil {
+                        // <li>/</li>
+                        <li>
+                            <details>
+                                <summary>{ state.ActiveEnv.Name }</summary>
+                                <ul>
+                                    for _, env := range state.Envs {
+                                    <li><a disabled={boolToString(env.Id==state.ActiveEnv.Id)} href={ templ.SafeURL(urls.Home{TeamId:
+                                            state.ActiveTeam.Id, EnvName: env.Name}.Render()) }>{env.Name}</a></li>
+                                    }
+                                </ul>
+                            </details>
+                        </li>
+                    }
+                </ul>
 			</div>
 			<div class="flex-none">
 				<ul class="px-1 menu menu-horizontal">
 					<li>
 						<details>
-							<summary>{ state.ActiveTeam.Name }</summary>
-							<ul>
-								if len(state.UserTeams) > 0 {
-									<li>
-										<h2 class="menu-title">switch</h2>
-										<ul>
-											for _, team := range state.UserTeams {
-												<li><a href={ templ.SafeURL("/dashboard/" + team.Id) }>{ team.Name }</a></li>
-											}
-										</ul>
-									</li>
-									<li><a>create team</a></li>
-								}
-							</ul>
-						</details>
-					</li>
-					<li>
-						<details>
 							<summary>{ state.User.Email }</summary>
 							<ul class="p-2 rounded-t-none bg-base-100">
 								<li><a>settings</a></li>
-								<li><a hx-target="body" hx-swap="innerHTML" hx-post="/logout">logout</a></li>
+								<li><a hx-target="body" hx-swap="innerHTML" hx-post={ urls.Logout.Render() }>logout</a></li>
 							</ul>
 						</details>
 					</li>
@@ -120,7 +154,7 @@ templ DashboardHomeNoServers(teamId string) {
 	<div>
 		<div role="alert" class="alert alert-success">
 			@party()
-			<span>welcome! to get started, launch a <a href={ templ.SafeURL("/dashboard/" + teamId + "/servers/new") } class="link">server</a></span>
+			<span>welcome! to get started, launch a <a href={ templ.SafeURL(urls.NewServer{TeamId: teamId}.Render()) } class="link">server</a></span>
 		</div>
 		@flashes(middleware.GetFlashes(ctx))
 		<div class="flex flex-col items-center justify-start w-full h-full gap-4 mt-20">
@@ -216,8 +250,8 @@ templ ServerStatsMem(stats *cellprovider.ServerStats) {
 	}
 }
 
-templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, deployments []store.Deployment, apps []store.App) {
-	<div hx-ext="sse" sse-connect={ "/dashboard/" + teamId + "/sse" }>
+templ DashboardHome(teamId string, envName string, servers []store.Server, cells []store.Cell, deployments []store.Deployment, apps []store.App) {
+	<div hx-ext="sse" sse-connect={ urls.HomeSse{TeamId: teamId, EnvName: envName}.Render() }>
 		@flashes(middleware.GetFlashes(ctx))
 		<div class="flex flex-col items-center justify-start w-full h-full gap-4">
 			<div class="divider">Servers</div>
@@ -253,7 +287,7 @@ templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, d
 							<td>{ server.OfferingId }</td>
 							<td>{ server.LocationId }</td>
 							<td>{ string(server.Status) }</td>
-							<td>{ server.CreatedAt.Format(time.RFC3339) }</td>
+							<td class="whitespace-nowrap">{ server.CreatedAt.Format(TimeFormat) }</td>
 							<td>
 								if server.PublicIpv4 != nil {
 									{ *server.PublicIpv4 }
@@ -278,18 +312,32 @@ templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, d
 			</table>
 			if (len(deployments) > 0) {
 				<div class="divider">Deployments</div>
+                // <select id="env-filter" class="mb-4">
+                //     <option value="<all>">all</option>
+                //     for _, env := range lo.Uniq(lo.Map(deployments, func(d store.Deployment, _ int) string { return d.Env.Name })) {
+                //       <option value={ env }>{ env }</option>
+                //     }
+                // </select>
 				<table class="table table-xs" id="deployments-table">
 					<thead>
 						<tr>
 							<th>id</th>
 							<th>app</th>
-							<th>environment</th>
+							<th><div class="dropdown">
+                                <div tabindex="0" role="button">environment</div>
+                                <ul tabindex="0" class="dropdown-content menu bg-base-100 z-[1] w-52 m-0 p-0 shadow text-xs">
+                                    for _, env := range lo.Uniq(lo.Map(deployments, func(d store.Deployment, _ int) string { return d.Env.Name })) {
+                                        <li class="border border-base-200"><a class="pl-2">{ env }</a></li>
+                                    }
+                                </ul>
+                            </div></th>
 							<th>type</th>
-							<th>status</th>
 							<th>cpu (cores)</th>
 							<th>memory (mib)</th>
 							<th>replicas</th>
 							<th>created at</th>
+                            <th>status</th>
+                            <th>status reason</th>
 							<th></th>
 						</tr>
 					</thead>
@@ -297,20 +345,21 @@ templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, d
 						for _, deployment := range deployments {
 							<tr>
 								<td>{ fmt.Sprintf("%d", deployment.Id) }</td>
-								<td>{ deployment.App.Name }</td>
-								<td>{ deployment.Env.Name }</td>
+								<td class="whitespace-nowrap">{ deployment.App.Name }</td>
+								<td class="whitespace-nowrap">{ deployment.Env.Name }</td>
 								<td>{ string(deployment.Type) }</td>
-								<td>{ string(deployment.Status) }</td>
 								if resources := deployment.AppSettings.Resources.Data(); true {
 									<td>{ fmt.Sprintf("%.2f", resources.Requests.CpuCores) }</td>
 									<td>{ fmt.Sprintf("%d", resources.Requests.MemoryMiB) }</td>
 								}
 								<td>{ fmt.Sprintf("%d", deployment.Replicas) }</td>
-								<td>{ deployment.CreatedAt.Format(time.RFC3339) }</td>
+								<td class="whitespace-nowrap">{ deployment.CreatedAt.Format(TimeFormat) }</td>
+								<td>{ string(deployment.Status) }</td>
+								<td>{ string(deployment.StatusReason) }</td>
 								<td>
 									<ul class="p-0 menu menu-horizontal menu-xs rounded-box">
 										<li>
-											<a class="tooltip" data-tip="Logs" href={ templ.SafeURL("/dashboard/" + teamId + "/apps/" + deployment.AppId + "/envs/" + deployment.EnvId + "/deployments/" + fmt.Sprintf("%d", deployment.Id) + "/logs") }>
+											<a class="tooltip" data-tip="Logs" href={ templ.SafeURL(urls.DeploymentLogs{TeamId: teamId, AppId: deployment.AppId, EnvId: deployment.EnvId, DeploymentId: deployment.Id}.Render()) }>
 												<button class="w-4 h-4">
 													@iconLogs()
 												</button>
@@ -343,21 +392,21 @@ templ DashboardHome(teamId string, servers []store.Server, cells []store.Cell, d
 								<td>{ app.Id }</td>
 								<td>{ app.Name }</td>
 								<td>
-									{ strings.Join(lo.Map(deploymentEnvsForApp(deployments, app), func(env store.Env, _ int) string {
-								return env.Name
-							}), ", ") }
+									{ strings.Join(lo.Uniq(lo.Map(deploymentEnvsForApp(deployments, app), func(env store.Env, _ int) string {
+										return env.Name
+									})), ", ") }
 								</td>
 								if cpu, mem := totalResourcesForApp(deployments, app); true {
 									<td>{ fmt.Sprintf("%.2f", cpu) }</td>
 									<td>{ fmt.Sprintf("%d", mem) }</td>
 								}
-								<td>{ app.CreatedAt.Format(time.RFC3339) }</td>
+								<td class="whitespace-nowrap">{ app.CreatedAt.Format(TimeFormat) }</td>
 								<td>
 									<ul class="p-0 menu menu-horizontal menu-xs rounded-box">
 										<li>
 											<a class="tooltip" data-tip="Delete">
-												<button
-													hx-delete={ "/dashboard/" + teamId + "/apps/" + app.Id }
+                                                <button
+													hx-delete={ urls.App{TeamId: teamId, AppId: app.Id}.Render() }
 													hx-confirm="Are you sure you want to delete this app?"
 													class="w-4 h-4"
 												>

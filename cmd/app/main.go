@@ -22,6 +22,7 @@ import (
 	"github.com/onmetal-dev/metal/cmd/app/handlers/api"
 	"github.com/onmetal-dev/metal/cmd/app/hash/passwordhash"
 	m "github.com/onmetal-dev/metal/cmd/app/middleware"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/background"
 	"github.com/onmetal-dev/metal/lib/background/celljanitor"
 	"github.com/onmetal-dev/metal/lib/background/deployment"
@@ -356,20 +357,20 @@ func main() {
 
 		r.Get("/", handlers.NewHomeHandler().ServeHTTP)
 
-		r.Get("/about", handlers.NewAboutHandler().ServeHTTP)
+		r.Get(urls.About.Pattern(), handlers.NewAboutHandler().ServeHTTP)
 
-		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		r.Get(urls.Health.Pattern(), func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
 
-		r.Post("/waitlist", handlers.NewPostWaitlistHandler(handlers.PostWaitlistHandlerParams{
+		r.Post(urls.Waitlist.Pattern(), handlers.NewPostWaitlistHandler(handlers.PostWaitlistHandlerParams{
 			WaitlistStore: waitlistStore,
 		}).ServeHTTP)
-		r.Get("/signup", handlers.NewGetSignUpHandler(inviteStore, teamStore).ServeHTTP)
-		r.Post("/signup", handlers.NewPostSignUpHandler(userStore, inviteStore, teamStore).ServeHTTP)
-		r.Get("/login", handlers.NewGetLoginHandler().ServeHTTP)
-		r.Post("/login", handlers.NewPostLoginHandler(userStore, teamStore, passwordhash, sessionStore, c.SessionName).ServeHTTP)
-		r.Post("/logout", handlers.NewPostLogoutHandler(handlers.PostLogoutHandlerParams{
+		r.Get(urls.Signup.Pattern(), handlers.NewGetSignUpHandler(inviteStore, teamStore).ServeHTTP)
+		r.Post(urls.Signup.Pattern(), handlers.NewPostSignUpHandler(userStore, inviteStore, teamStore).ServeHTTP)
+		r.Get(urls.Login.Pattern(), handlers.NewGetLoginHandler().ServeHTTP)
+		r.Post(urls.Login.Pattern(), handlers.NewPostLoginHandler(userStore, teamStore, passwordhash, sessionStore, c.SessionName).ServeHTTP)
+		r.Post(urls.Logout.Pattern(), handlers.NewPostLogoutHandler(handlers.PostLogoutHandlerParams{
 			SessionStore: sessionStore,
 			SessionName:  c.SessionName,
 		}).ServeHTTP)
@@ -378,27 +379,27 @@ func main() {
 		r.Group(func(r chi.Router) {
 			dashboardHandler := handlers.NewDashboardHandler(userStore, teamStore, serverStore, cellStore, deploymentStore, appStore, cellProviderForType)
 			r.Use(m.RequireLoggedInUser)
-			r.Get("/onboarding", handlers.NewGetOnboardingHandler(teamStore).ServeHTTP)
-			r.Post("/onboarding", handlers.NewPostOnboardingHandler(teamStore).ServeHTTP)
-			r.Get("/onboarding/{teamId}/payment", handlers.NewGetOnboardingPaymentHandler(teamStore, stripeCustomerSession).ServeHTTP)
-			r.Post("/onboarding/{teamId}/payment", handlers.NewPostOnboardingPaymentHandler(teamStore, stripeSetupIntent).ServeHTTP)
-			r.Get("/onboarding/{teamId}/payment/confirm", handlers.NewGetOnboardingPaymentConfirmHandler(teamStore, stripeSetupIntent, stripeCustomer).ServeHTTP)
-			r.Get("/dashboard/{teamId}", dashboardHandler.ServeHTTP)
-			r.Get("/dashboard/{teamId}/sse", dashboardHandler.ServeHTTPSSE)
-			r.Get("/dashboard/{teamId}/servers/new", handlers.NewGetServersNewHandler(teamStore, serverOfferingStore).ServeHTTP)
-			r.Get("/dashboard/{teamId}/servers/checkout", handlers.NewGetServersCheckoutHandler(teamStore, serverOfferingStore, stripeCheckoutSession, stripeProduct, stripePrice, stripeMeter, c.StripePublishableKey).ServeHTTP)
-			r.Get("/dashboard/{teamId}/servers/checkout-return-url", handlers.NewGetServersCheckoutReturnHandler(teamStore, serverOfferingStore, stripeCheckoutSession, producerFulfillment).ServeHTTP)
-			r.Get("/dashboard/{teamId}/apps/new", handlers.NewAppsNewHandler(userStore, teamStore, serverStore, cellStore).ServeHTTP)
-			r.Post("/dashboard/{teamId}/apps/new", handlers.NewPostAppsNewHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, producerDeployment).ServeHTTP)
-			r.Delete("/dashboard/{teamId}/apps/{appId}", handlers.NewDeleteAppHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, cellProviderForType).ServeHTTP)
+			r.Get(urls.Onboarding.Render(), handlers.NewGetOnboardingHandler(teamStore).ServeHTTP)
+			r.Post(urls.Onboarding.Render(), handlers.NewPostOnboardingHandler(teamStore).ServeHTTP)
+			r.Get(urls.OnboardingPayment{}.Pattern(), handlers.NewGetOnboardingPaymentHandler(teamStore, stripeCustomerSession).ServeHTTP)
+			r.Post(urls.OnboardingPayment{}.Pattern(), handlers.NewPostOnboardingPaymentHandler(teamStore, stripeSetupIntent).ServeHTTP)
+			r.Get(urls.OnboardingPaymentConfirm{}.Pattern(), handlers.NewGetOnboardingPaymentConfirmHandler(teamStore, stripeSetupIntent, stripeCustomer).ServeHTTP)
+			r.Get(urls.Home{}.Pattern(), dashboardHandler.ServeHTTP)
+			r.Get(urls.HomeSse{}.Pattern(), dashboardHandler.ServeHTTPSSE)
+			r.Get(urls.NewServer{}.Pattern(), handlers.NewGetServersNewHandler(teamStore, serverOfferingStore).ServeHTTP)
+			r.Get(urls.ServerCheckout{}.Pattern(), handlers.NewGetServersCheckoutHandler(teamStore, serverOfferingStore, stripeCheckoutSession, stripeProduct, stripePrice, stripeMeter, c.StripePublishableKey).ServeHTTP)
+			r.Get(urls.ServerCheckoutReturnUrl{}.Pattern(), handlers.NewGetServersCheckoutReturnHandler(teamStore, serverOfferingStore, stripeCheckoutSession, producerFulfillment).ServeHTTP)
+			r.Get(urls.NewApp{}.Pattern(), handlers.NewAppsNewHandler(userStore, teamStore, serverStore, cellStore).ServeHTTP)
+			r.Post(urls.NewApp{}.Pattern(), handlers.NewPostAppsNewHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, producerDeployment).ServeHTTP)
+			r.Delete(urls.App{}.Pattern(), handlers.NewDeleteAppHandler(userStore, teamStore, serverStore, cellStore, appStore, deploymentStore, cellProviderForType).ServeHTTP)
 			logsHandler := handlers.NewGetDeploymentLogsHandler(teamStore, deploymentStore, cellProviderForType)
-			r.Get("/dashboard/{teamId}/apps/{appId}/envs/{envId}/deployments/{deploymentId}/logs", logsHandler.ServeHTTP)
-			r.Post("/dashboard/{teamId}/apps/{appId}/envs/{envId}/deployments/{deploymentId}/logs", logsHandler.ServeHTTP)
-			r.Get("/dashboard/{teamId}/settings", handlers.NewGetTeamSettingsHandler(userStore, teamStore, apiTokenStore).ServeHTTP)
-			r.Post("/dashboard/{teamId}/invites", handlers.NewPostInviteHandler(userStore, teamStore, c.LoopsApiKey, c.LoopsTxAddedToTeamNewUser, c.LoopsTxAddedToTeamExistingUser).ServeHTTP)
-			r.Delete("/dashboard/{teamId}/invites/{email}", handlers.NewDeleteInviteHandler(teamStore).ServeHTTP)
-			r.Post("/dashboard/{teamId}/apitokens", handlers.NewPostApiTokenHandler(teamStore, apiTokenStore).ServeHTTP)
-			r.Delete("/dashboard/{teamId}/apitokens/{apiTokenId}", handlers.NewDeleteApiTokenHandler(teamStore, apiTokenStore).ServeHTTP)
+			r.Get(urls.DeploymentLogs{}.Pattern(), logsHandler.ServeHTTP)
+			r.Post(urls.DeploymentLogs{}.Pattern(), logsHandler.ServeHTTP)
+			r.Get(urls.TeamSettings{}.Pattern(), handlers.NewGetTeamSettingsHandler(userStore, teamStore, apiTokenStore).ServeHTTP)
+			r.Post(urls.TeamInvites{}.Pattern(), handlers.NewPostInviteHandler(userStore, teamStore, c.LoopsApiKey, c.LoopsTxAddedToTeamNewUser, c.LoopsTxAddedToTeamExistingUser).ServeHTTP)
+			r.Delete(urls.DeleteTeamInvite{}.Pattern(), handlers.NewDeleteInviteHandler(teamStore).ServeHTTP)
+			r.Post(urls.TeamApiTokens{}.Pattern(), handlers.NewPostApiTokenHandler(teamStore, apiTokenStore).ServeHTTP)
+			r.Delete(urls.DeleteTeamApiToken{}.Pattern(), handlers.NewDeleteApiTokenHandler(teamStore, apiTokenStore).ServeHTTP)
 		})
 
 		// API routes

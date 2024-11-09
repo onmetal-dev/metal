@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/sessions"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/store"
 )
 
@@ -125,7 +126,7 @@ func RequireLoggedInUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := GetUser(r.Context())
 		if user == nil {
-			http.Redirect(w, r, "/login?next="+r.URL.RequestURI(), http.StatusFound)
+			http.Redirect(w, r, urls.Login.Render()+"?next="+r.URL.RequestURI(), http.StatusFound)
 			return
 		}
 		next.ServeHTTP(w, r)

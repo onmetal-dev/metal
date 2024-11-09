@@ -1,6 +1,8 @@
 package templates
 
-import "fmt"
+import (
+	"github.com/onmetal-dev/metal/cmd/app/urls"
+)
 
 templ OnboardingPayment(nonce string, teamId string, stripeCustomerSessionClientSecret string) {
 	<div class="flex flex-col items-center justify-start max-w-md gap-4 mx-auto">
@@ -13,7 +15,7 @@ templ OnboardingPayment(nonce string, teamId string, stripeCustomerSessionClient
 		@templ.JSONScript("scriptData", map[string]string{
 			"customerSessionClientSecret": stripeCustomerSessionClientSecret,
 			"key":                         "pk_test_51PLTflDAkR0SeGPZBoKim1zPKLPdCrrlsh8LG2sKcIHN66Ro55qIPFvG3Mx1mZYoMTW8FfQOu5dcIoB0QCskX1Qc00sEZJby2F",
-			"urlPath":                     fmt.Sprintf("/onboarding/%s/payment", teamId),
+			"urlPath":                     urls.OnboardingPayment{TeamId: teamId}.Render(),
 		}).WithNonceFromString(nonce)
 		<script nonce={ nonce }>
             const scriptData = JSON.parse(document.getElementById('scriptData').textContent);

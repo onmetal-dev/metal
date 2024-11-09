@@ -41,9 +41,8 @@ func (h *GetTeamSettingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 	dashboardState := templates.DashboardState{
 		User:              *user,
-		UserTeams:         userTeams,
+		Teams:             userTeams,
 		ActiveTeam:        *team,
-		ActiveTabName:     templates.TabNameSettings,
 		AdditionalScripts: []templates.ScriptTag{},
 	}
 

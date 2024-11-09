@@ -8,6 +8,8 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
+import "github.com/onmetal-dev/metal/cmd/app/urls"
+
 func SignUpPage(allowed bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -31,7 +33,29 @@ func SignUpPage(allowed bool) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if allowed {
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<form hx-post=\"/signup\" hx-trigger=\"submit\" hx-target-401=\"#signup-error\" hx-swap=\"outerHTML\" class=\"flex flex-col gap-4\"><div id=\"signup-error\"></div><div class=\"flex flex-col gap-2\"><label for=\"email\">email</label> <input class=\"input input-bordered input-primary\" type=\"email\" name=\"email\" id=\"email\" placeholder=\"name@company.com\" required=\"\"></div><div class=\"flex flex-col gap-2\"><label for=\"password\">password</label> <input class=\"input input-bordered input-primary\" type=\"password\" name=\"password\" id=\"password\" placeholder=\"••••••••\" required=\"\"></div><button type=\"submit\" class=\"btn btn-primary\">sign up</button><p>already have an account? <a href=\"/login\" class=\"link\">login</a></p></form>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<form hx-post=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var2 string
+			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(urls.Signup.Render())
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/signup.templ`, Line: 9, Col: 34}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\" hx-trigger=\"submit\" hx-target-401=\"#signup-error\" hx-swap=\"outerHTML\" class=\"flex flex-col gap-4\"><div id=\"signup-error\"></div><div class=\"flex flex-col gap-2\"><label for=\"email\">email</label> <input class=\"input input-bordered input-primary\" type=\"email\" name=\"email\" id=\"email\" placeholder=\"name@company.com\" required=\"\"></div><div class=\"flex flex-col gap-2\"><label for=\"password\">password</label> <input class=\"input input-bordered input-primary\" type=\"password\" name=\"password\" id=\"password\" placeholder=\"••••••••\" required=\"\"></div><button type=\"submit\" class=\"btn btn-primary\">sign up</button><p>already have an account? <a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var3 templ.SafeURL = templ.SafeURL(urls.Login.Render())
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var3)))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\" class=\"link\">login</a></p></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -62,12 +86,21 @@ func SignUpSuccess() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var2 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var2 == nil {
-			templ_7745c5c3_Var2 = templ.NopComponent
+		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var4 == nil {
+			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<h1>Sign up successful</h1><p>Go to <a class=\"link\" href=\"login\">login</a></p>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<h1>Sign up successful</h1><p>Go to <a class=\"link\" href=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var5 templ.SafeURL = templ.SafeURL(urls.Login.Render())
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var5)))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\">login</a></p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -88,9 +121,9 @@ func SignUpError() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var3 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var3 == nil {
-			templ_7745c5c3_Var3 = templ.NopComponent
+		templ_7745c5c3_Var6 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var6 == nil {
+			templ_7745c5c3_Var6 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div><h1>Sign up failed</h1><p>There was an error registering your account</p></div>")

@@ -1,7 +1,7 @@
 package templates
 
 import (
-	"fmt"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/form"
 	"github.com/onmetal-dev/metal/lib/store"
 )
@@ -32,7 +32,7 @@ func selectClass(error error) string {
 templ CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, errors form.FieldErrors, submitError error) {
 	<form
 		novalidate
-		hx-post={ fmt.Sprintf("/dashboard/%s/apps/new", teamId) }
+		hx-post={ urls.NewApp{TeamId: teamId}.Render() }
 		hx-disabled-elt="find button[type='submit']"
 		hx-trigger="submit"
 		hx-indicator="find .loading"

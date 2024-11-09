@@ -1,9 +1,13 @@
 package templates
 
+import (
+	"github.com/onmetal-dev/metal/cmd/app/urls"
+)
+
 templ Login(next string) {
 	<div hx-ext="response-targets" class="max-w-md mx-auto">
 		<form
-			hx-post="/login"
+			hx-post={ urls.Login.Render() }
 			hx-trigger="submit"
 			hx-target-401="#login-error"
 			class="flex flex-col gap-4"
@@ -41,7 +45,7 @@ templ Login(next string) {
 			</button>
 			<p>
 				don’t have an account yet?
-				<a href="/signup" class="link">sign up</a>
+				<a href={ templ.SafeURL(urls.Signup.Render()) } class="link">sign up</a>
 			</p>
 		</form>
 	</div>

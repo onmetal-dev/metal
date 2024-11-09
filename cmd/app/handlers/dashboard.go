@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/cmd/app/templates"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/logger"
 	"github.com/onmetal-dev/metal/lib/store"
@@ -157,6 +158,7 @@ func (h *DashboardHandler) ServeHTTPSSE(w http.ResponseWriter, r *http.Request) 
 func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	teamId := chi.URLParam(r, "teamId")
+	envName := chi.URLParam(r, "envName")
 	user := middleware.GetUser(ctx)
 	team, userTeams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
@@ -167,6 +169,8 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		cells       []store.Cell
 		deployments []store.Deployment
 		apps        []store.App
+		envs        []store.Env
+		activeEnv   store.Env
 	)
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -195,22 +199,49 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return err
 	})
 
+	g.Go(func() error {
+		var err error
+		envs, err = h.deploymentStore.GetEnvsForTeam(teamId)
+		if err != nil {
+			return err
+		}
+		for _, env := range envs {
+			if env.Name == envName {
+				activeEnv = env
+			}
+		}
+		return nil
+	})
+
 	if err := g.Wait(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	if activeEnv.Id == "" {
+		if envName == urls.DefaultEnvSentinel {
+			// redirect to the first env
+			envName = envs[0].Name
+			http.Redirect(w, r, urls.Home{TeamId: teamId, EnvName: envName}.Render(), http.StatusTemporaryRedirect)
+			return
+		}
+		http.Error(w, "env not found", http.StatusNotFound)
+		return
+	}
+
 	if err := templates.DashboardLayout(templates.DashboardState{
 		User:          *user,
-		UserTeams:     userTeams,
+		Teams:         userTeams,
 		ActiveTeam:    *team,
+		Envs:          envs,
+		ActiveEnv:     &activeEnv,
 		ActiveTabName: templates.TabNameHome,
 		AdditionalScripts: []templates.ScriptTag{
 			templates.ScriptTag{
 				Src: "/static/script/sse.js",
 			},
 		},
-	}, templates.DashboardHome(teamId, servers, cells, deployments, apps)).Render(ctx, w); err != nil {
+	}, templates.DashboardHome(teamId, envName, servers, cells, deployments, apps)).Render(ctx, w); err != nil {
 		http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
 	}
 }

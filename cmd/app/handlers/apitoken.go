@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/cmd/app/templates"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/form"
 	"github.com/onmetal-dev/metal/lib/store"
 )
@@ -48,7 +49,7 @@ func (h *PostApiTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("HX-Redirect", fmt.Sprintf("/dashboard/%s/settings", teamId))
+	w.Header().Set("HX-Redirect", urls.TeamSettings{TeamId: teamId}.Render())
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -79,6 +80,6 @@ func (h *DeleteApiTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("HX-Redirect", fmt.Sprintf("/dashboard/%s/settings", teamId))
+	w.Header().Set("HX-Redirect", urls.TeamSettings{TeamId: teamId}.Render())
 	w.WriteHeader(http.StatusOK)
 }

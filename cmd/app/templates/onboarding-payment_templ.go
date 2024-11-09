@@ -8,7 +8,9 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "fmt"
+import (
+	"github.com/onmetal-dev/metal/cmd/app/urls"
+)
 
 func OnboardingPayment(nonce string, teamId string, stripeCustomerSessionClientSecret string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -35,7 +37,7 @@ func OnboardingPayment(nonce string, teamId string, stripeCustomerSessionClientS
 		templ_7745c5c3_Err = templ.JSONScript("scriptData", map[string]string{
 			"customerSessionClientSecret": stripeCustomerSessionClientSecret,
 			"key":                         "pk_test_51PLTflDAkR0SeGPZBoKim1zPKLPdCrrlsh8LG2sKcIHN66Ro55qIPFvG3Mx1mZYoMTW8FfQOu5dcIoB0QCskX1Qc00sEZJby2F",
-			"urlPath":                     fmt.Sprintf("/onboarding/%s/payment", teamId),
+			"urlPath":                     urls.OnboardingPayment{TeamId: teamId}.Render(),
 		}).WithNonceFromString(nonce).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -47,7 +49,7 @@ func OnboardingPayment(nonce string, teamId string, stripeCustomerSessionClientS
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(nonce)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/onboarding-payment.templ`, Line: 18, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/onboarding-payment.templ`, Line: 20, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {

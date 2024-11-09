@@ -365,9 +365,9 @@ func LogEntry(log cellprovider.LogEntry) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var19 string
-		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(log.Timestamp.Format("Jan 02 15:04:05"))
+		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(log.Timestamp.Format(TimeFormat))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 99, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/app/templates/deployment-logs.templ`, Line: 99, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {

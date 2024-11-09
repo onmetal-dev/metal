@@ -1,10 +1,12 @@
 package templates
 
+import "github.com/onmetal-dev/metal/cmd/app/urls"
+
 templ SignUpPage(allowed bool) {
 	<div hx-ext="response-targets" class="max-w-md mx-auto">
 		if allowed {
 			<form
-				hx-post="/signup"
+				hx-post={ urls.Signup.Render() }
 				hx-trigger="submit"
 				hx-target-401="#signup-error"
 				hx-swap="outerHTML"
@@ -38,7 +40,7 @@ templ SignUpPage(allowed bool) {
 				</button>
 				<p>
 					already have an account?
-					<a href="/login" class="link">login</a>
+					<a href={ templ.SafeURL(urls.Login.Render()) } class="link">login</a>
 				</p>
 			</form>
 		} else {
@@ -49,7 +51,7 @@ templ SignUpPage(allowed bool) {
 
 templ SignUpSuccess() {
 	<h1>Sign up successful</h1>
-	<p>Go to <a class="link" href="login">login</a></p>
+	<p>Go to <a class="link" href={ templ.SafeURL(urls.Login.Render()) }>login</a></p>
 }
 
 templ SignUpError() {

@@ -2,6 +2,7 @@ package templates
 
 import (
 	"fmt"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/store"
 )
 
@@ -125,7 +126,7 @@ templ CreateServer(teamId string, serverOfferings []store.ServerOffering) {
 							<td>{ humanizePrice(findPrice(location.Id, offering.Prices).Monthly, findPrice(location.Id, offering.Prices).Currency) }</td>
 							<td>{ humanizePrice(findPrice(location.Id, offering.Prices).Setup, findPrice(location.Id, offering.Prices).Currency) }</td>
 							<th>
-								<a hx-boost="false" role="button" class="btn btn-primary" href={ templ.SafeURL(fmt.Sprintf("/dashboard/%s/servers/checkout?offeringId=%s&locationId=%s", teamId, offering.Id, location.Id)) }>select</a>
+								<a hx-boost="false" role="button" class="btn btn-primary" href={ templ.SafeURL(urls.ServerCheckout{TeamId: teamId, OfferingId: offering.Id, LocationId: location.Id}.Render()) }>select</a>
 							</th>
 						</tr>
 					}

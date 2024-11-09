@@ -40,7 +40,7 @@ func (h *GetDeploymentLogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	envId := chi.URLParam(r, "envId")
 	deploymentIdStr := chi.URLParam(r, "deploymentId")
 	user := middleware.GetUser(ctx)
-	team, userTeams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
+	team, teams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
@@ -123,7 +123,7 @@ func (h *GetDeploymentLogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	} else {
 		err = templates.DashboardLayout(templates.DashboardState{
 			User:          *user,
-			UserTeams:     userTeams,
+			Teams:         teams,
 			ActiveTeam:    *team,
 			ActiveTabName: templates.TabNameHome,
 		}, templates.DeploymentLogs(deployment, r.URL.Path, defaultFormData, form.FieldErrors{}, nil, []cellprovider.LogEntry{})).Render(ctx, w)

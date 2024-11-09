@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/onmetal-dev/metal/cmd/app/middleware"
 	"github.com/onmetal-dev/metal/cmd/app/templates"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/store"
 	"github.com/stripe/stripe-go/v79"
 	"github.com/stripe/stripe-go/v79/customer"
@@ -68,7 +69,7 @@ func (h *PostOnboardingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("HX-Redirect", fmt.Sprintf("/onboarding/%s/payment", team.Id))
+	w.Header().Set("HX-Redirect", urls.OnboardingPayment{TeamId: team.Id}.Render())
 	w.WriteHeader(http.StatusOK)
 }
 
