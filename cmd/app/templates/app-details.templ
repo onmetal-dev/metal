@@ -6,6 +6,8 @@ import (
 	"github.com/onmetal-dev/metal/cmd/app/urls"
     "github.com/dustin/go-humanize"
     "github.com/dustin/go-humanize/english"
+    "github.com/onmetal-dev/metal/cmd/app/middleware"
+    "github.com/onmetal-dev/metal/lib/form"
     "fmt"
 )
 
@@ -103,26 +105,49 @@ templ AppDetailsDeployments(activeDeployment *store.Deployment, sortedOtherDeplo
     </div>
 }
 
-templ AppDetailsVariables(app store.App) {
+type UpdateAppEnvVarsFormData struct {
+    EnvVars string `validate:"omitempty,dotenvformat"`
+}
+
+templ UpdateAppEnvVarsForm(teamId, envName, appId string, data UpdateAppEnvVarsFormData, errors form.FieldErrors, submitError error) {
+    <form novalidate hx-post={ urls.EnvAppVariablesUpdate{TeamId: teamId, EnvName: envName, AppId: appId}.Render() }
+        hx-disabled-elt="find button[type='submit']" hx-trigger="submit" hx-indicator="find .loading" hx-swap="outerHTML"
+        class="w-full">
+        <div class="flex flex-col gap-4">
+            <textarea name="EnvVars" class={ textareaClass(errors.Get("EnvVars")) } placeholder="KEY=value
+ANOTHER_KEY=another_value" rows="10">{ form.InputValue(data.EnvVars) }</textarea>
+            if errors.Get("EnvVars") != nil {
+            <div class="text-xs text-error">{ errors.Get("EnvVars").Error() }</div>
+            }
+            <div class="flex items-center justify-start gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">Update Variables</button>
+                <span class="htmx-indicator loading loading-ring loading-sm"></span>
+            </div>
+            if submitError != nil {
+            <div class="text-xs text-error">{ submitError.Error() }</div>
+            }
+        </div>
+    </form>
+}
+
+templ AppDetailsVariables(teamId, envName, appId string, data UpdateAppEnvVarsFormData, errors form.FieldErrors, submitError error) {
     <div class="flex flex-col items-start w-full h-full gap-4">
-        <p class="font-mono whitespace-pre-wrap">
-            Variables:
-            {string(templ.EscapeString(debug.PrettyJSON(app)))}
-        </p>
+        @UpdateAppEnvVarsForm(teamId, envName, appId, data, errors, submitError)
     </div>
 }
 
-templ AppDetailsSettings(app store.App) {
+templ AppDetailsSettings(appSettings store.AppSettings) {
     <div class="flex flex-col items-start w-full h-full gap-4">
         <p class="font-mono whitespace-pre-wrap">
             Settings:
-            {string(templ.EscapeString(debug.PrettyJSON(app)))}
+            {string(debug.PrettyJSON(appSettings))}
         </p>
     </div>
 }
 
 templ AppDetailsLayout(team store.Team, env store.Env, app store.App, selected AppMenuItemName, contents templ.Component) {
     <div class="flex flex-col items-start w-full h-full">
+        @flashes(middleware.GetFlashes(ctx))
         <div class="my-0 divider"></div>
         <div class="container sticky top-0 z-[1] navbar bg-base-100 backdrop-blur-sm px-0 pt-0">
             <div class="navbar-start min-w-fit">

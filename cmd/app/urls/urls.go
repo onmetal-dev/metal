@@ -372,3 +372,22 @@ func (u EnvAppSettings) Render() string {
 	}
 	return fmt.Sprintf("/dashboard/%s/envs/%s/apps/%s/settings", u.TeamId, u.EnvName, u.AppId)
 }
+
+type EnvAppVariablesUpdate struct {
+	TeamId  string
+	AppId   string
+	EnvName string
+}
+
+var _ Url = EnvAppVariablesUpdate{}
+
+func (u EnvAppVariablesUpdate) Pattern() string {
+	return "/dashboard/{teamId}/envs/{envName}/apps/{appId}/variables/update"
+}
+
+func (u EnvAppVariablesUpdate) Render() string {
+	if u.TeamId == "" || u.AppId == "" || u.EnvName == "" {
+		panic("teamId, appId, and envName are required")
+	}
+	return fmt.Sprintf("/dashboard/%s/envs/%s/apps/%s/variables/update", u.TeamId, u.EnvName, u.AppId)
+}

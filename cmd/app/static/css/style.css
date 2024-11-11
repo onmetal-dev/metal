@@ -3661,10 +3661,6 @@ input.tab:checked + .tab-content,
   z-index: 1;
 }
 
-.m-0 {
-  margin: 0px;
-}
-
 .mx-auto {
   margin-left: auto;
   margin-right: auto;
@@ -3906,11 +3902,6 @@ input.tab:checked + .tab-content,
   border-bottom-width: 2px;
 }
 
-.border-base-200 {
-  --tw-border-opacity: 1;
-  border-color: var(--fallback-b2,oklch(var(--b2)/var(--tw-border-opacity)));
-}
-
 .border-transparent {
   border-color: transparent;
 }
@@ -3972,10 +3963,6 @@ input.tab:checked + .tab-content,
 
 .pl-1 {
   padding-left: 0.25rem;
-}
-
-.pl-2 {
-  padding-left: 0.5rem;
 }
 
 .pt-0 {

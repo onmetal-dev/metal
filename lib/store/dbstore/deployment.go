@@ -297,6 +297,9 @@ func (s *DeploymentStore) GetLatestForAppEnv(ctx context.Context, appId string, 
 		}
 		return nil, err
 	}
+	if err := s.decryptAppEnvVars(&deployment.AppEnvVars); err != nil {
+		return nil, err
+	}
 	return &deployment, nil
 }
 
