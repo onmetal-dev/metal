@@ -16,6 +16,7 @@ require (
 	github.com/cloudflare/cloudflare-go v0.102.0
 	github.com/craigpastro/pgmq-go v0.4.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
+	github.com/dustin/go-humanize v1.0.1
 	github.com/equinix/equinix-sdk-go v0.42.0
 	github.com/floshodan/hrobot-go v0.0.0-20240813191752-ed07e44014ef
 	github.com/getkin/kin-openapi v0.127.0
@@ -157,7 +158,6 @@ require (
 	github.com/docker/docker v27.2.1+incompatible // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
