@@ -3,32 +3,37 @@ testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-full_bin = ""
 args_bin = []
 bin = "./bin/app"
-cmd = "make build"
-delay = 0
-exclude_dir = ["assets", "tmp", "vendor", "testdata", "node_modules", "lib/cli"]
+cmd = "make tailwind-build-dev && templ generate && go build -o ./bin/app ./cmd/app"
+delay = 1000
+exclude_dir = [
+    "assets",
+    "tmp",
+    "vendor",
+    "testdata",
+    "node_modules",
+    "lib/cli",
+    "bin",
+]
 exclude_file = []
-exclude_regex = ["_test.go", ".*_templ.go"]
+exclude_regex = ["_test.go", "_templ.go", "oapi.go"]
 exclude_unchanged = false
 follow_symlink = false
+full_bin = ""
 include_dir = []
-include_ext = ["go", "tpl", "tmpl", "templ", "html", "js", "yaml"]
-include_file = [
-    "./cmd/app/tailwind.config.js",
-    "./env/local/app/.env",
-    "./openapi.yaml",
-]
+include_ext = ["go", "tpl", "tmpl", "templ"]
+include_file = ["./env/local/app/.env"]
 kill_delay = "0s"
 log = "build-errors.log"
 poll = false
 poll_interval = 0
+post_cmd = ["kill -15 $(lsof -ti:8080)"]
+pre_cmd = []
 rerun = false
 rerun_delay = 500
 send_interrupt = false
 stop_on_error = false
-post_cmd = ["kill -15 $(lsof -ti:8080)"]
 
 [color]
 app = ""
@@ -39,10 +44,16 @@ watcher = "cyan"
 
 [log]
 main_only = false
+silent = false
 time = false
 
 [misc]
 clean_on_exit = false
+
+[proxy]
+app_port = 0
+enabled = false
+proxy_port = 0
 
 [screen]
 clear_on_rebuild = false

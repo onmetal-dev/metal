@@ -160,7 +160,7 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	teamId := chi.URLParam(r, "teamId")
 	envName := chi.URLParam(r, "envName")
 	user := middleware.GetUser(ctx)
-	team, userTeams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
+	team, teams := validateAndFetchTeams(ctx, h.teamStore, w, teamId, user)
 	if team == nil {
 		return
 	}
@@ -173,7 +173,7 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		activeEnv   store.Env
 	)
 
-	g, ctx := errgroup.WithContext(ctx)
+	g, _ := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		var err error
@@ -231,7 +231,7 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := templates.DashboardLayout(templates.DashboardState{
 		User:          *user,
-		Teams:         userTeams,
+		Teams:         teams,
 		ActiveTeam:    *team,
 		Envs:          envs,
 		ActiveEnv:     &activeEnv,

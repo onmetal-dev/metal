@@ -62,19 +62,19 @@ func activeEnvNameOrSentinel(env *store.Env) string {
 }
 
 templ dashboardNav(state DashboardState) {
-	<nav class="container sticky top-0 z-50 backdrop-blur-sm">
+	<nav class="container sticky top-0 z-10 backdrop-blur-sm">
 		<div class="p-0 navbar bg-base">
-			<div class="flex-1">
+			<div class="navbar-start min-w-fit">
 				@logoWithText()
-				<div role="tablist" class="pl-4 tabs">
+				<ul class="flex px-1 ml-2 menu menu-horizontal">
 					for _, tab := range dashboardTabs(state.ActiveTeam.Id, activeEnvNameOrSentinel(state.ActiveEnv)) {
 						if tab.Name == state.ActiveTabName {
-							<a role="tab" class="font-bold border-b-2 tab border-primary" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a>
+							<li><a class="font-bold border-b-2 border-primary" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a></li>
 						} else {
-							<a role="tab" class="border-b-2 border-transparent tab hover:border-primary/50" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a>
+							<li><a class="border-b-2 border-transparent hover:border-primary/50" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a></li>
 						}
 					}
-				</div>
+				</ul>
                 <ul class="px-1 pt-2 menu menu-horizontal">
                     <li>
                         <details>
@@ -97,7 +97,6 @@ templ dashboardNav(state DashboardState) {
                         </details>
                     </li>
                     if state.ActiveEnv != nil {
-                        // <li>/</li>
                         <li>
                             <details>
                                 <summary>{ state.ActiveEnv.Name }</summary>
@@ -112,7 +111,8 @@ templ dashboardNav(state DashboardState) {
                     }
                 </ul>
 			</div>
-			<div class="flex-none">
+            <div class="flex navbar-center"></div>
+			<div class="navbar-end">
 				<ul class="px-1 menu menu-horizontal">
 					<li>
 						<details>
@@ -377,8 +377,8 @@ templ DashboardHome(teamId string, envName string, servers []store.Server, cells
 				<table class="table table-xs" id="apps-table">
 					<thead>
 						<tr>
-							<th>id</th>
 							<th>name</th>
+							<th>id</th>
 							<th>deployment envs</th>
 							<th>total cpu (cores)</th>
 							<th>total memory (mib)</th>
@@ -388,9 +388,9 @@ templ DashboardHome(teamId string, envName string, servers []store.Server, cells
 					</thead>
 					<tbody>
 						for _, app := range apps {
-							<tr>
-								<td>{ app.Id }</td>
+							<tr class="cursor-pointer hover" hx-get={ urls.EnvApp{TeamId: teamId, AppId: app.Id, EnvName: envName}.Render() } hx-target="body" hx-swap="innerHTML show:window:top" hx-push-url={ urls.EnvApp{TeamId: teamId, AppId: app.Id, EnvName: envName}.Render() }>
 								<td>{ app.Name }</td>
+								<td>{ app.Id }</td>
 								<td>
 									{ strings.Join(lo.Uniq(lo.Map(deploymentEnvsForApp(deployments, app), func(env store.Env, _ int) string {
 										return env.Name

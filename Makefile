@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: templ-generate templ-watch
+.PHONY: templ-generate
 templ-generate: templ
 	templ generate
 
@@ -8,13 +8,13 @@ templ-generate: templ
 oapi-generate: oapi-codegen
 	oapi-codegen -config ./oapi-codegen.yaml ./openapi.yaml
 	
-.PHONY: tailwind-build tailwind-watch
+.PHONY: tailwind-build-prod tailwind-build-dev
 TAILWINDCLI := bunx tailwindcss
-tailwind-watch: bun
-	$(TAILWINDCLI) -i ./cmd/app/static/css/input.css -o ./cmd/app/static/css/style.css --watch
-tailwind-build: bun
+tailwind-build-prod: bun
 	bun install
 	$(TAILWINDCLI) -c ./cmd/app/tailwind.config.js -i ./cmd/app/static/css/input.css -o ./cmd/app/static/css/style.min.css --minify
+tailwind-build-dev: bun
+	bun install
 	$(TAILWINDCLI) -c ./cmd/app/tailwind.config.js -i ./cmd/app/static/css/input.css -o ./cmd/app/static/css/style.css
 
 
@@ -49,16 +49,15 @@ air:
 	fi
 
 .PHONY: build
-build: templ-generate oapi-generate tailwind-build
+build: oapi-generate tailwind-build-prod templ-generate
 	mkdir -p bin/
 	go build -o ./bin/app ./cmd/app
-
-.PHONY: dev-app
+.PHONY: dev dev-tracing dev-app dev-db dev-hetzner-sandbox dev-talhelper-sandbox
 dev: bun
-	bunx concurrently --kill-others-on-fail "make dev-tracing" "make dev-app" "make dev-db"
+	bunx concurrently --kill-others-on-fail "make dev-app" "make dev-db" 
 dev-tracing: docker
 	cd env/local/tracing && docker compose up
-dev-app: air build
+dev-app: air tailwind-build-dev
 	mkdir -p bin/
 	source env/local/app/.env && air -c env/local/app/air.toml
 dev-db: docker
