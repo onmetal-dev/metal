@@ -54,7 +54,7 @@ func (s TeamStore) CreateTeam(name string, description string) (*store.Team, err
 }
 
 func (s *TeamStore) preloadTeam(query *gorm.DB) *gorm.DB {
-	return query.Preload("Members").Preload("Members.User").Preload("InvitedMembers").Preload("PaymentMethods").Preload("Cells")
+	return query.Preload("Members").Preload("Members.User").Preload("InvitedMembers").Preload("PaymentMethods").Preload("Cells").Preload("Envs").Preload("Apps")
 }
 
 func (s TeamStore) GetTeam(ctx context.Context, id string) (*store.Team, error) {

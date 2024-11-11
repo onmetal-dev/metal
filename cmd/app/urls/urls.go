@@ -296,3 +296,98 @@ func (u DeleteTeamApiToken) Render() string {
 	}
 	return fmt.Sprintf("/dashboard/%s/apitokens/%s", u.TeamId, u.ApiTokenId)
 }
+
+type EnvApp struct {
+	TeamId  string
+	AppId   string
+	EnvName string
+}
+
+var _ Url = EnvApp{}
+
+func (u EnvApp) Pattern() string {
+	return "/dashboard/{teamId}/envs/{envName}/apps/{appId}"
+}
+
+func (u EnvApp) Render() string {
+	if u.TeamId == "" || u.AppId == "" || u.EnvName == "" {
+		panic("teamId, appId, and envName are required")
+	}
+	return fmt.Sprintf("/dashboard/%s/envs/%s/apps/%s", u.TeamId, u.EnvName, u.AppId)
+}
+
+type EnvAppDeployments struct {
+	TeamId  string
+	AppId   string
+	EnvName string
+}
+
+var _ Url = EnvAppDeployments{}
+
+func (u EnvAppDeployments) Pattern() string {
+	return "/dashboard/{teamId}/envs/{envName}/apps/{appId}/deployments"
+}
+
+func (u EnvAppDeployments) Render() string {
+	if u.TeamId == "" || u.AppId == "" || u.EnvName == "" {
+		panic(fmt.Sprintf("teamId, appId, and envName are required: %v", u))
+	}
+	return fmt.Sprintf("/dashboard/%s/envs/%s/apps/%s/deployments", u.TeamId, u.EnvName, u.AppId)
+}
+
+type EnvAppVariables struct {
+	TeamId  string
+	AppId   string
+	EnvName string
+}
+
+var _ Url = EnvAppVariables{}
+
+func (u EnvAppVariables) Pattern() string {
+	return "/dashboard/{teamId}/envs/{envName}/apps/{appId}/variables"
+}
+
+func (u EnvAppVariables) Render() string {
+	if u.TeamId == "" || u.AppId == "" || u.EnvName == "" {
+		panic("teamId, appId, and envName are required")
+	}
+	return fmt.Sprintf("/dashboard/%s/envs/%s/apps/%s/variables", u.TeamId, u.EnvName, u.AppId)
+}
+
+type EnvAppSettings struct {
+	TeamId  string
+	AppId   string
+	EnvName string
+}
+
+var _ Url = EnvAppSettings{}
+
+func (u EnvAppSettings) Pattern() string {
+	return "/dashboard/{teamId}/envs/{envName}/apps/{appId}/settings"
+}
+
+func (u EnvAppSettings) Render() string {
+	if u.TeamId == "" || u.AppId == "" || u.EnvName == "" {
+		panic("teamId, appId, and envName are required")
+	}
+	return fmt.Sprintf("/dashboard/%s/envs/%s/apps/%s/settings", u.TeamId, u.EnvName, u.AppId)
+}
+
+type EnvAppVariablesUpdate struct {
+	TeamId  string
+	AppId   string
+	EnvName string
+}
+
+var _ Url = EnvAppVariablesUpdate{}
+
+func (u EnvAppVariablesUpdate) Pattern() string {
+	return "/dashboard/{teamId}/envs/{envName}/apps/{appId}/variables/update"
+}
+
+func (u EnvAppVariablesUpdate) Render() string {
+	if u.TeamId == "" || u.AppId == "" || u.EnvName == "" {
+		panic("teamId, appId, and envName are required")
+	}
+	return fmt.Sprintf("/dashboard/%s/envs/%s/apps/%s/variables/update", u.TeamId, u.EnvName, u.AppId)
+}

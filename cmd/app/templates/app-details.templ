@@ -1,0 +1,236 @@
+package templates
+
+import (
+	"github.com/onmetal-dev/metal/lib/store"
+	"github.com/onmetal-dev/metal/lib/debug"
+	"github.com/onmetal-dev/metal/cmd/app/urls"
+    "github.com/dustin/go-humanize"
+    "github.com/dustin/go-humanize/english"
+    "github.com/onmetal-dev/metal/cmd/app/middleware"
+    "github.com/onmetal-dev/metal/lib/form"
+    "fmt"
+)
+
+
+type AppMenuItemName string
+
+const (
+    AppMenuItemDeployments AppMenuItemName = "deployments"
+    AppMenuItemVariables   AppMenuItemName = "variables"
+    AppMenuItemSettings    AppMenuItemName = "settings"
+)
+
+type appMenuItem struct {
+    Name AppMenuItemName
+    Href string
+    Selected bool
+}
+
+
+func appMenuItems(teamId, envName, appId string, selected AppMenuItemName) []appMenuItem {
+    return []appMenuItem{
+        {
+            Name: AppMenuItemDeployments,
+            Href: urls.EnvAppDeployments{ TeamId: teamId, EnvName: envName, AppId: appId }.Render(),
+            Selected: selected == AppMenuItemDeployments,
+        },
+        {
+            Name: AppMenuItemVariables,
+            Href: urls.EnvAppVariables{ TeamId: teamId, EnvName: envName, AppId: appId }.Render(),
+            Selected: selected == AppMenuItemVariables,
+        },
+        {
+            Name: AppMenuItemSettings,
+            Href: urls.EnvAppSettings{ TeamId: teamId, EnvName: envName, AppId: appId }.Render(),
+            Selected: selected == AppMenuItemSettings,
+        },
+    }
+}
+
+func colorForDeploymentStatus(status store.DeploymentStatus) string {
+    switch status {
+        case store.DeploymentStatusDeploying:
+            return "info"
+        case store.DeploymentStatusFailed:
+            return "error"
+        case store.DeploymentStatusRunning:
+            return "success"
+        default:
+            return "neutral-content"
+    }
+}
+
+templ deploymentCard(deployment store.Deployment) {
+    <div class="w-full mb-4 shadow-xl card bg-base-100">
+        <div class={cls("card-body", "cursor-pointer", "hover:bg-base-200", "border", fmt.Sprintf("border-%s", colorForDeploymentStatus(deployment.Status)))}>
+            <div class="flex flex-row items-baseline justify-start gap-2">
+                if deployment.Type != store.DeploymentTypeDeploy {
+                    <h2 class="card-title"># {fmt.Sprintf("%d (%s)", deployment.Id, string(deployment.Type))}</h2>
+                } else {
+                    <h2 class="card-title"># {fmt.Sprintf("%d", deployment.Id)}</h2>
+                }
+            </div>
+            <div class="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                <div>
+                    <div class="flex flex-row items-start gap-2 group">
+                        <span>{humanize.Time(deployment.CreatedAt)}</span>
+                    </div>
+                    <p>{english.Plural(deployment.Replicas, "replica", "")}</p>
+                    
+                </div>
+                <div>
+                    <p class="font-semibold">{string(deployment.Status)}</p>
+                    <p>{deployment.StatusReason}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+templ AppDetailsDeployments(activeDeployment *store.Deployment, sortedOtherDeployments []store.Deployment) {
+    <div class="flex flex-col items-start w-full h-full gap-4">
+        if activeDeployment == nil && len(sortedOtherDeployments) == 0 {
+            <p class="text-center">none</p>
+        } else if activeDeployment != nil {
+            <h3 class="font-bold">active</h3>
+            @deploymentCard(*activeDeployment)
+            <div class="divider"></div>
+        }
+        if len(sortedOtherDeployments) > 0 {
+            <h3 class="font-bold">history</h3>
+            for _, deployment := range sortedOtherDeployments {
+                @deploymentCard(deployment)
+            }
+        }
+    </div>
+}
+
+type UpdateAppEnvVarsFormData struct {
+    EnvVars string `validate:"omitempty,dotenvformat"`
+}
+
+templ UpdateAppEnvVarsForm(teamId, envName, appId string, data UpdateAppEnvVarsFormData, errors form.FieldErrors, submitError error) {
+    <form novalidate hx-post={ urls.EnvAppVariablesUpdate{TeamId: teamId, EnvName: envName, AppId: appId}.Render() }
+        hx-disabled-elt="find button[type='submit']" hx-trigger="submit" hx-indicator="find .loading" hx-swap="outerHTML"
+        class="w-full">
+        <div class="flex flex-col gap-4">
+            <textarea name="EnvVars" class={ textareaClass(errors.Get("EnvVars")) } placeholder="KEY=value
+ANOTHER_KEY=another_value" rows="10">{ form.InputValue(data.EnvVars) }</textarea>
+            if errors.Get("EnvVars") != nil {
+            <div class="text-xs text-error">{ errors.Get("EnvVars").Error() }</div>
+            }
+            <div class="flex items-center justify-start gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">Update Variables</button>
+                <span class="htmx-indicator loading loading-ring loading-sm"></span>
+            </div>
+            if submitError != nil {
+            <div class="text-xs text-error">{ submitError.Error() }</div>
+            }
+        </div>
+    </form>
+}
+
+templ AppDetailsVariables(teamId, envName, appId string, data UpdateAppEnvVarsFormData, errors form.FieldErrors, submitError error) {
+    <div class="flex flex-col items-start w-full h-full gap-4">
+        @UpdateAppEnvVarsForm(teamId, envName, appId, data, errors, submitError)
+    </div>
+}
+
+templ AppDetailsSettings(appSettings store.AppSettings) {
+    <div class="flex flex-col items-start w-full h-full gap-4">
+        <p class="font-mono whitespace-pre-wrap">
+            Settings:
+            {string(debug.PrettyJSON(appSettings))}
+        </p>
+    </div>
+}
+
+templ AppDetailsLayout(team store.Team, env store.Env, app store.App, selected AppMenuItemName, contents templ.Component) {
+    <div class="flex flex-col items-start w-full h-full">
+        @flashes(middleware.GetFlashes(ctx))
+        <div class="my-0 divider"></div>
+        <div class="container sticky top-0 z-[1] navbar bg-base-100 backdrop-blur-sm px-0 pt-0">
+            <div class="navbar-start min-w-fit">
+                <div class="dropdown">
+                    <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+                        <div class="w-5 h-5">
+                            @iconMenu()
+                        </div>
+                    </div>
+                    <ul tabindex="0" class="menu menu-sm dropdown-content bg-base-100 rounded-box z-[1] mt-3 w-52 p-2 shadow">
+                        for _, item := range appMenuItems(team.Id, env.Name, app.Id, selected) {
+                            // if len(item.SubItems) > 0 {
+                            //     <li>
+                            //         <a>{item.Name}</a>
+                            //         <ul class="p-2">
+                            //             for _, subItem := range item.SubItems {
+                            //                 <li><a>{subItem.Name}</a></li>
+                            //             }
+                            //         </ul>
+                            //     </li>
+                            // } else {
+                            <li><a href={templ.SafeURL(item.Href)}>{string(item.Name)}</a></li>
+                            // }
+                        }
+                    </ul>
+                </div>
+                <div class="flex flex-row items-center justify-start gap-2">
+                    <div class="w-5 h-5">
+                        @iconTerminal()
+                    </div>
+                    <p class="font-mono text-lg font-bold whitespace-pre-wrap">
+                        {app.Name}
+                    </p>
+                </div>
+                <ul class="hidden px-1 ml-2 menu menu-horizontal lg:flex">
+                    for _, item := range appMenuItems(team.Id, env.Name, app.Id, selected) {
+                        // if len(item.SubItems) > 0 {
+                        //     <li>
+                        //         <details>
+                        //             <summary>{item.Name}</summary>
+                        //             <ul class="p-2">
+                        //                 for _, subItem := range item.SubItems {
+                        //                 <li><a>{subItem.Name}</a></li>
+                        //                 }
+                        //             </ul>
+                        //         </details>
+                        //     </li>
+                        // } else {
+                            if item.Selected {
+                                <li><a class="font-bold border-b-2 border-primary" href={templ.SafeURL(item.Href)}>{string(item.Name)}</a></li>
+                            } else {
+                                <li><a class="border-b-2 border-transparent hover:border-primary/50" href={templ.SafeURL(item.Href)}>{string(item.Name)}</a></li>
+                            }
+                        // }
+                    }
+                </ul>
+            </div>
+            <div class="hidden navbar-center lg:flex">
+                // <ul class="px-1 menu menu-horizontal">
+                //     for _, item := range appMenuItems {
+                //         if len(item.SubItems) > 0 {
+                //             <li>
+                //                 <details>
+                //                     <summary>{item.Name}</summary>
+                //                     <ul class="p-2">
+                //                         for _, subItem := range item.SubItems {
+                //                             <li><a>{subItem.Name}</a></li>
+                //                         }
+                //                     </ul>
+                //                 </details>
+                //             </li>
+                //         } else {
+                //             <li><a>{item.Name}</a></li>
+                //         }
+                //     }
+                // </ul>
+            </div>
+            <div class="navbar-end">
+            // TODO:
+                // <a class="btn btn-error">Delete</a>
+            </div>
+        </div>
+        @contents
+    </div>
+}
+

@@ -497,6 +497,7 @@ type DeploymentStore interface {
 	Get(appId string, envId string, id uint) (Deployment, error)
 	GetForTeam(ctx context.Context, teamId string) ([]Deployment, error)
 	GetForApp(ctx context.Context, appId string) ([]Deployment, error)
+	GetForAppEnv(ctx context.Context, appId string, envId string) ([]Deployment, error)
 	GetLatestForAppEnv(ctx context.Context, appId string, envId string) (*Deployment, error)
 	GetForEnv(envId string) ([]Deployment, error)
 	GetForCell(cellId string) ([]Deployment, error)

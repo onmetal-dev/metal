@@ -268,6 +268,24 @@ func (s *DeploymentStore) GetForApp(ctx context.Context, appId string) ([]store.
 	return deployments, nil
 }
 
+func (s *DeploymentStore) GetForAppEnv(ctx context.Context, appId string, envId string) ([]store.Deployment, error) {
+	var deployments []store.Deployment
+	err := s.preloadDeployment(s.db).
+		WithContext(ctx).
+		Where(&store.Deployment{AppId: appId, EnvId: envId}).
+		Order("created_at DESC").
+		Find(&deployments).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range deployments {
+		if err := s.decryptAppEnvVars(&deployments[i].AppEnvVars); err != nil {
+			return nil, err
+		}
+	}
+	return deployments, nil
+}
+
 func (s *DeploymentStore) GetLatestForAppEnv(ctx context.Context, appId string, envId string) (*store.Deployment, error) {
 	var deployment store.Deployment
 	if err := s.preloadDeployment(s.db).WithContext(ctx).
@@ -277,6 +295,9 @@ func (s *DeploymentStore) GetLatestForAppEnv(ctx context.Context, appId string, 
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
+		return nil, err
+	}
+	if err := s.decryptAppEnvVars(&deployment.AppEnvVars); err != nil {
 		return nil, err
 	}
 	return &deployment, nil

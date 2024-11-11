@@ -160,5 +160,25 @@ func (h MessageHandler) Handle(ctx context.Context, m Message) error {
 		return h.ReQueue(ctx, m)
 	}
 
+	if result.Status == store.DeploymentStatusRunning {
+		log.Info("Deployment completed successfully")
+		// mark all previously running deployments as completed
+		deployments, err := h.deploymentStore.GetForAppEnv(ctx, m.AppId, m.EnvId)
+		if err != nil {
+			log.Error("Error fetching deployments", slog.Any("error", err))
+			return err
+		}
+		for _, deployment := range deployments {
+			if deployment.Id == m.DeploymentId {
+				continue
+			}
+			if deployment.Status == store.DeploymentStatusRunning {
+				if err := h.deploymentStore.UpdateDeploymentStatus(m.AppId, m.EnvId, deployment.Id, store.DeploymentStatusStopped, fmt.Sprintf("superseded by deployment %d", m.DeploymentId)); err != nil {
+					log.Error("Error updating deployment status", slog.Any("error", err))
+				}
+			}
+		}
+	}
+
 	return nil
 }

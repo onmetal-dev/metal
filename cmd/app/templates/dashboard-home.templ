@@ -6,8 +6,6 @@ import (
     "github.com/onmetal-dev/metal/cmd/app/urls"
 	"github.com/onmetal-dev/metal/lib/cellprovider"
 	"github.com/onmetal-dev/metal/lib/store"
-	"github.com/samber/lo"
-	"strings"
 )
 
 const TimeFormat = "Jan 02 15:04:05"
@@ -62,19 +60,19 @@ func activeEnvNameOrSentinel(env *store.Env) string {
 }
 
 templ dashboardNav(state DashboardState) {
-	<nav class="container sticky top-0 z-50 backdrop-blur-sm">
+	<nav class="container sticky top-0 z-10 backdrop-blur-sm">
 		<div class="p-0 navbar bg-base">
-			<div class="flex-1">
+			<div class="navbar-start min-w-fit">
 				@logoWithText()
-				<div role="tablist" class="pl-4 tabs">
+				<ul class="flex px-1 ml-2 menu menu-horizontal">
 					for _, tab := range dashboardTabs(state.ActiveTeam.Id, activeEnvNameOrSentinel(state.ActiveEnv)) {
 						if tab.Name == state.ActiveTabName {
-							<a role="tab" class="font-bold border-b-2 tab border-primary" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a>
+							<li><a class="font-bold border-b-2 border-primary" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a></li>
 						} else {
-							<a role="tab" class="border-b-2 border-transparent tab hover:border-primary/50" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a>
+							<li><a class="border-b-2 border-transparent hover:border-primary/50" href={ templ.SafeURL(tab.Href) }>{ string(tab.Name) }</a></li>
 						}
 					}
-				</div>
+				</ul>
                 <ul class="px-1 pt-2 menu menu-horizontal">
                     <li>
                         <details>
@@ -97,7 +95,6 @@ templ dashboardNav(state DashboardState) {
                         </details>
                     </li>
                     if state.ActiveEnv != nil {
-                        // <li>/</li>
                         <li>
                             <details>
                                 <summary>{ state.ActiveEnv.Name }</summary>
@@ -112,7 +109,8 @@ templ dashboardNav(state DashboardState) {
                     }
                 </ul>
 			</div>
-			<div class="flex-none">
+            <div class="flex navbar-center"></div>
+			<div class="navbar-end">
 				<ul class="px-1 menu menu-horizontal">
 					<li>
 						<details>
@@ -202,21 +200,11 @@ func humanizePercent(value float64) string {
 	return fmt.Sprintf("%.2f%%", value*100)
 }
 
-func deploymentEnvsForApp(deployments []store.Deployment, app store.App) []store.Env {
-	envs := []store.Env{}
-	for _, deployment := range deployments {
-		if deployment.AppId == app.Id {
-			envs = append(envs, deployment.Env)
-		}
-	}
-	return envs
-}
-
 func totalResourcesForApp(deployments []store.Deployment, app store.App) (float64, int) {
 	cpu := 0.0
 	mem := 0
 	for _, deployment := range deployments {
-		if deployment.AppId == app.Id {
+		if deployment.AppId == app.Id && deployment.Status == store.DeploymentStatusRunning {
 			resources := deployment.AppSettings.Resources.Data()
 			replicas := deployment.Replicas
 			cpu += resources.Requests.CpuCores * float64(replicas)
@@ -254,7 +242,51 @@ templ DashboardHome(teamId string, envName string, servers []store.Server, cells
 	<div hx-ext="sse" sse-connect={ urls.HomeSse{TeamId: teamId, EnvName: envName}.Render() }>
 		@flashes(middleware.GetFlashes(ctx))
 		<div class="flex flex-col items-center justify-start w-full h-full gap-4">
-			<div class="divider">Servers</div>
+            if (len(apps) > 0) {
+                <div class="divider">apps</div>
+                <table class="table table-xs" id="apps-table">
+                    <thead>
+                        <tr>
+                            <th>name</th>
+                            <th>id</th>
+                            <th>total cpu (cores)</th>
+                            <th>total memory (mib)</th>
+                            <th>created at</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        for _, app := range apps {
+                        <tr class="cursor-pointer hover"
+                            hx-get={ urls.EnvApp{TeamId: teamId, AppId: app.Id, EnvName: envName}.Render() }
+                            hx-target="body" 
+                            hx-swap="innerHTML show:window:top"
+                            hx-push-url={ urls.EnvApp{TeamId: teamId, AppId: app.Id, EnvName: envName}.Render() }>
+                            <td>{ app.Name }</td>
+                            <td>{ app.Id }</td>
+                            if cpu, mem := totalResourcesForApp(deployments, app); true {
+                                <td>{ fmt.Sprintf("%.2f", cpu) }</td>
+                                <td>{ fmt.Sprintf("%d", mem) }</td>
+                            }
+                            <td class="whitespace-nowrap">{ app.CreatedAt.Format(TimeFormat) }</td>
+                            <td>
+                                <ul class="p-0 menu menu-horizontal menu-xs rounded-box">
+                                    <li>
+                                        <a class="tooltip" data-tip="Delete">
+                                            <button hx-delete={ urls.App{TeamId: teamId, AppId: app.Id}.Render() }
+                                                hx-confirm="Are you sure you want to delete this app?" class="w-4 h-4">
+                                                @iconTrash()
+                                            </button>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </td>
+                        </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+			<div class="divider">servers</div>
 			<table class="table table-xs" id="servers-table">
 				<thead>
 					<tr>
@@ -311,26 +343,12 @@ templ DashboardHome(teamId string, envName string, servers []store.Server, cells
 				</tbody>
 			</table>
 			if (len(deployments) > 0) {
-				<div class="divider">Deployments</div>
-                // <select id="env-filter" class="mb-4">
-                //     <option value="<all>">all</option>
-                //     for _, env := range lo.Uniq(lo.Map(deployments, func(d store.Deployment, _ int) string { return d.Env.Name })) {
-                //       <option value={ env }>{ env }</option>
-                //     }
-                // </select>
+				<div class="divider">deployments</div>
 				<table class="table table-xs" id="deployments-table">
 					<thead>
 						<tr>
 							<th>id</th>
 							<th>app</th>
-							<th><div class="dropdown">
-                                <div tabindex="0" role="button">environment</div>
-                                <ul tabindex="0" class="dropdown-content menu bg-base-100 z-[1] w-52 m-0 p-0 shadow text-xs">
-                                    for _, env := range lo.Uniq(lo.Map(deployments, func(d store.Deployment, _ int) string { return d.Env.Name })) {
-                                        <li class="border border-base-200"><a class="pl-2">{ env }</a></li>
-                                    }
-                                </ul>
-                            </div></th>
 							<th>type</th>
 							<th>cpu (cores)</th>
 							<th>memory (mib)</th>
@@ -346,7 +364,6 @@ templ DashboardHome(teamId string, envName string, servers []store.Server, cells
 							<tr>
 								<td>{ fmt.Sprintf("%d", deployment.Id) }</td>
 								<td class="whitespace-nowrap">{ deployment.App.Name }</td>
-								<td class="whitespace-nowrap">{ deployment.Env.Name }</td>
 								<td>{ string(deployment.Type) }</td>
 								if resources := deployment.AppSettings.Resources.Data(); true {
 									<td>{ fmt.Sprintf("%.2f", resources.Requests.CpuCores) }</td>
@@ -372,55 +389,6 @@ templ DashboardHome(teamId string, envName string, servers []store.Server, cells
 					</tbody>
 				</table>
 			}
-			if (len(apps) > 0) {
-				<div class="divider">Apps</div>
-				<table class="table table-xs" id="apps-table">
-					<thead>
-						<tr>
-							<th>id</th>
-							<th>name</th>
-							<th>deployment envs</th>
-							<th>total cpu (cores)</th>
-							<th>total memory (mib)</th>
-							<th>created at</th>
-							<th></th>
-						</tr>
-					</thead>
-					<tbody>
-						for _, app := range apps {
-							<tr>
-								<td>{ app.Id }</td>
-								<td>{ app.Name }</td>
-								<td>
-									{ strings.Join(lo.Uniq(lo.Map(deploymentEnvsForApp(deployments, app), func(env store.Env, _ int) string {
-										return env.Name
-									})), ", ") }
-								</td>
-								if cpu, mem := totalResourcesForApp(deployments, app); true {
-									<td>{ fmt.Sprintf("%.2f", cpu) }</td>
-									<td>{ fmt.Sprintf("%d", mem) }</td>
-								}
-								<td class="whitespace-nowrap">{ app.CreatedAt.Format(TimeFormat) }</td>
-								<td>
-									<ul class="p-0 menu menu-horizontal menu-xs rounded-box">
-										<li>
-											<a class="tooltip" data-tip="Delete">
-                                                <button
-													hx-delete={ urls.App{TeamId: teamId, AppId: app.Id}.Render() }
-													hx-confirm="Are you sure you want to delete this app?"
-													class="w-4 h-4"
-												>
-													@iconTrash()
-												</button>
-											</a>
-										</li>
-									</ul>
-								</td>
-							</tr>
-						}
-					</tbody>
-				</table>
-			}
-		</div>
+        </div>
 	</div>
 }

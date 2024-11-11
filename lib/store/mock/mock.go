@@ -215,6 +215,11 @@ func (m *DeploymentStoreMock) GetForApp(ctx context.Context, appId string) ([]st
 	return args.Get(0).([]store.Deployment), args.Error(1)
 }
 
+func (m *DeploymentStoreMock) GetForAppEnv(ctx context.Context, appId string, envId string) ([]store.Deployment, error) {
+	args := m.Called(ctx, appId, envId)
+	return args.Get(0).([]store.Deployment), args.Error(1)
+}
+
 func (m *DeploymentStoreMock) GetLatestForAppEnv(ctx context.Context, appId string, envId string) (*store.Deployment, error) {
 	args := m.Called(ctx, appId, envId)
 	return args.Get(0).(*store.Deployment), args.Error(1)

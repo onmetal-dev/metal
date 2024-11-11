@@ -1,2 +1,80 @@
 - Don't capitalize the first letter of a comment
 - The first letter of Go error strings should not be capitalized: e.g. fmt.Errorf("failed to send deployment message to queue: %w", err)
+
+
+# Forms
+The pattern / convention we have for forms is as follows:
+
+1. Define a struct with the data captured by the form and the validation rules for each piece of data, e.g.:
+
+type CreateAppFormData struct {
+	AppName        string  `validate:"required,max=63,lowercasealphanumhyphen"`
+	ContainerImage string  `validate:"required"`
+	Replicas       int     `validate:"required,min=1"`
+	ContainerPort  int     `validate:"required,min=1,max=65535"`
+	CpuLimit       float64 `validate:"required,min=0.1"`
+	MemoryLimit    int     `validate:"required,min=32"`
+	EnvVars        string  `validate:"omitempty,dotenvformat"`
+	CellId         string  `validate:"required,startswith=cell_"`
+}
+
+2. Define a templ component that renders the form and takes in the form data, field errors, and a submit error. The form should use hx-post to post the form, hx-disabled-elt to disable the submit button, hx-trigger to trigger on submit, hx-indicator to show a loading indicator, and hx-swap to swap the form with the response, e.g.:
+
+templ CreateAppForm(teamId string, cells []store.Cell, data CreateAppFormData, errors form.FieldErrors, submitError error) {
+	<form
+		novalidate
+		hx-post={ urls.NewApp{TeamId: teamId}.Render() }
+		hx-disabled-elt="find button[type='submit']"
+		hx-trigger="submit"
+		hx-indicator="find .loading"
+		hx-swap="outerHTML"
+		class="grid grid-cols-[auto,1fr] gap-2 text-xs mt-4"
+	>
+		<label class="flex items-center justify-end">app name</label>
+		<div class="flex items-center justify-start gap-2">
+			<input
+				type="text"
+				name="AppName"
+				class={ cls(inputClass(errors.Get("AppName")), "max-w-xs") }
+				placeholder="my-app"
+				value={ form.InputValue(data.AppName) }
+				required
+			/>
+			if errors.Get("AppName") != nil {
+				<div class="text-error">{ errors.Get("AppName").Error() }</div>
+			}
+		</div>
+		...
+		<div></div>
+		<div class="flex items-center justify-start gap-2">
+			<button type="submit" class="btn btn-primary btn-sm">Create App</button>
+			<span class="htmx-indicator loading loading-ring loading-sm"></span>
+		</div>
+		<div></div>
+		if submitError != nil {
+			<div class="text-error">{ submitError.Error() }</div>
+		}
+	</form>
+}
+
+3. The endpoint that receives the form data should return the same templ component, passing in the form data, field errors, and a submit error, e.g.:
+
+func (h *PostAppsNewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    // ...
+	var f templates.CreateAppFormData
+	inputErrs, err := form.Decode(&f, r)
+	if inputErrs.NotNil() || err != nil {
+		// send back the form html w/ errors
+		if err := templates.CreateAppForm(teamId, cells, f, inputErrs, err).Render(ctx, w); err != nil {
+			http.Error(w, fmt.Sprintf("error rendering template: %v", err), http.StatusInternalServerError)
+		}
+		return
+	}
+    // ... other logic to do further validation, create resources, etc.
+
+	// Redirect to the dashboard on success
+	middleware.AddFlash(ctx, fmt.Sprintf("app %s created successfully", f.AppName))
+	w.Header().Set("HX-Redirect", urls.Home{TeamId: teamId, EnvName: urls.DefaultEnvSentinel}.Render())
+	w.WriteHeader(http.StatusOK)
+}
+
