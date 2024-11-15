@@ -120,7 +120,7 @@ ANOTHER_KEY=another_value" rows="10">{ form.InputValue(data.EnvVars) }</textarea
             <div class="text-xs text-error">{ errors.Get("EnvVars").Error() }</div>
             }
             <div class="flex items-center justify-start gap-2">
-                <button type="submit" class="btn btn-primary btn-sm">Update Variables</button>
+                <button type="submit" class="btn btn-primary btn-sm">update variables and redeploy</button>
                 <span class="htmx-indicator loading loading-ring loading-sm"></span>
             </div>
             if submitError != nil {

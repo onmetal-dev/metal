@@ -311,15 +311,16 @@ func (c customUpResponse) VisitUpResponse(w http.ResponseWriter) (err error) {
 			Ports: []store.Port{
 				{
 					Name:  "http",
-					Port:  80,
+					Port:  8080,
 					Proto: "http",
 				},
 			},
 			ExternalPorts: []store.ExternalPort{
 				{
-					Name:  "http",
-					Port:  80,
-					Proto: "http",
+					PortName: "http",
+					Name:     "expose-8080",
+					Port:     443,
+					Proto:    "https",
 				},
 			},
 			Resources: store.Resources{
