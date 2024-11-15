@@ -19,6 +19,9 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
+const gatewayNamespace = "gateway"
+const gatewayName = "gateway"
+
 func cellHostname(cellId string) string {
 	// if you are strict about hostnames (and k8s is) they cannot contain underscores
 	cellIdForHostname := strings.ReplaceAll(cellId, "_", "-")
@@ -32,8 +35,7 @@ func cellHostname(cellId string) string {
 // - external-dns is installed
 func (p *TalosClusterCellProvider) createOrUpdateGateway(ctx context.Context, k8sClient kubernetes.Interface, ctrlClient client.Client, cellId string) error {
 	log := logger.FromContext(ctx)
-	namespace := "gateway"
-	if err := ensureNamespaceWithLabels(ctx, k8sClient, namespace, podSecurityLabels); err != nil {
+	if err := ensureNamespaceWithLabels(ctx, k8sClient, gatewayNamespace, podSecurityLabels); err != nil {
 		return fmt.Errorf("failed to ensure gateway namespace: %w", err)
 	}
 	wildcardDomain := fmt.Sprintf("*.%s", cellHostname(cellId))
@@ -43,16 +45,16 @@ func (p *TalosClusterCellProvider) createOrUpdateGateway(ctx context.Context, k8
 	certificate := &cmv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certificateName,
-			Namespace: namespace,
+			Namespace: gatewayNamespace,
 		},
 	}
 	create := false
-	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: certificateName, Namespace: namespace}, certificate); err != nil {
+	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: certificateName, Namespace: gatewayNamespace}, certificate); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get certificate: %w", err)
 		}
 		create = true
-		log.Info("creating certificate", "name", certificateName, "namespace", namespace, "dnsNames", wildcardDomain)
+		log.Info("creating certificate", "name", certificateName, "namespace", gatewayNamespace, "dnsNames", wildcardDomain)
 		certificate.Spec = cmv1.CertificateSpec{
 			DNSNames: []string{wildcardDomain},
 			IssuerRef: cmmeta.ObjectReference{
@@ -71,13 +73,13 @@ func (p *TalosClusterCellProvider) createOrUpdateGateway(ctx context.Context, k8
 		return fmt.Errorf("timeout waiting for Certificate to be ready: %w", err)
 	}
 	if create {
-		log.Info("certificate is ready", "name", certificateName, "namespace", namespace)
+		log.Info("certificate is ready", "name", certificateName, "namespace", gatewayNamespace)
 	}
 
 	gateway := &gatewayv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "gateway",
-			Namespace: "gateway",
+			Name:      gatewayName,
+			Namespace: gatewayNamespace,
 			Annotations: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname": wildcardDomain,
 			},
@@ -107,7 +109,7 @@ func (p *TalosClusterCellProvider) createOrUpdateGateway(ctx context.Context, k8
 							{
 								Kind:      lo.ToPtr(gatewayv1.Kind("Secret")),
 								Name:      gatewayv1.ObjectName(certificateName),
-								Namespace: lo.ToPtr(gatewayv1.Namespace("gateway")),
+								Namespace: lo.ToPtr(gatewayv1.Namespace(gatewayNamespace)),
 							},
 						},
 					},

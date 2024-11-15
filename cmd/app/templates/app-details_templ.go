@@ -370,7 +370,7 @@ func UpdateAppEnvVarsForm(teamId, envName, appId string, data UpdateAppEnvVarsFo
 				return templ_7745c5c3_Err
 			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex items-center justify-start gap-2\"><button type=\"submit\" class=\"btn btn-primary btn-sm\">Update Variables</button> <span class=\"htmx-indicator loading loading-ring loading-sm\"></span></div>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div class=\"flex items-center justify-start gap-2\"><button type=\"submit\" class=\"btn btn-primary btn-sm\">update variables and redeploy</button> <span class=\"htmx-indicator loading loading-ring loading-sm\"></span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -237,7 +237,7 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ActiveEnv:     &activeEnv,
 		ActiveTabName: templates.TabNameHome,
 		AdditionalScripts: []templates.ScriptTag{
-			templates.ScriptTag{
+			{
 				Src: "/static/script/sse.js",
 			},
 		},

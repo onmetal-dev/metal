@@ -74,14 +74,14 @@ const DefaultEnvSentinel = "x"
 var _ Url = Home{}
 
 func (u Home) Pattern() string {
-	return "/dashboard/{teamId}/env/{envName}"
+	return "/dashboard/{teamId}/envs/{envName}"
 }
 
 func (u Home) Render() string {
 	if u.TeamId == "" || u.EnvName == "" {
 		panic("teamId and envName are required")
 	}
-	return fmt.Sprintf("/dashboard/%s/env/%s", u.TeamId, u.EnvName)
+	return fmt.Sprintf("/dashboard/%s/envs/%s", u.TeamId, u.EnvName)
 }
 
 type HomeSse struct {
@@ -92,14 +92,14 @@ type HomeSse struct {
 var _ Url = HomeSse{}
 
 func (u HomeSse) Pattern() string {
-	return "/dashboard/{teamId}/env/{envName}/sse"
+	return "/dashboard/{teamId}/envs/{envName}/sse"
 }
 
 func (u HomeSse) Render() string {
 	if u.TeamId == "" || u.EnvName == "" {
 		panic("teamId and envName are required")
 	}
-	return fmt.Sprintf("/dashboard/%s/env/%s/sse", u.TeamId, u.EnvName)
+	return fmt.Sprintf("/dashboard/%s/envs/%s/sse", u.TeamId, u.EnvName)
 }
 
 type NewServer struct {

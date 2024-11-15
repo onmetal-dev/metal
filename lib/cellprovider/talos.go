@@ -62,6 +62,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -933,6 +934,161 @@ func (p *TalosClusterCellProvider) DestroyDeployments(ctx context.Context, cellI
 	return nil
 }
 
+// hostnameForDeployment encodes our convention for hostnames for deployments.
+func hostnameForDeployment(cellId string, deployment *store.Deployment) string {
+	return fmt.Sprintf("%s-%s.%s", deployment.App.Name, deployment.Env.Name, cellHostname(cellId))
+}
+
+// httpRoutesForDeployment returns the HTTPRoutes that should be created for a given deployment
+func httpRoutesForDeployment(cellId string, deployment *store.Deployment) ([]gatewayv1.HTTPRoute, error) {
+	httpRoutes := []gatewayv1.HTTPRoute{}
+
+	for _, port := range deployment.AppSettings.ExternalPorts.Data() {
+		var containerPort *store.Port
+		for i, p := range deployment.AppSettings.Ports.Data() {
+			if p.Name == port.PortName {
+				containerPort = &deployment.AppSettings.Ports.Data()[i]
+				break
+			}
+		}
+		if containerPort == nil {
+			return nil, fmt.Errorf("external port references container port %s but it doesn't exist. %#v %#v", port.PortName, deployment.AppSettings.Ports.Data(), deployment.AppSettings.ExternalPorts.Data())
+		}
+		var gatewayPort *gatewayv1.PortNumber
+		switch port.Proto {
+		case "http":
+			gatewayPort = ptr.To(gatewayv1.PortNumber(80))
+		case "https":
+			gatewayPort = ptr.To(gatewayv1.PortNumber(443))
+		default:
+			return nil, fmt.Errorf("unsupported protocol in external port %s: %s", port.Name, port.Proto)
+		}
+		httpRoutes = append(httpRoutes, gatewayv1.HTTPRoute{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%s", deployment.App.Name, port.PortName),
+				Namespace: deployment.Env.Name,
+			},
+			Spec: gatewayv1.HTTPRouteSpec{
+				Hostnames: []gatewayv1.Hostname{
+					gatewayv1.Hostname(hostnameForDeployment(cellId, deployment)),
+				},
+				CommonRouteSpec: gatewayv1.CommonRouteSpec{
+					ParentRefs: []gatewayv1.ParentReference{
+						{
+							Group:     lo.ToPtr(gatewayv1.Group("gateway.networking.k8s.io")),
+							Kind:      lo.ToPtr(gatewayv1.Kind("Gateway")),
+							Name:      gatewayName,
+							Namespace: lo.ToPtr(gatewayv1.Namespace(gatewayNamespace)),
+							Port:      gatewayPort,
+						},
+					},
+				},
+				Rules: []gatewayv1.HTTPRouteRule{
+					{
+						BackendRefs: []gatewayv1.HTTPBackendRef{
+							{
+								BackendRef: gatewayv1.BackendRef{
+									BackendObjectReference: gatewayv1.BackendObjectReference{
+										Group: lo.ToPtr(gatewayv1.Group("")),
+										Kind:  lo.ToPtr(gatewayv1.Kind("Service")),
+										Name:  gatewayv1.ObjectName(deployment.App.Name),
+										Port:  ptr.To(gatewayv1.PortNumber(port.Port)),
+									},
+									Weight: ptr.To(int32(1)),
+								},
+							},
+						},
+						Matches: []gatewayv1.HTTPRouteMatch{
+							{
+								Path: &gatewayv1.HTTPPathMatch{
+									Type:  ptr.To(gatewayv1.PathMatchType("PathPrefix")),
+									Value: ptr.To("/"),
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+	}
+	return httpRoutes, nil
+}
+
+// ensureHttpRoutesForDeployment ensures that the HTTPRoutes for a given deployment are created
+func ensureHttpRoutesForDeployment(ctx context.Context, ctrlClient ctrlclient.Client, cellId string, deployment *store.Deployment) error {
+	httpRoutes, err := httpRoutesForDeployment(cellId, deployment)
+	if err != nil {
+		return fmt.Errorf("error getting http routes for deployment: %v", err)
+	}
+	for _, httpRoute := range httpRoutes {
+		if err := createOrUpdateResource(ctx, ctrlClient, &httpRoute); err != nil {
+			return fmt.Errorf("error creating or updating http route: %v", err)
+		}
+	}
+	return nil
+}
+
+// servicePortsForDeployment converts a deployment's container ports into k8s ServicePorts
+func servicePortsForDeployment(deployment *store.Deployment) ([]corev1.ServicePort, error) {
+	servicePorts := []corev1.ServicePort{}
+	var protocol corev1.Protocol
+	switch deployment.AppSettings.Ports.Data()[0].Proto {
+	case "http":
+		protocol = corev1.ProtocolTCP
+	case "https":
+		protocol = corev1.ProtocolTCP
+	default:
+		return nil, fmt.Errorf("unsupported protocol in container port %s: %s", deployment.AppSettings.Ports.Data()[0].Name, deployment.AppSettings.Ports.Data()[0].Proto)
+	}
+	for _, port := range deployment.AppSettings.Ports.Data() {
+		fmt.Println("DEBUG SERVICE PORT", port.Name, port.Port)
+		servicePorts = append(servicePorts, corev1.ServicePort{
+			Name:     port.Name,
+			Port:     int32(port.Port),
+			Protocol: protocol,
+			TargetPort: intstr.IntOrString{
+				Type:   intstr.String,
+				StrVal: port.Name,
+			},
+		})
+	}
+	return servicePorts, nil
+}
+
+// ensureServiceForDeployment ensures that a Kubernetes Service is created or updated for the given deployment
+func ensureServiceForDeployment(ctx context.Context, ctrlClient ctrlclient.Client, deployment *store.Deployment) error {
+	serviceName := deployment.App.Name
+	namespace := deployment.Env.Name
+	servicePorts, err := servicePortsForDeployment(deployment)
+	if err != nil {
+		return fmt.Errorf("error getting service ports for deployment: %v", err)
+	}
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app": serviceName,
+			},
+			Annotations: map[string]string{
+				"onmetal.dev/app-id":  deployment.App.Id,
+				"onmetal.dev/team-id": deployment.TeamId,
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{
+				"app": serviceName,
+			},
+			Ports: servicePorts,
+			Type:  corev1.ServiceTypeClusterIP,
+		},
+	}
+	if err := createOrUpdateResource(ctx, ctrlClient, service); err != nil {
+		return fmt.Errorf("error creating or updating service: %v", err)
+	}
+	return nil
+}
+
 func (p *TalosClusterCellProvider) handlePendingDeployment(ctx context.Context, cellId string, deployment *store.Deployment) (*AdvanceDeploymentResult, error) {
 	log := logger.FromContext(ctx)
 	clients, err := p.setupClients(ctx, cellId)
@@ -947,6 +1103,16 @@ func (p *TalosClusterCellProvider) handlePendingDeployment(ctx context.Context, 
 	}
 	if err := copyImagePullSecretToNamespace(ctx, ctrlClient, registryNamespace, deployment.Env.Name); err != nil {
 		return nil, fmt.Errorf("error copying image pull secret to namespace: %v", err)
+	}
+
+	// at this point we should create or update the service
+	if err := ensureServiceForDeployment(ctx, ctrlClient, deployment); err != nil {
+		return nil, fmt.Errorf("error ensuring service for deployment: %v", err)
+	}
+
+	// ensure the http routes
+	if err := ensureHttpRoutesForDeployment(ctx, ctrlClient, cellId, deployment); err != nil {
+		return nil, fmt.Errorf("error ensuring http routes for deployment: %v", err)
 	}
 
 	limits, requests, err := getResourceLimits(deployment.AppSettings.Resources.Data())
